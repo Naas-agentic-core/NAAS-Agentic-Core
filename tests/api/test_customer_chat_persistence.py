@@ -404,7 +404,7 @@ async def test_customer_websocket_persists_fallback_message_on_stream_failure(
     finally:
         test_app.dependency_overrides.clear()
 
-
+    assert any(event.get("type") == "complete" for event in events)
     assert response.status_code == 200
     payload = response.json()
     messages = payload.get("messages", [])
