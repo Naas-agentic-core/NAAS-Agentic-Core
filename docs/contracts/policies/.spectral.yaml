@@ -199,7 +199,7 @@ rules:
     then:
       function: pattern
       functionOptions:
-        match: "^(/[a-z0-9-{}_]+)+$"
+        match: "^(/[a-z0-9-{}_.]*)+$"
 
   cogniforge-path-no-trailing-slash:
     description: المسارات يجب ألا تنتهي بـ / (Paths should not end with /)
@@ -219,7 +219,7 @@ rules:
     then:
       function: pattern
       functionOptions:
-        match: "^(/[a-z0-9-{}]+)+$"
+        match: "^(/[a-z0-9-{}._]+)+$"
 
   # ==========================================================================
   # Parameter Rules - قواعد المعاملات
