@@ -92,7 +92,10 @@ class AdminChatStreamer:
 
         except Exception as e:
             logger.error(f"🔥 Streaming error: {e}")
+            error_message = f"Error: {e}"
+            await self._persist_response(conversation.id, [error_message], session_factory_func)
             yield self._create_error_event(str(e))
+            yield {"type": "complete", "payload": {"status": "done"}}
 
     def _inject_system_context_if_missing(self, history: list[dict[str, object]]) -> None:
         """

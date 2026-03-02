@@ -109,7 +109,6 @@ class MissionEventType(CaseInsensitiveEnum):
 
 class MicroMission(OrchestratorSQLModel, table=True):
     __tablename__ = "missions"
-    __table_args__ = {"extend_existing": True}
     id: int | None = Field(default=None, primary_key=True)
     objective: str = Field(sa_column=Column(Text))
     status: MissionStatus = Field(
@@ -157,7 +156,6 @@ class MicroMission(OrchestratorSQLModel, table=True):
 
 class MicroMissionPlan(OrchestratorSQLModel, table=True):
     __tablename__ = "mission_plans"
-    __table_args__ = {"extend_existing": True}
     id: int | None = Field(default=None, primary_key=True)
     mission_id: int = Field(foreign_key="missions.id", index=True)
     version: int = Field(default=1)
@@ -190,7 +188,6 @@ class MicroMissionPlan(OrchestratorSQLModel, table=True):
 
 class MicroTask(OrchestratorSQLModel, table=True):
     __tablename__ = "tasks"
-    __table_args__ = {"extend_existing": True}
     id: int | None = Field(default=None, primary_key=True)
     mission_id: int = Field(foreign_key="missions.id", index=True)
     plan_id: int | None = Field(default=None, foreign_key="mission_plans.id", index=True)
@@ -240,7 +237,6 @@ class MicroTask(OrchestratorSQLModel, table=True):
 
 class MicroMissionEvent(OrchestratorSQLModel, table=True):
     __tablename__ = "mission_events"
-    __table_args__ = {"extend_existing": True}
     id: int | None = Field(default=None, primary_key=True)
     mission_id: int = Field(foreign_key="missions.id", index=True)
     event_type: MissionEventType = Field()
@@ -264,7 +260,6 @@ class MicroMissionOutbox(OrchestratorSQLModel, table=True):
     """
 
     __tablename__ = "mission_outbox"
-    __table_args__ = {"extend_existing": True}
     id: int | None = Field(default=None, primary_key=True)
     mission_id: int = Field(index=True)
     event_type: str = Field(index=True)

@@ -12,15 +12,17 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.routers.ws_auth import extract_websocket_auth
 from app.api.schemas.customer_chat import CustomerConversationDetails, CustomerConversationSummary
+from app.core.ai_gateway import AIClient, get_ai_client
 from app.core.config import get_settings
 from app.core.database import async_session_factory, get_db
 from app.core.di import get_logger
 from app.core.domain.user import User
 from app.deps.auth import CurrentUser, require_permissions
-from app.infrastructure.clients.orchestrator_client import orchestrator_client
 from app.services.auth.token_decoder import decode_user_id
 from app.services.boundaries.customer_chat_boundary_service import CustomerChatBoundaryService
+from app.services.chat.contracts import ChatDispatchRequest
 from app.services.chat.dispatcher import ChatRoleDispatcher, build_chat_dispatcher
+from app.services.chat.orchestrator import ChatOrchestrator
 from app.services.rbac import QA_SUBMIT
 
 logger = get_logger(__name__)
@@ -78,6 +80,9 @@ def get_chat_dispatcher(db: AsyncSession = Depends(get_db)) -> ChatRoleDispatche
 @router.websocket("/ws")
 async def chat_stream_ws(
     websocket: WebSocket,
+    ai_client: AIClient = Depends(get_ai_client),
+    dispatcher: ChatRoleDispatcher = Depends(get_chat_dispatcher),
+    session_factory: Callable[[], AsyncSession] = Depends(get_session_factory),
     db: AsyncSession = Depends(get_db),
 ) -> None:
     """
@@ -125,37 +130,41 @@ async def chat_stream_ws(
                 continue
 
             mission_type = payload.get("mission_type")
-            context = {}
+            metadata: dict[str, object] = {}
             if mission_type:
-                context["intent"] = mission_type
-
-            content_delivered = False
+                metadata["mission_type"] = mission_type
 
             try:
-                # Use OrchestratorClient (Microservice)
-                async for event in orchestrator_client.chat_with_agent(
+                dispatch_request = ChatDispatchRequest(
                     question=question,
-                    user_id=actor.id,
                     conversation_id=payload.get("conversation_id"),
-                    history_messages=[],  # Managed by Microservice or empty for now
-                    context=context,
-                ):
-                    if isinstance(event, dict):
-                        evt_type = str(event.get("type", ""))
-                        if evt_type in (
-                            "assistant_delta",
-                            "assistant_final",
-                            "assistant_error",
-                            "tool_result_summary",
-                        ):
-                            content_delivered = True
-                        await websocket.send_json(event)
-                    else:
-                        content_delivered = True
-                        await websocket.send_json(
-                            {"type": "assistant_delta", "payload": {"content": str(event)}}
-                        )
+                    ai_client=ai_client,
+                    session_factory=session_factory,
+                    metadata=metadata,
+                )
+                dispatch_result = await ChatOrchestrator.dispatch(
+                    user=actor,
+                    request=dispatch_request,
+                    dispatcher=dispatcher,
+                )
+            except HTTPException as exc:
+                await websocket.send_json(
+                    {
+                        "type": "error",
+                        "payload": {"details": exc.detail, "status_code": exc.status_code},
+                    }
+                )
+                continue
 
+            await websocket.send_json(
+                {"type": "status", "payload": {"status_code": dispatch_result.status_code}}
+            )
+
+            try:
+                async for event in dispatch_result.stream:
+                    if not isinstance(event, dict):
+                        event = {"type": "delta", "payload": {"content": str(event)}}
+                    await websocket.send_json(event)
             except Exception as exc:
                 logger.error(f"Error in chat stream: {exc}", exc_info=True)
                 await websocket.send_json(
@@ -165,21 +174,6 @@ async def chat_stream_ws(
                     }
                 )
                 continue
-
-            # Output Contract: Ensure something always appears
-            if not content_delivered:
-                logger.warning(
-                    "Output Guard triggered: Stream ended without content.",
-                    extra={"user_id": actor.id},
-                )
-                await websocket.send_json(
-                    {
-                        "type": "assistant_fallback",
-                        "payload": {
-                            "content": "عذراً، لم أتمكن من استخراج نتيجة نهائية لهذه العملية. يرجى المحاولة مرة أخرى أو صياغة الطلب بشكل أوضح."
-                        },
-                    }
-                )
 
     except WebSocketDisconnect:
         logger.info("Customer WebSocket disconnected")
