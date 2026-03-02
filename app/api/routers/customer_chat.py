@@ -163,8 +163,10 @@ async def chat_stream_ws(
             try:
                 async for event in dispatch_result.stream:
                     if not isinstance(event, dict):
-                        event = {"type": "delta", "payload": {"content": str(event)}}
-                    await websocket.send_json(event)
+                        normalized_event = {"type": "delta", "payload": {"content": str(event)}}
+                    else:
+                        normalized_event = event
+                    await websocket.send_json(normalized_event)
             except Exception as exc:
                 logger.error(f"Error in chat stream: {exc}", exc_info=True)
                 await websocket.send_json(

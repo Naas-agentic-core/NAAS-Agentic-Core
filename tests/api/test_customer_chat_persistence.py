@@ -72,7 +72,6 @@ def _consume_stream_until_terminal(websocket: object) -> list[dict[str, object]]
     return messages
 
 
-
 @pytest.mark.asyncio
 async def test_customer_chat_stream_delivers_final_message(
     test_app, db_session: AsyncSession
@@ -379,7 +378,11 @@ async def test_customer_websocket_persists_fallback_message_on_stream_failure(
                     events = _consume_stream_until_terminal(websocket)
 
             user = (
-                (await db_session.execute(select(User).where(User.email == "customer-fail@example.com")))
+                (
+                    await db_session.execute(
+                        select(User).where(User.email == "customer-fail@example.com")
+                    )
+                )
                 .scalars()
                 .one()
             )

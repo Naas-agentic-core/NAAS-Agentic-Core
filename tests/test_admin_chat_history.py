@@ -96,7 +96,11 @@ async def test_admin_websocket_persists_and_history_reads_same_records(
                     events = _consume_stream_until_terminal(websocket)
 
             user = (
-                (await db_session.execute(select(User).where(User.email == "admin-history@example.com")))
+                (
+                    await db_session.execute(
+                        select(User).where(User.email == "admin-history@example.com")
+                    )
+                )
                 .scalars()
                 .one()
             )
@@ -226,7 +230,11 @@ async def test_admin_websocket_persists_error_message_on_stream_failure(
                     events = _consume_stream_until_terminal(websocket)
 
             user = (
-                (await db_session.execute(select(User).where(User.email == "admin-fail@example.com")))
+                (
+                    await db_session.execute(
+                        select(User).where(User.email == "admin-fail@example.com")
+                    )
+                )
                 .scalars()
                 .one()
             )
