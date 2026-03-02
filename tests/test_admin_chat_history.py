@@ -132,6 +132,7 @@ async def test_admin_websocket_persists_and_history_reads_same_records(
     finally:
         test_app.dependency_overrides.clear()
 
+    assert any(event.get("type") == "status" for event in events)
     assert any(event.get("type") == "conversation_init" for event in events)
     assert any(event.get("type") == "complete" for event in events)
     assert len(messages) == 2
@@ -250,6 +251,7 @@ async def test_admin_websocket_persists_error_message_on_stream_failure(
     finally:
         test_app.dependency_overrides.clear()
 
+    assert any(event.get("type") == "status" for event in events)
     assert any(event.get("type") == "error" for event in events)
     assert any(event.get("type") == "complete" for event in events)
 
