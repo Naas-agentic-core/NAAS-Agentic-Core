@@ -1,6 +1,7 @@
 import logging
 import uuid
-from typing import Any
+
+from sqlalchemy import text
 
 from fastapi import (
     APIRouter,
@@ -12,7 +13,7 @@ from fastapi import (
     WebSocketDisconnect,
 )
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from microservices.orchestrator_service.src.core.config import get_settings
@@ -54,8 +55,8 @@ class ChatRequest(BaseModel):
     question: str
     user_id: int
     conversation_id: int | None = None
-    history_messages: list[dict[str, str]] = []
-    context: dict[str, Any] = {}
+    history_messages: list[dict[str, str]] = Field(default_factory=list)
+    context: dict[str, object] = Field(default_factory=dict)
 
 
 def _extract_chat_objective(payload: dict[str, object]) -> str | None:
@@ -67,6 +68,209 @@ def _extract_chat_objective(payload: dict[str, object]) -> str | None:
     if isinstance(objective, str) and objective.strip():
         return objective.strip()
     return None
+
+
+def _is_mission_complex(payload: dict[str, object]) -> bool:
+    """يتحقق من مسار المهمة الخارقة عبر mission_type المباشر أو داخل metadata."""
+    mission_type = payload.get("mission_type")
+    if isinstance(mission_type, str) and mission_type.strip().lower() == "mission_complex":
+        return True
+
+    metadata = payload.get("metadata")
+    if isinstance(metadata, dict):
+        metadata_type = metadata.get("mission_type")
+        if isinstance(metadata_type, str) and metadata_type.strip().lower() == "mission_complex":
+            return True
+    return False
+
+
+def _extract_mission_context(payload: dict[str, object]) -> dict[str, object]:
+    """يبني سياق المهمة بشكل صريح مع الحفاظ على conversation_id وmetadata."""
+    context: dict[str, object] = {}
+    if isinstance(payload.get("metadata"), dict):
+        context["metadata"] = payload["metadata"]
+
+    conversation_id = payload.get("conversation_id")
+    if isinstance(conversation_id, int):
+        context["conversation_id"] = conversation_id
+    context["mission_type"] = "mission_complex"
+    return context
+
+
+async def _ensure_conversation(
+    *,
+    chat_scope: str,
+    user_id: int,
+    question: str,
+    requested_conversation_id: int | None,
+) -> int:
+    """ينشئ أو يتحقق من المحادثة ويحفظ رسالة المستخدم لضمان اتساق التاريخ."""
+    is_admin_scope = chat_scope == "admin"
+    check_query = (
+        text("SELECT id FROM admin_conversations WHERE id=:conversation_id AND user_id=:user_id")
+        if is_admin_scope
+        else text("SELECT id FROM customer_conversations WHERE id=:conversation_id AND user_id=:user_id")
+    )
+    create_query = (
+        text("INSERT INTO admin_conversations (title, user_id) VALUES (:title, :user_id) RETURNING id")
+        if is_admin_scope
+        else text(
+            "INSERT INTO customer_conversations (title, user_id) VALUES (:title, :user_id) RETURNING id"
+        )
+    )
+    insert_message_query = (
+        text(
+            "INSERT INTO admin_messages (conversation_id, role, content) "
+            "VALUES (:conversation_id, :role, :content)"
+        )
+        if is_admin_scope
+        else text(
+            "INSERT INTO customer_messages (conversation_id, role, content) "
+            "VALUES (:conversation_id, :role, :content)"
+        )
+    )
+
+    async with async_session_factory() as session:
+        conversation_id = requested_conversation_id
+        if conversation_id is not None:
+            result = await session.execute(
+                check_query,
+                {"conversation_id": conversation_id, "user_id": user_id},
+            )
+            exists = result.scalar_one_or_none()
+            if exists is None:
+                raise HTTPException(status_code=403, detail="conversation does not belong to user")
+        else:
+            title = question.strip()[:120] or "Super Agent Mission"
+            created = await session.execute(create_query, {"title": title, "user_id": user_id})
+            created_id = created.scalar_one_or_none()
+            if created_id is None:
+                raise HTTPException(status_code=500, detail="failed to create conversation")
+            conversation_id = int(created_id)
+
+        await session.execute(
+            insert_message_query,
+            {
+                "conversation_id": int(conversation_id),
+                "role": "user",
+                "content": question,
+            },
+        )
+        await session.commit()
+
+    return int(conversation_id)
+
+
+async def _persist_assistant_message(
+    *,
+    chat_scope: str,
+    conversation_id: int,
+    content: str,
+    mission_id: int | None,
+) -> None:
+    """يحفظ رد المساعد النهائي ويربط mission_id بالمحادثة الإدارية عند توفره."""
+    is_admin_scope = chat_scope == "admin"
+    insert_message_query = (
+        text(
+            "INSERT INTO admin_messages (conversation_id, role, content) "
+            "VALUES (:conversation_id, :role, :content)"
+        )
+        if is_admin_scope
+        else text(
+            "INSERT INTO customer_messages (conversation_id, role, content) "
+            "VALUES (:conversation_id, :role, :content)"
+        )
+    )
+    link_query = text(
+        "UPDATE admin_conversations SET linked_mission_id=:mission_id WHERE id=:conversation_id"
+    )
+
+    async with async_session_factory() as session:
+        await session.execute(
+            insert_message_query,
+            {
+                "conversation_id": conversation_id,
+                "role": "assistant",
+                "content": content,
+            },
+        )
+        if is_admin_scope and mission_id is not None:
+            await session.execute(
+                link_query,
+                {
+                    "mission_id": mission_id,
+                    "conversation_id": conversation_id,
+                },
+            )
+        await session.commit()
+
+
+async def _stream_mission_complex_events(
+    websocket: WebSocket,
+    *,
+    incoming: dict[str, object],
+    objective: str,
+    user_id: int,
+    chat_scope: str,
+) -> None:
+    """يوحّد بث mission_complex عبر send_json ويحافظ على الربط مع التاريخ."""
+    requested_conversation_id = incoming.get("conversation_id")
+    conversation_id = requested_conversation_id if isinstance(requested_conversation_id, int) else None
+    try:
+        conversation_id = await _ensure_conversation(
+            chat_scope=chat_scope,
+            user_id=user_id,
+            question=objective,
+            requested_conversation_id=conversation_id,
+        )
+    except HTTPException as error:
+        await websocket.send_json({"type": "assistant_error", "payload": {"content": error.detail}})
+        return
+    context = _extract_mission_context(incoming)
+    context["conversation_id"] = conversation_id
+    context["chat_scope"] = chat_scope
+
+    await websocket.send_json(
+        {
+            "type": "conversation_init",
+            "payload": {"conversation_id": conversation_id},
+        }
+    )
+
+    mission_id: int | None = None
+    final_content = ""
+    terminal_event_emitted = False
+    async for event in handle_mission_complex_stream(objective, context, user_id=user_id):
+        await websocket.send_json(event)
+        event_type = str(event.get("type", ""))
+        payload = event.get("payload")
+        payload_dict = payload if isinstance(payload, dict) else {}
+        if event_type == "mission_created":
+            candidate_id = payload_dict.get("mission_id")
+            if isinstance(candidate_id, int):
+                mission_id = candidate_id
+        if event_type in {"assistant_final", "assistant_error"}:
+            terminal_event_emitted = True
+            content = payload_dict.get("content")
+            if isinstance(content, str):
+                final_content = content
+
+    if not terminal_event_emitted:
+        final_content = "تعذر إكمال المهمة الخارقة بسبب انقطاع غير متوقع في البث."
+        await websocket.send_json(
+            {
+                "type": "assistant_error",
+                "payload": {"content": final_content},
+            }
+        )
+
+    if final_content.strip():
+        await _persist_assistant_message(
+            chat_scope=chat_scope,
+            conversation_id=conversation_id,
+            content=final_content,
+            mission_id=mission_id,
+        )
 
 
 async def _run_chat_langgraph(
@@ -145,15 +349,14 @@ async def chat_ws_stategraph(websocket: WebSocket) -> None:
                 )
                 continue
 
-            # Route mission_complex
-            metadata = incoming.get("metadata", {})
-            mission_type = incoming.get("mission_type")
-            if (
-                isinstance(metadata, dict) and metadata.get("mission_type") == "mission_complex"
-            ) or mission_type == "mission_complex":
-                async for chunk in handle_mission_complex_stream(objective, {}, user_id=user_id):
-                    # handle_mission_complex_stream yields JSON string chunks
-                    await websocket.send_text(chunk)
+            if _is_mission_complex(incoming):
+                await _stream_mission_complex_events(
+                    websocket,
+                    incoming=incoming,
+                    objective=objective,
+                    user_id=user_id,
+                    chat_scope="customer",
+                )
                 continue
 
             result = await _run_chat_langgraph(objective, {})
@@ -191,15 +394,14 @@ async def admin_chat_ws_stategraph(websocket: WebSocket) -> None:
                 )
                 continue
 
-            # Route mission_complex
-            metadata = incoming.get("metadata", {})
-            mission_type = incoming.get("mission_type")
-            if (
-                isinstance(metadata, dict) and metadata.get("mission_type") == "mission_complex"
-            ) or mission_type == "mission_complex":
-                async for chunk in handle_mission_complex_stream(objective, {}, user_id=user_id):
-                    # handle_mission_complex_stream yields JSON string chunks
-                    await websocket.send_text(chunk)
+            if _is_mission_complex(incoming):
+                await _stream_mission_complex_events(
+                    websocket,
+                    incoming=incoming,
+                    objective=objective,
+                    user_id=user_id,
+                    chat_scope="admin",
+                )
                 continue
 
             result = await _run_chat_langgraph(objective, {})

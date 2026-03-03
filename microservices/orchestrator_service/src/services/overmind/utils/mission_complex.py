@@ -20,20 +20,18 @@ logger = logging.getLogger(__name__)
 
 async def handle_mission_complex_stream(
     question: str,
-    context: dict,
+    context: dict[str, object],
     user_id: int,
-) -> AsyncGenerator[str, None]:
+) -> AsyncGenerator[dict[str, object], None]:
     """
     Handles the MISSION_COMPLEX intent.
-    Starts a mission and streams structured events as NDJSON strings.
+    Starts a mission and streams structured JSON events.
     """
     # Initial status
-    yield _json_event(
-        {
-            "type": "assistant_delta",
-            "payload": {"content": "🚀 **بدء المهمة الخارقة (Super Agent)**...\n"},
-        }
-    )
+    yield {
+        "type": "assistant_delta",
+        "payload": {"content": "🚀 **بدء المهمة الخارقة (Super Agent)**...\n"},
+    }
 
     # Detect Force Research Intent
     force_research = False
@@ -58,12 +56,18 @@ async def handle_mission_complex_stream(
             )
             mission_id = mission.id
 
-        yield _json_event(
-            {
-                "type": "assistant_delta",
-                "payload": {"content": f"🆔 رقم المهمة: `{mission_id}`\n⏳ البدء..."},
-            }
-        )
+        yield {
+            "type": "assistant_delta",
+            "payload": {"content": f"🆔 رقم المهمة: `{mission_id}`\n⏳ البدء..."},
+        }
+
+        yield {
+            "type": "mission_created",
+            "payload": {
+                "mission_id": mission_id,
+                "conversation_id": context.get("conversation_id"),
+            },
+        }
 
         # Emit RUN_STARTED
         sequence_id = 0
@@ -72,18 +76,16 @@ async def handle_mission_complex_stream(
         run0_id = f"{mission_id}:{current_iteration}"
         now = datetime.now(UTC).isoformat()
 
-        yield _json_event(
-            {
-                "type": "RUN_STARTED",
-                "payload": {
-                    "run_id": run0_id,
-                    "seq": sequence_id,
-                    "timestamp": now,
-                    "iteration": current_iteration,
-                    "mode": "standard",
-                },
-            }
-        )
+        yield {
+            "type": "RUN_STARTED",
+            "payload": {
+                "run_id": run0_id,
+                "seq": sequence_id,
+                "timestamp": now,
+                "iteration": current_iteration,
+                "mode": "standard",
+            },
+        }
 
         # Subscribe to Events
         event_bus = get_event_bus()
@@ -112,13 +114,13 @@ async def handle_mission_complex_stream(
             if message:
                 if message.get("type") == "assistant_final":
                     processed_final = True
-                yield _json_event(message)
+                yield message
 
             # Canonical Events (UI State)
             sequence_id += 1
             structured = _create_structured_event(evt_data, sequence_id, current_iteration)
             if structured:
-                yield _json_event(structured)
+                yield structured
 
             # Check terminal state
             evt_type = evt_data.get("event_type")
@@ -130,39 +132,28 @@ async def handle_mission_complex_stream(
                     if not message or message.get("type") != "assistant_final":
                         # Attempt to get text result
                         result_text = _extract_result_text(result)
-                        yield _json_event(
-                            {
-                                "type": "assistant_final",
-                                "payload": {"content": result_text or "✅ تمت المهمة بنجاح."},
-                            }
-                        )
+                        yield {
+                            "type": "assistant_final",
+                            "payload": {"content": result_text or "✅ تمت المهمة بنجاح."},
+                        }
                 break  # Stop subscription
 
             elif evt_type == "mission_failed":
                 if not processed_final:
-                    yield _json_event(
-                        {
-                            "type": "assistant_error",
-                            "payload": {
-                                "content": f"❌ فشلت المهمة: {payload.get('error') or 'Unknown error'}"
-                            },
-                        }
-                    )
+                    yield {
+                        "type": "assistant_error",
+                        "payload": {
+                            "content": f"❌ فشلت المهمة: {payload.get('error') or 'Unknown error'}"
+                        },
+                    }
                 break
 
     except Exception as e:
         logger.error(f"Error in mission complex handler: {e}", exc_info=True)
-        yield _json_event(
-            {
-                "type": "assistant_error",
-                "payload": {"content": "\n🛑 **حدث خطأ حرج أثناء تنفيذ المهمة.**\n"},
-            }
-        )
-
-
-def _json_event(data: dict) -> str:
-    """Helper to dump JSON line."""
-    return json.dumps(data) + "\n"
+        yield {
+            "type": "assistant_error",
+            "payload": {"content": "\n🛑 **حدث خطأ حرج أثناء تنفيذ المهمة.**\n"},
+        }
 
 
 def _extract_result_text(result: dict | str) -> str:
