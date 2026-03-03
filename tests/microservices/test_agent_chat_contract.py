@@ -2,14 +2,16 @@
 
 from __future__ import annotations
 
-from collections.abc import AsyncGenerator
 import json
+from collections.abc import AsyncGenerator
 
 from fastapi.testclient import TestClient
 
 from microservices.orchestrator_service.main import app
 from microservices.orchestrator_service.src.api import routes
-from microservices.orchestrator_service.src.services.overmind.agents import orchestrator as orch_module
+from microservices.orchestrator_service.src.services.overmind.agents import (
+    orchestrator as orch_module,
+)
 
 
 def test_agent_chat_mission_complex_stream_is_text_encodable(monkeypatch) -> None:
@@ -25,7 +27,7 @@ def test_agent_chat_mission_complex_stream_is_text_encodable(monkeypatch) -> Non
         yield {"type": "assistant_final", "payload": {"content": "done"}}
 
     monkeypatch.setattr(orch_module, "handle_mission_complex_stream", fake_mission_stream)
-    monkeypatch.setattr(routes, "get_ai_client", lambda: object())
+    monkeypatch.setattr(routes, "get_ai_client", object)
 
     client = TestClient(app)
     with client.stream(

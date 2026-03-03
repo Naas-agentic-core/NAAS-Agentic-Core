@@ -60,7 +60,7 @@ jobs:
       - name: 📦 Install Minimal Python Dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install pytest sqlalchemy pyjwt
+          pip install pytest sqlalchemy pyjwt aiosqlite pydantic-settings httpx uvicorn websockets requests authlib tenacity pyyaml
 
       - name: 📦 Install Spectral CLI
         run: |
@@ -164,7 +164,7 @@ jobs:
       - name: 📦 Install Dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements-test.txt pytest fastapi httpx sqlalchemy pydantic-settings pyjwt
+          pip install -r requirements-test.txt pytest fastapi httpx sqlalchemy pydantic-settings pyjwt uvicorn
 
       - name: 🛡️ Run Guardrails
         run: python scripts/ci_guardrails.py
