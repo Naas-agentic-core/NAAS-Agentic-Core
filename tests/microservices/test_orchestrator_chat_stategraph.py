@@ -65,10 +65,12 @@ def test_chat_ws_customer_uses_stategraph(monkeypatch) -> None:
 
     async def fake_ensure_conversation(**kwargs):
         return 123
+
     monkeypatch.setattr(routes, "_ensure_conversation", fake_ensure_conversation)
 
     async def fake_persist_assistant_message(**kwargs):
         pass
+
     monkeypatch.setattr(routes, "_persist_assistant_message", fake_persist_assistant_message)
 
     token = jwt.encode({"sub": "1", "user_id": 1}, get_settings().SECRET_KEY, algorithm="HS256")
@@ -91,10 +93,12 @@ def test_chat_ws_admin_uses_stategraph(monkeypatch) -> None:
 
     async def fake_ensure_conversation(**kwargs):
         return 456
+
     monkeypatch.setattr(routes, "_ensure_conversation", fake_ensure_conversation)
 
     async def fake_persist_assistant_message(**kwargs):
         pass
+
     monkeypatch.setattr(routes, "_persist_assistant_message", fake_persist_assistant_message)
 
     token = jwt.encode({"sub": "1", "user_id": 1}, get_settings().SECRET_KEY, algorithm="HS256")
