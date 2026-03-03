@@ -206,7 +206,9 @@ def test_chat_ws_mission_complex_emits_error_when_conversation_forbidden(monkeyp
     assert payload["payload"]["content"] == "conversation does not belong to user"
 
 
-def test_chat_ws_mission_complex_emits_fallback_terminal_error_when_stream_ends(monkeypatch) -> None:
+def test_chat_ws_mission_complex_emits_fallback_terminal_error_when_stream_ends(
+    monkeypatch,
+) -> None:
     """يتأكد أن انتهاء بث mission_complex دون حدث نهائي ينتج assistant_error محفوظًا."""
 
     captured: dict[str, object] = {}

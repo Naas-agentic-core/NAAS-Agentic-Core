@@ -16,10 +16,13 @@ class _FakeMission:
         self.status = status
 
 
+from typing import ClassVar
+
+
 class _FakeStateManager:
     """يدير حالة مزيفة مع تسجيل الاستدعاءات للتحقق من السلوك."""
 
-    instances: list["_FakeStateManager"] = []
+    instances: ClassVar[list[_FakeStateManager]] = []
 
     def __init__(self, session: object) -> None:
         _ = session
@@ -37,7 +40,9 @@ class _FakeStateManager:
         _ = (objective, initiator_id, context, idempotency_key)
         return _FakeMission(mission_id=99, status=MissionStatus.PENDING)
 
-    async def log_event(self, mission_id: int, event_type: object, payload: dict[str, object]) -> None:
+    async def log_event(
+        self, mission_id: int, event_type: object, payload: dict[str, object]
+    ) -> None:
         _ = event_type
         self.logged_events.append({"mission_id": mission_id, "payload": payload})
 
@@ -107,8 +112,12 @@ async def test_start_mission_dispatches_in_degraded_mode_when_redis_lock_fails(m
             coro.close()
         return object()
 
+    def _fake_redis_client(*args, **kwargs):
+        _ = (args, kwargs)
+        return _FakeRedisClient()
+
     monkeypatch.setattr(entrypoint, "MissionStateManager", _FakeStateManager)
-    monkeypatch.setattr(entrypoint.redis, "from_url", lambda *args, **kwargs: _FakeRedisClient())
+    monkeypatch.setattr(entrypoint.redis, "from_url", _fake_redis_client)
     monkeypatch.setattr(entrypoint.asyncio, "create_task", fake_create_task)
 
     mission = await entrypoint.start_mission(
@@ -139,11 +148,15 @@ async def test_start_mission_dispatches_when_lock_not_acquired(monkeypatch) -> N
             coro.close()
         return object()
 
+    def _fake_redis_client_not_acquired(*args, **kwargs):
+        _ = (args, kwargs)
+        return _FakeRedisClientNotAcquired()
+
     monkeypatch.setattr(entrypoint, "MissionStateManager", _FakeStateManager)
     monkeypatch.setattr(
         entrypoint.redis,
         "from_url",
-        lambda *args, **kwargs: _FakeRedisClientNotAcquired(),
+        _fake_redis_client_not_acquired,
     )
     monkeypatch.setattr(entrypoint.asyncio, "create_task", fake_create_task)
 

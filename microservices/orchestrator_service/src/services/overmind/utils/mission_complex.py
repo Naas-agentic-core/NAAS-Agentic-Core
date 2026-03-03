@@ -160,6 +160,8 @@ async def handle_mission_complex_stream(
                 await queue.put(None)
 
         pump_task = asyncio.create_task(_pump_events())
+        # To avoid the garbage collector destroying the task prematurely
+        _pump_task_ref = pump_task
 
         processed_final = False
         idle_cycles = 0
@@ -167,7 +169,9 @@ async def handle_mission_complex_stream(
 
         while True:
             try:
-                event = await asyncio.wait_for(queue.get(), timeout=MISSION_EVENT_WAIT_TIMEOUT_SECONDS)
+                event = await asyncio.wait_for(
+                    queue.get(), timeout=MISSION_EVENT_WAIT_TIMEOUT_SECONDS
+                )
                 idle_cycles = 0
             except TimeoutError:
                 idle_cycles += 1
@@ -178,16 +182,18 @@ async def handle_mission_complex_stream(
                     yield terminal_event
                     break
                 recovery_cycles += 1
-                if recovery_cycles < MISSION_EVENT_MAX_RECOVERY_CYCLES:
-                    if await _is_mission_still_active(mission_id):
-                        yield {
-                            "type": "assistant_delta",
-                            "payload": {
-                                "content": "⏳ لا تزال المهمة قيد التنفيذ... جاري استرجاع الحالة النهائية من نظام المهام.\n"
-                            },
-                        }
-                        idle_cycles = 0
-                        continue
+                if (
+                    recovery_cycles < MISSION_EVENT_MAX_RECOVERY_CYCLES
+                    and await _is_mission_still_active(mission_id)
+                ):
+                    yield {
+                        "type": "assistant_delta",
+                        "payload": {
+                            "content": "⏳ لا تزال المهمة قيد التنفيذ... جاري استرجاع الحالة النهائية من نظام المهام.\n"
+                        },
+                    }
+                    idle_cycles = 0
+                    continue
                 yield {
                     "type": "assistant_error",
                     "payload": {

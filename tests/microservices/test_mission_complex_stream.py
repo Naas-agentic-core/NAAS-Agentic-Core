@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from collections.abc import AsyncGenerator
 import asyncio
+from collections.abc import AsyncGenerator
 
 import pytest
 
@@ -70,8 +70,10 @@ async def test_mission_complex_emits_timeout_error_when_event_bus_is_idle(monkey
         return False
 
     monkeypatch.setattr(mission_complex, "start_mission", fake_start_mission)
-    monkeypatch.setattr(mission_complex, "get_event_bus", lambda: _FakeEventBus())
-    monkeypatch.setattr(mission_complex, "_get_terminal_event_from_persistence", fake_no_terminal_event)
+    monkeypatch.setattr(mission_complex, "get_event_bus", _FakeEventBus)
+    monkeypatch.setattr(
+        mission_complex, "_get_terminal_event_from_persistence", fake_no_terminal_event
+    )
     monkeypatch.setattr(mission_complex, "_is_mission_still_active", fake_not_active)
     monkeypatch.setattr(mission_complex, "MISSION_EVENT_WAIT_TIMEOUT_SECONDS", 0.01)
     monkeypatch.setattr(mission_complex, "MISSION_EVENT_MAX_IDLE_CYCLES", 1)
@@ -108,8 +110,10 @@ async def test_mission_complex_reads_terminal_result_from_persistence_on_idle(mo
         return {"type": "assistant_final", "payload": {"content": "result from db"}}
 
     monkeypatch.setattr(mission_complex, "start_mission", fake_start_mission)
-    monkeypatch.setattr(mission_complex, "get_event_bus", lambda: _FakeEventBusIdleOnce())
-    monkeypatch.setattr(mission_complex, "_get_terminal_event_from_persistence", fake_terminal_event)
+    monkeypatch.setattr(mission_complex, "get_event_bus", _FakeEventBusIdleOnce)
+    monkeypatch.setattr(
+        mission_complex, "_get_terminal_event_from_persistence", fake_terminal_event
+    )
     monkeypatch.setattr(mission_complex, "MISSION_EVENT_WAIT_TIMEOUT_SECONDS", 0.01)
     monkeypatch.setattr(mission_complex, "MISSION_EVENT_MAX_IDLE_CYCLES", 1)
 
@@ -131,7 +135,9 @@ async def test_mission_complex_reads_terminal_result_from_persistence_on_idle(mo
 
 
 @pytest.mark.asyncio
-async def test_mission_complex_waits_when_persistence_shows_active_then_emits_final(monkeypatch) -> None:
+async def test_mission_complex_waits_when_persistence_shows_active_then_emits_final(
+    monkeypatch,
+) -> None:
     """يتأكد أن التدفق لا يفشل مبكرًا إذا كانت المهمة ما تزال نشطة ثم ينهي بنتيجة نهائية."""
 
     async def fake_start_mission(**kwargs: object) -> _FakeMission:
@@ -156,8 +162,10 @@ async def test_mission_complex_waits_when_persistence_shows_active_then_emits_fi
         return True
 
     monkeypatch.setattr(mission_complex, "start_mission", fake_start_mission)
-    monkeypatch.setattr(mission_complex, "get_event_bus", lambda: _FakeEventBusIdleOnce())
-    monkeypatch.setattr(mission_complex, "_get_terminal_event_from_persistence", probe.terminal_event)
+    monkeypatch.setattr(mission_complex, "get_event_bus", _FakeEventBusIdleOnce)
+    monkeypatch.setattr(
+        mission_complex, "_get_terminal_event_from_persistence", probe.terminal_event
+    )
     monkeypatch.setattr(mission_complex, "_is_mission_still_active", fake_is_active)
     monkeypatch.setattr(mission_complex, "MISSION_EVENT_WAIT_TIMEOUT_SECONDS", 0.01)
     monkeypatch.setattr(mission_complex, "MISSION_EVENT_MAX_IDLE_CYCLES", 1)
@@ -181,7 +189,9 @@ async def test_mission_complex_waits_when_persistence_shows_active_then_emits_fi
 
 
 @pytest.mark.asyncio
-async def test_mission_complex_recovers_terminal_event_when_subscription_closes(monkeypatch) -> None:
+async def test_mission_complex_recovers_terminal_event_when_subscription_closes(
+    monkeypatch,
+) -> None:
     """يتأكد أن إغلاق الاشتراك دون أحداث لا يسقط النتيجة النهائية إذا كانت محفوظة."""
 
     async def fake_start_mission(**kwargs: object) -> _FakeMission:
@@ -193,8 +203,10 @@ async def test_mission_complex_recovers_terminal_event_when_subscription_closes(
         return {"type": "assistant_final", "payload": {"content": "terminal from closed stream"}}
 
     monkeypatch.setattr(mission_complex, "start_mission", fake_start_mission)
-    monkeypatch.setattr(mission_complex, "get_event_bus", lambda: _FakeEventBusClosed())
-    monkeypatch.setattr(mission_complex, "_get_terminal_event_from_persistence", fake_terminal_event)
+    monkeypatch.setattr(mission_complex, "get_event_bus", _FakeEventBusClosed)
+    monkeypatch.setattr(
+        mission_complex, "_get_terminal_event_from_persistence", fake_terminal_event
+    )
 
     events: list[dict[str, object]] = []
     async for event in mission_complex.handle_mission_complex_stream(

@@ -1,8 +1,6 @@
 import logging
 import uuid
 
-from sqlalchemy import text
-
 from fastapi import (
     APIRouter,
     BackgroundTasks,
@@ -14,6 +12,7 @@ from fastapi import (
 )
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from microservices.orchestrator_service.src.core.config import get_settings
@@ -109,10 +108,14 @@ async def _ensure_conversation(
     check_query = (
         text("SELECT id FROM admin_conversations WHERE id=:conversation_id AND user_id=:user_id")
         if is_admin_scope
-        else text("SELECT id FROM customer_conversations WHERE id=:conversation_id AND user_id=:user_id")
+        else text(
+            "SELECT id FROM customer_conversations WHERE id=:conversation_id AND user_id=:user_id"
+        )
     )
     create_query = (
-        text("INSERT INTO admin_conversations (title, user_id) VALUES (:title, :user_id) RETURNING id")
+        text(
+            "INSERT INTO admin_conversations (title, user_id) VALUES (:title, :user_id) RETURNING id"
+        )
         if is_admin_scope
         else text(
             "INSERT INTO customer_conversations (title, user_id) VALUES (:title, :user_id) RETURNING id"
@@ -215,7 +218,9 @@ async def _stream_mission_complex_events(
 ) -> None:
     """يوحّد بث mission_complex عبر send_json ويحافظ على الربط مع التاريخ."""
     requested_conversation_id = incoming.get("conversation_id")
-    conversation_id = requested_conversation_id if isinstance(requested_conversation_id, int) else None
+    conversation_id = (
+        requested_conversation_id if isinstance(requested_conversation_id, int) else None
+    )
     try:
         conversation_id = await _ensure_conversation(
             chat_scope=chat_scope,

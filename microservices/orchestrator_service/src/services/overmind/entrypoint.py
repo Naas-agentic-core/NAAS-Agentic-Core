@@ -164,7 +164,9 @@ async def start_mission(
         try:
             await client.close()
         except Exception as close_error:
-            logger.warning("Failed to close Redis client for mission %s: %s", mission.id, close_error)
+            logger.warning(
+                "Failed to close Redis client for mission %s: %s", mission.id, close_error
+            )
 
     return mission
 
