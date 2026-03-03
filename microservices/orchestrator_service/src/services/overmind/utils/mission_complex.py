@@ -7,6 +7,7 @@ import asyncio
 import json
 import logging
 from collections.abc import AsyncGenerator
+from contextlib import suppress
 from datetime import UTC, datetime
 
 from microservices.orchestrator_service.src.core.database import async_session_factory
@@ -198,6 +199,16 @@ async def handle_mission_complex_stream(
                 break
 
             if event is None:
+                terminal_event = await _get_terminal_event_from_persistence(mission_id)
+                if terminal_event is not None:
+                    yield terminal_event
+                else:
+                    yield {
+                        "type": "assistant_error",
+                        "payload": {
+                            "content": "❌ توقف بث أحداث المهمة قبل ظهور نتيجة نهائية، ولم نعثر على حالة نهائية محفوظة."
+                        },
+                    }
                 break
 
             # Event comes as a dict from Redis/EventBus
@@ -264,6 +275,8 @@ async def handle_mission_complex_stream(
         pump_task_instance = locals().get("pump_task")
         if pump_task_instance is not None and not pump_task_instance.done():
             pump_task_instance.cancel()
+            with suppress(asyncio.CancelledError):
+                await pump_task_instance
         subscription_instance = locals().get("subscription")
         if subscription_instance is not None and hasattr(subscription_instance, "aclose"):
             await subscription_instance.aclose()

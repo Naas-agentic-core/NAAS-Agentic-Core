@@ -40,6 +40,19 @@ class _FakeEventBusIdleOnce:
         return _never_yield_subscription()
 
 
+async def _closed_subscription() -> AsyncGenerator[dict[str, object], None]:
+    if False:
+        yield {}
+
+
+class _FakeEventBusClosed:
+    """ناقل أحداث يغلق الاشتراك مباشرة للتحقق من استرجاع النتيجة من DB."""
+
+    def subscribe(self, channel: str) -> AsyncGenerator[dict[str, object], None]:
+        _ = channel
+        return _closed_subscription()
+
+
 @pytest.mark.asyncio
 async def test_mission_complex_emits_timeout_error_when_event_bus_is_idle(monkeypatch) -> None:
     """يتأكد أن التدفق يعيد assistant_error واضحًا عند انقطاع أحداث التنفيذ."""
@@ -165,3 +178,36 @@ async def test_mission_complex_waits_when_persistence_shows_active_then_emits_fi
     payload = events[-1].get("payload")
     assert isinstance(payload, dict)
     assert payload.get("content") == "final after wait"
+
+
+@pytest.mark.asyncio
+async def test_mission_complex_recovers_terminal_event_when_subscription_closes(monkeypatch) -> None:
+    """يتأكد أن إغلاق الاشتراك دون أحداث لا يسقط النتيجة النهائية إذا كانت محفوظة."""
+
+    async def fake_start_mission(**kwargs: object) -> _FakeMission:
+        _ = kwargs
+        return _FakeMission(888)
+
+    async def fake_terminal_event(mission_id: int) -> dict[str, object] | None:
+        _ = mission_id
+        return {"type": "assistant_final", "payload": {"content": "terminal from closed stream"}}
+
+    monkeypatch.setattr(mission_complex, "start_mission", fake_start_mission)
+    monkeypatch.setattr(mission_complex, "get_event_bus", lambda: _FakeEventBusClosed())
+    monkeypatch.setattr(mission_complex, "_get_terminal_event_from_persistence", fake_terminal_event)
+
+    events: list[dict[str, object]] = []
+    async for event in mission_complex.handle_mission_complex_stream(
+        question="run",
+        context={"conversation_id": 1},
+        user_id=10,
+    ):
+        events.append(event)
+        if event.get("type") in {"assistant_final", "assistant_error"}:
+            break
+
+    terminal_event = events[-1]
+    assert terminal_event["type"] == "assistant_final"
+    payload = terminal_event.get("payload")
+    assert isinstance(payload, dict)
+    assert payload.get("content") == "terminal from closed stream"
