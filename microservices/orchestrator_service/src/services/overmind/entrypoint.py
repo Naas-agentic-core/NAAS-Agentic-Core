@@ -39,6 +39,27 @@ async def _dispatch_mission_task(
     _task = asyncio.create_task(_run_mission_task(mission_id, force_research))  # noqa: RUF006
 
 
+async def _dispatch_mission_task_degraded(
+    *,
+    state_manager: MissionStateManager,
+    mission_id: int,
+    force_research: bool,
+    triggered_by: str,
+) -> None:
+    """ينفّذ تشغيلًا متدهورًا صريحًا عند تعذر قفل Redis دون إسقاط المهمة."""
+    logger.warning(
+        "Dispatching mission %s in degraded mode without distributed lock (triggered_by=%s).",
+        mission_id,
+        triggered_by,
+    )
+    await _dispatch_mission_task(
+        state_manager=state_manager,
+        mission_id=mission_id,
+        force_research=force_research,
+        triggered_by=triggered_by,
+    )
+
+
 async def start_mission(
     session: AsyncSession,
     objective: str,
@@ -95,7 +116,12 @@ async def start_mission(
         acquired = await lock.acquire(blocking=False)
 
         if not acquired:
-            logger.warning(f"Mission {mission.id} is locked. Skipping execution trigger.")
+            await _dispatch_mission_task_degraded(
+                state_manager=state_manager,
+                mission_id=mission.id,
+                force_research=force_research,
+                triggered_by="entrypoint_degraded_lock_not_acquired",
+            )
             return mission
 
         try:
@@ -119,7 +145,7 @@ async def start_mission(
             redis_error,
         )
         try:
-            await _dispatch_mission_task(
+            await _dispatch_mission_task_degraded(
                 state_manager=state_manager,
                 mission_id=mission.id,
                 force_research=force_research,

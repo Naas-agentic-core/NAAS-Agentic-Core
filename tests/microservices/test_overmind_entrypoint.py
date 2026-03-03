@@ -61,12 +61,34 @@ class _FakeRedisLock:
         return None
 
 
+class _FakeRedisLockNotAcquired:
+    """قفل Redis مزيف لا يُكتسب لمحاكاة lock contention."""
+
+    async def acquire(self, blocking: bool = False) -> bool:
+        _ = blocking
+        return False
+
+    async def release(self) -> None:
+        return None
+
+
 class _FakeRedisClient:
     """عميل Redis مزيف يعيد القفل المزيف ويغلق بشكل طبيعي."""
 
     def lock(self, key: str, timeout: int) -> _FakeRedisLock:
         _ = (key, timeout)
         return _FakeRedisLock()
+
+    async def close(self) -> None:
+        return None
+
+
+class _FakeRedisClientNotAcquired:
+    """عميل Redis مزيف يعيد قفلًا غير مكتسب للتأكد من dispatch المتدهور."""
+
+    def lock(self, key: str, timeout: int) -> _FakeRedisLockNotAcquired:
+        _ = (key, timeout)
+        return _FakeRedisLockNotAcquired()
 
     async def close(self) -> None:
         return None
@@ -102,3 +124,42 @@ async def test_start_mission_dispatches_in_degraded_mode_when_redis_lock_fails(m
     assert manager.status_updates == []
     assert manager.logged_events
     assert manager.logged_events[0]["payload"]["triggered_by"] == "entrypoint_degraded_no_lock"
+
+
+@pytest.mark.asyncio
+async def test_start_mission_dispatches_when_lock_not_acquired(monkeypatch) -> None:
+    """يتأكد أن عدم اكتساب القفل لا يوقف المهمة ويتم تشغيل المسار المتدهور."""
+
+    created_tasks: list[object] = []
+    _FakeStateManager.instances.clear()
+
+    def fake_create_task(coro: object) -> object:
+        created_tasks.append(coro)
+        if hasattr(coro, "close"):
+            coro.close()
+        return object()
+
+    monkeypatch.setattr(entrypoint, "MissionStateManager", _FakeStateManager)
+    monkeypatch.setattr(
+        entrypoint.redis,
+        "from_url",
+        lambda *args, **kwargs: _FakeRedisClientNotAcquired(),
+    )
+    monkeypatch.setattr(entrypoint.asyncio, "create_task", fake_create_task)
+
+    mission = await entrypoint.start_mission(
+        session=object(),
+        objective="run mission",
+        initiator_id=1,
+        context={"conversation_id": 22},
+    )
+
+    assert mission.id == 99
+    assert len(created_tasks) == 1
+    manager = _FakeStateManager.instances[0]
+    assert manager.status_updates == []
+    assert manager.logged_events
+    assert (
+        manager.logged_events[0]["payload"]["triggered_by"]
+        == "entrypoint_degraded_lock_not_acquired"
+    )
