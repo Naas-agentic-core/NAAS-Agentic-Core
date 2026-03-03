@@ -23,6 +23,22 @@ from microservices.orchestrator_service.src.services.overmind.state import Missi
 logger = logging.getLogger(__name__)
 
 
+async def _dispatch_mission_task(
+    *,
+    state_manager: MissionStateManager,
+    mission_id: int,
+    force_research: bool,
+    triggered_by: str,
+) -> None:
+    """ينفّذ إطلاق المهمة مع تسجيل حدث بدء واضح يدعم تتبع مسار التشغيل."""
+    await state_manager.log_event(
+        mission_id,
+        MissionEventType.STATUS_CHANGE,
+        {"status": "starting", "triggered_by": triggered_by},
+    )
+    _task = asyncio.create_task(_run_mission_task(mission_id, force_research))  # noqa: RUF006
+
+
 async def start_mission(
     session: AsyncSession,
     objective: str,
@@ -83,33 +99,46 @@ async def start_mission(
             return mission
 
         try:
-            # 3. Log Started Event
-            await state_manager.log_event(
-                mission.id,
-                MissionEventType.STATUS_CHANGE,
-                {"status": "starting", "triggered_by": "entrypoint"},
+            # 3. Log Started Event + Trigger Background Execution
+            await _dispatch_mission_task(
+                state_manager=state_manager,
+                mission_id=mission.id,
+                force_research=force_research,
+                triggered_by="entrypoint",
             )
-
-            # 4. Trigger Background Execution
-            # We explicitly define the task wrapper here to decouple from the caller.
-            # Assigning to variable to satisfy linter (RUF006)
-            _task = asyncio.create_task(_run_mission_task(mission.id, force_research))  # noqa: RUF006
 
             logger.info(f"Mission {mission.id} dispatched via Unified Entrypoint.")
 
         finally:
             await lock.release()
 
-    except Exception as e:
-        logger.error(f"Failed to dispatch mission {mission.id}: {e}")
-        # We don't rollback the mission creation because it's already committed in create_mission
-        # But we should update status to FAILED
-        await state_manager.update_mission_status(
-            mission.id, MissionStatus.FAILED, note=f"Dispatch Error: {e}"
+    except Exception as redis_error:
+        logger.warning(
+            "Redis lock unavailable for mission %s; dispatching in degraded mode without distributed lock: %s",
+            mission.id,
+            redis_error,
         )
-        raise e
+        try:
+            await _dispatch_mission_task(
+                state_manager=state_manager,
+                mission_id=mission.id,
+                force_research=force_research,
+                triggered_by="entrypoint_degraded_no_lock",
+            )
+            logger.info("Mission %s dispatched in degraded mode without Redis lock.", mission.id)
+        except Exception as dispatch_error:
+            logger.error(f"Failed to dispatch mission {mission.id}: {dispatch_error}")
+            await state_manager.update_mission_status(
+                mission.id,
+                MissionStatus.FAILED,
+                note=f"Dispatch Error: {dispatch_error}",
+            )
+            raise dispatch_error
     finally:
-        await client.close()
+        try:
+            await client.close()
+        except Exception as close_error:
+            logger.warning("Failed to close Redis client for mission %s: %s", mission.id, close_error)
 
     return mission
 
