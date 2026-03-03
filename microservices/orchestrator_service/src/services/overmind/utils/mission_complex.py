@@ -13,13 +13,49 @@ from microservices.orchestrator_service.src.core.database import async_session_f
 from microservices.orchestrator_service.src.core.event_bus import get_event_bus
 from microservices.orchestrator_service.src.models.mission import (
     MissionEventType,
+    MissionStatus,
 )
 from microservices.orchestrator_service.src.services.overmind.entrypoint import start_mission
+from microservices.orchestrator_service.src.services.overmind.state import MissionStateManager
 
 logger = logging.getLogger(__name__)
 
 MISSION_EVENT_WAIT_TIMEOUT_SECONDS = 5.0
 MISSION_EVENT_MAX_IDLE_CYCLES = 3
+
+
+async def _get_terminal_event_from_persistence(mission_id: int) -> dict[str, object] | None:
+    """يستعيد النتيجة النهائية للمهمة من قاعدة البيانات عند فقدان أحداث البث اللحظي."""
+    async with async_session_factory() as session:
+        state_manager = MissionStateManager(session)
+        mission = await state_manager.get_mission(mission_id)
+        if mission is None:
+            return None
+
+        if mission.status in {MissionStatus.SUCCESS, MissionStatus.PARTIAL_SUCCESS}:
+            summary = mission.result_summary or "✅ تمت المهمة بنجاح."
+            return {
+                "type": "assistant_final",
+                "payload": {"content": summary},
+            }
+
+        if mission.status == MissionStatus.FAILED:
+            events = await state_manager.get_mission_events(mission_id)
+            for event in reversed(events):
+                if event.event_type in (MissionEventType.MISSION_FAILED, "mission_failed"):
+                    payload = event.payload_json or {}
+                    error_text = payload.get("error") if isinstance(payload, dict) else None
+                    if isinstance(error_text, str) and error_text.strip():
+                        return {
+                            "type": "assistant_error",
+                            "payload": {"content": f"❌ فشلت المهمة: {error_text}"},
+                        }
+            return {
+                "type": "assistant_error",
+                "payload": {"content": "❌ فشلت المهمة قبل اكتمال البث."},
+            }
+
+    return None
 
 
 async def handle_mission_complex_stream(
@@ -110,6 +146,10 @@ async def handle_mission_complex_stream(
                 idle_cycles += 1
                 if idle_cycles < MISSION_EVENT_MAX_IDLE_CYCLES:
                     continue
+                terminal_event = await _get_terminal_event_from_persistence(mission_id)
+                if terminal_event is not None:
+                    yield terminal_event
+                    break
                 yield {
                     "type": "assistant_error",
                     "payload": {
