@@ -376,7 +376,9 @@ async def chat_ws_stategraph(websocket: WebSocket) -> None:
                     requested_conversation_id=conversation_id,
                 )
             except HTTPException as error:
-                await websocket.send_json({"type": "assistant_error", "payload": {"content": error.detail}})
+                await websocket.send_json(
+                    {"type": "assistant_error", "payload": {"content": error.detail}}
+                )
                 continue
 
             await websocket.send_json(
@@ -398,8 +400,8 @@ async def chat_ws_stategraph(websocket: WebSocket) -> None:
                         "run_id": result.get("run_id"),
                         "timeline": result.get("timeline", []),
                         "graph_mode": result.get("graph_mode", "stategraph"),
-                        "route_id": "chat_ws_customer"
-                    }
+                        "route_id": "chat_ws_customer",
+                    },
                 }
             )
 
@@ -463,7 +465,9 @@ async def admin_chat_ws_stategraph(websocket: WebSocket) -> None:
                     requested_conversation_id=conversation_id,
                 )
             except HTTPException as error:
-                await websocket.send_json({"type": "assistant_error", "payload": {"content": error.detail}})
+                await websocket.send_json(
+                    {"type": "assistant_error", "payload": {"content": error.detail}}
+                )
                 continue
 
             await websocket.send_json(
@@ -485,8 +489,8 @@ async def admin_chat_ws_stategraph(websocket: WebSocket) -> None:
                         "run_id": result.get("run_id"),
                         "timeline": result.get("timeline", []),
                         "graph_mode": result.get("graph_mode", "stategraph"),
-                        "route_id": "chat_ws_admin"
-                    }
+                        "route_id": "chat_ws_admin",
+                    },
                 }
             )
 
