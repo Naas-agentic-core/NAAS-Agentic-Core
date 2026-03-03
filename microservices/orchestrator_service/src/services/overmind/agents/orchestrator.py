@@ -170,7 +170,7 @@ class OrchestratorAgent:
                     return
                 user_id = int(context["user_id"])
                 async for chunk in handle_mission_complex_stream(normalized, context, user_id):
-                    yield chunk
+                    yield self._serialize_mission_chunk(chunk)
 
             elif intent in (ChatIntent.ANALYTICS_REPORT, ChatIntent.LEARNING_SUMMARY):
                 result = self.analytics_agent.process(context)
@@ -208,6 +208,12 @@ class OrchestratorAgent:
 
     def _make_json_event(self, text: str) -> str:
         return json.dumps({"type": "assistant_delta", "payload": {"content": text}}) + "\n"
+
+    def _serialize_mission_chunk(self, chunk: dict[str, object] | str) -> str:
+        """يضمن أن مخرجات mission_complex تُبث كسلاسل نصية قابلة للترميز عبر StreamingResponse."""
+        if isinstance(chunk, str):
+            return chunk if chunk.endswith("\n") else f"{chunk}\n"
+        return json.dumps(chunk, ensure_ascii=False) + "\n"
 
     async def _as_json_event(
         self, generator: AsyncGenerator[str, None]
