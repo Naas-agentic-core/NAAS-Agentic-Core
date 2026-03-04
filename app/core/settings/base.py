@@ -139,6 +139,7 @@ class AppSettings(BaseServiceSettings):
     RESEARCH_AGENT_URL: str | None = Field(None, description="Research Agent URL")
     PLANNING_AGENT_URL: str | None = Field(None, description="Planning Agent URL")
     REASONING_AGENT_URL: str | None = Field(None, description="Reasoning Agent URL")
+    ORCHESTRATOR_SERVICE_URL: str | None = Field(None, description="Orchestrator Service URL")
 
     # AI (Missing fields restored)
     OPENAI_API_KEY: str | None = Field(None, description="OpenAI API Key")
@@ -175,6 +176,7 @@ class AppSettings(BaseServiceSettings):
         "RESEARCH_AGENT_URL",
         "PLANNING_AGENT_URL",
         "REASONING_AGENT_URL",
+        "ORCHESTRATOR_SERVICE_URL",
         mode="before",
     )
     @classmethod
@@ -203,6 +205,7 @@ class AppSettings(BaseServiceSettings):
             "RESEARCH_AGENT_URL": ("8006", "research-agent", "8000"),
             "PLANNING_AGENT_URL": ("8001", "planning-agent", "8000"),
             "REASONING_AGENT_URL": ("8007", "reasoning-agent", "8000"),
+            "ORCHESTRATOR_SERVICE_URL": ("8006", "orchestrator-service", "8006"),
         }
 
         if field_name not in service_map:
