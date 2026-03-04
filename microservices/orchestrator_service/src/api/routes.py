@@ -184,7 +184,7 @@ import asyncio
 async def _stream_chat_langgraph(
     websocket: WebSocket,
     objective: str,
-    context: dict[str, str | int | float | bool | None],
+    context: dict[str, object],
     chat_scope: str,
     conversation_id: int,
 ) -> None:
@@ -339,7 +339,7 @@ async def _stream_chat_langgraph(
 
 async def _run_chat_langgraph(
     objective: str,
-    context: dict[str, str | int | float | bool | None],
+    context: dict[str, object],
 ) -> dict[str, object]:
     """يشغّل LangGraph كعمود فقري لرحلة chat ويعيد حمولة موحدة قابلة للبث (HTTP legacy fallback)."""
     service = create_langgraph_service()
@@ -374,13 +374,12 @@ async def chat_messages_endpoint(payload: dict[str, object]) -> dict[str, object
         raise HTTPException(status_code=422, detail="question/objective is required")
 
     context_payload = payload.get("context")
-    context: dict[str, str | int | float | bool | None] = {}
+    context: dict[str, object] = {}
     if isinstance(context_payload, dict):
         for key, value in context_payload.items():
             if not isinstance(key, str):
                 continue
-            if isinstance(value, str | int | float | bool) or value is None:
-                context[key] = value
+            context[key] = value
 
     return await _run_chat_langgraph(objective, context)
 
@@ -438,17 +437,20 @@ async def chat_ws_stategraph(websocket: WebSocket) -> None:
             )
 
             context_payload = incoming.get("context")
-            context: dict[str, str | int | float | bool | None] = {}
+            context: dict[str, object] = {}
             if isinstance(context_payload, dict):
                 for key, value in context_payload.items():
                     if not isinstance(key, str):
                         continue
-                    if isinstance(value, str | int | float | bool) or value is None:
-                        context[key] = value
+                    context[key] = value
 
             if "mission_type" in incoming:
                 context["mission_type"] = incoming["mission_type"]
-            elif "metadata" in incoming and isinstance(incoming["metadata"], dict) and "mission_type" in incoming["metadata"]:
+            elif (
+                "metadata" in incoming
+                and isinstance(incoming["metadata"], dict)
+                and "mission_type" in incoming["metadata"]
+            ):
                 context["mission_type"] = incoming["metadata"]["mission_type"]
 
             await _stream_chat_langgraph(
@@ -516,17 +518,20 @@ async def admin_chat_ws_stategraph(websocket: WebSocket) -> None:
             )
 
             context_payload = incoming.get("context")
-            context: dict[str, str | int | float | bool | None] = {}
+            context: dict[str, object] = {}
             if isinstance(context_payload, dict):
                 for key, value in context_payload.items():
                     if not isinstance(key, str):
                         continue
-                    if isinstance(value, str | int | float | bool) or value is None:
-                        context[key] = value
+                    context[key] = value
 
             if "mission_type" in incoming:
                 context["mission_type"] = incoming["mission_type"]
-            elif "metadata" in incoming and isinstance(incoming["metadata"], dict) and "mission_type" in incoming["metadata"]:
+            elif (
+                "metadata" in incoming
+                and isinstance(incoming["metadata"], dict)
+                and "mission_type" in incoming["metadata"]
+            ):
                 context["mission_type"] = incoming["metadata"]["mission_type"]
 
             await _stream_chat_langgraph(
