@@ -38,9 +38,6 @@ from microservices.orchestrator_service.src.services.overmind.factory import (
     create_langgraph_service,
 )
 from microservices.orchestrator_service.src.services.overmind.state import MissionStateManager
-from microservices.orchestrator_service.src.services.overmind.utils.mission_complex import (
-    handle_mission_complex_stream,
-)
 from microservices.orchestrator_service.src.services.overmind.utils.tools import tool_registry
 
 logger = logging.getLogger(__name__)
@@ -219,7 +216,8 @@ async def _stream_chat_langgraph(
     task = asyncio.create_task(_runner())
     _task_ref = task  # store reference to avoid GC
 
-    from datetime import datetime, UTC
+    from datetime import UTC, datetime
+
     now = datetime.now(UTC).isoformat()
     await websocket.send_json(
         {
@@ -305,8 +303,14 @@ async def _stream_chat_langgraph(
                 }
             )
         elif evt["type"] == "loop_start":
-            iteration = evt["payload"].get("iteration", 0) if isinstance(evt["payload"], dict) else 0
-            mode = evt["payload"].get("graph_mode", "standard") if isinstance(evt["payload"], dict) else "standard"
+            iteration = (
+                evt["payload"].get("iteration", 0) if isinstance(evt["payload"], dict) else 0
+            )
+            mode = (
+                evt["payload"].get("graph_mode", "standard")
+                if isinstance(evt["payload"], dict)
+                else "standard"
+            )
             await websocket.send_json(
                 {
                     "type": "RUN_STARTED",

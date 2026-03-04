@@ -2,9 +2,6 @@
 
 from __future__ import annotations
 
-from collections.abc import AsyncGenerator
-
-from fastapi import HTTPException
 from fastapi.testclient import TestClient
 
 from microservices.orchestrator_service.main import app
