@@ -4,6 +4,7 @@ Intent handlers using Strategy pattern.
 
 import asyncio
 import logging
+import re
 from collections.abc import AsyncGenerator
 
 # Import chat domain to ensure AdminConversation is registered, preventing mapping errors
@@ -159,6 +160,167 @@ class DeepAnalysisHandler(IntentHandler):
     async def _analyze(self, question: str, ai_client) -> str:
         """Perform deep analysis."""
         return "تحليل عميق (قيد التطوير)"
+
+
+def _format_tool_result_data(data: object) -> str:
+    """Format tool result data for display."""
+    if not isinstance(data, (dict, list)):
+        return str(data)
+
+    # Handle ToolResult structure (only if dict)
+    if isinstance(data, dict) and "ok" in data and ("data" in data or "error" in data):
+        if not data.get("ok"):
+            return f"❌ خطأ: {data.get('error')}"
+
+        inner_data = data.get("data")
+        if inner_data is None:
+            return "✅ تم."
+
+        return _format_inner_data(inner_data)
+
+    return _format_inner_data(data)
+
+
+def _format_inner_data(data: object) -> str:
+    """Format inner data (dict/list) nicely."""
+    # Custom formatting for search results (List of content items)
+    if (
+        isinstance(data, list)
+        and data
+        and isinstance(data[0], dict)
+        and "title" in data[0]
+        and "id" in data[0]
+    ):
+        lines = ["✅ **النتائج:**\n"]
+        for item in data[:3]:  # Limit to top 3 to prevent flooding
+            title = item.get("title", "بدون عنوان")
+            lines.append(f"* 🔹 {title}")
+
+        if len(data) > 3:
+            lines.append(f"* ... و {len(data) - 3} نتائج أخرى.")
+
+        return "\n".join(lines)
+
+    if isinstance(data, (dict, list)):
+        # Return summary instead of full JSON dump
+        return "📄 (بيانات مهيكلة)"
+    return str(data)
+
+
+def _clean_raw_string(text: str) -> str:
+    """Clean raw ToolResult string representation."""
+    if text.startswith("ToolResult("):
+        match = re.search(r"data=(.*?)(, error=|$)", text)
+        if match:
+            return f"✅ {match.group(1)}"
+        return text
+    return text
+
+
+class HelpHandler(IntentHandler):
+    """Handle help requests."""
+
+    def __init__(self):
+        super().__init__("HELP", priority=10)
+
+    async def execute(self, context: ChatContext) -> AsyncGenerator[str, None]:
+        """Show help."""
+        yield "📚 **المساعدة**\n\n"
+        yield "الأوامر المتاحة:\n"
+        yield "- قراءة ملف: `اقرأ ملف path/to/file`\n"
+        yield "- كتابة ملف: `اكتب ملف path/to/file`\n"
+        yield "- البحث: `ابحث عن query`\n"
+        yield "- فهرسة: `فهرس المشروع`\n"
+        yield "- مهمة معقدة: (أي سؤال معقد سيتم تحويله للوكيل الخارق)\n"
+
+
+class DefaultChatHandler(IntentHandler):
+    """Default chat handler (fallback)."""
+
+    def __init__(self):
+        super().__init__("DEFAULT", priority=-1)
+        # Deferred imports to avoid circular dependency
+        from app.services.chat.context_service import get_context_service
+        from app.services.overmind.identity import OvermindIdentity
+
+        self._identity = OvermindIdentity()
+        self._context_service = get_context_service()
+
+    async def can_handle(self, context: ChatContext) -> bool:
+        """Always can handle (fallback)."""
+        return True
+
+    async def execute(self, context: ChatContext) -> AsyncGenerator[str, None]:
+        """Execute default chat with identity context."""
+        # إضافة معلومات الهوية إلى رسائل المحادثة
+        enhanced_messages = self._add_identity_context(context.history_messages)
+
+        async for chunk in context.ai_client.stream_chat(enhanced_messages):
+            if isinstance(chunk, dict):
+                choices = chunk.get("choices", [])
+                if choices:
+                    content = choices[0].get("delta", {}).get("content", "")
+                    if content:
+                        yield content
+            elif isinstance(chunk, str):
+                yield chunk
+
+    def _add_identity_context(self, messages: list[dict[str, str]]) -> list[dict[str, str]]:
+        """
+        إضافة سياق النظام والهوية لإثراء إجابة Overmind.
+
+        Args:
+            messages: قائمة الرسائل الأصلية.
+
+        Returns:
+            list[dict[str, str]]: قائمة الرسائل بعد إدراج سياق النظام.
+        """
+        has_system = bool(messages) and messages[0].get("role") == "system"
+        system_prompt = self._build_system_prompt(include_base_prompt=not has_system)
+        if not has_system:
+            return [{"role": "system", "content": system_prompt}, *messages]
+
+        enhanced_messages = messages.copy()
+        enhanced_messages[0] = {
+            "role": "system",
+            "content": messages[0]["content"] + "\n\n" + system_prompt,
+        }
+        return enhanced_messages
+
+    def _build_system_prompt(self, *, include_base_prompt: bool) -> str:
+        """
+        إنشاء رسالة النظام الموحدة لتوجيه الردود الخارقة.
+
+        Returns:
+            str: رسالة نظام مركزة تجمع الهوية والتعليمات المتقدمة.
+        """
+        base_prompt = ""
+        if include_base_prompt:
+            base_prompt = self._context_service.get_context_system_prompt().strip()
+        identity_context = self._build_identity_context()
+        intelligence_directive = (
+            "توجيه إضافي:\n"
+            "- أجب بطريقة عبقرية فائقة الذكاء مع شرح منطقي متسلسل.\n"
+            "- حافظ على العمق والوضوح، وقدم أمثلة تعليمية عند الحاجة.\n"
+            "- إذا كان السؤال تعليمياً، قدم خطة تعلم مختصرة قبل الإجابة.\n"
+        )
+        multi_agent_directive = (
+            "توجيهات العقل الجمعي:\n"
+            "- فعّل أسلوب التفكير متعدد الوكلاء (Strategist/Architect/Auditor/Operator).\n"
+            "- لخّص خطة الحل في نقاط، ثم نفّذ الإجابة خطوة بخطوة.\n"
+            "- تحقّق من الفرضيات وصحّح المسار عند وجود غموض.\n"
+            "- استخدم أسلوب Tree of Thoughts عند الأسئلة المعقدة.\n"
+        )
+        return "\n\n".join(
+            part
+            for part in [
+                base_prompt,
+                identity_context,
+                intelligence_directive,
+                multi_agent_directive,
+            ]
+            if part
+        )
 
     def _build_identity_context(self) -> str:
         """
