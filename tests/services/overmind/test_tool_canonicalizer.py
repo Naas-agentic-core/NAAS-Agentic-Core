@@ -7,7 +7,7 @@ Comprehensive tests for the refactored tool canonicalization system.
 
 import pytest
 
-from app.services.overmind.tool_canonicalizer import (
+from microservices.orchestrator_service.src.services.overmind.tool_canonicalizer import (
     AliasStrategy,
     CanonicalResult,
     DescriptionIntentStrategy,

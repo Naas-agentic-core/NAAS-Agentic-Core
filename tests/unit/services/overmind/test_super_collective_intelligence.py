@@ -2,15 +2,15 @@ from __future__ import annotations
 
 import pytest
 
-from app.services.overmind.agents import AgentCouncil
-from app.services.overmind.collaboration import CollaborationHub
-from app.services.overmind.domain.super_intelligence.models import (
+from microservices.orchestrator_service.src.services.overmind.agents import AgentCouncil
+from microservices.orchestrator_service.src.services.overmind.collaboration import CollaborationHub
+from microservices.orchestrator_service.src.services.overmind.domain.super_intelligence.models import (
     Decision,
     DecisionCategory,
     DecisionImpact,
     DecisionPriority,
 )
-from app.services.overmind.domain.super_intelligence.system import SuperCollectiveIntelligence
+from microservices.orchestrator_service.src.services.overmind.domain.super_intelligence.system import SuperCollectiveIntelligence
 
 
 class StubAgent:

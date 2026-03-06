@@ -2,8 +2,8 @@
 اختبارات تنقية وسائط البحث التعليمي داخل المنفذ.
 """
 
-from app.services.overmind.agents.operator import OperatorAgent
-from app.services.overmind.domain.context import InMemoryCollaborationContext
+from microservices.orchestrator_service.src.services.overmind.agents.operator import OperatorAgent
+from microservices.orchestrator_service.src.services.overmind.domain.context import InMemoryCollaborationContext
 
 
 def test_prepare_search_educational_args_merges_context():

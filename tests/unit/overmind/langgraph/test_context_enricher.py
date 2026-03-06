@@ -1,6 +1,6 @@
 import pytest
 
-from app.services.overmind.langgraph.context_enricher import ContextEnricher
+from microservices.orchestrator_service.src.services.overmind.langgraph.context_enricher import ContextEnricher
 
 
 class DummyPayload:
@@ -15,7 +15,7 @@ class DummyNode:
         self.score = 0.0
 
 
-from app.services.overmind.langgraph.context_contracts import Snippet
+from microservices.orchestrator_service.src.services.overmind.langgraph.context_contracts import Snippet
 
 
 class DummyRetriever:

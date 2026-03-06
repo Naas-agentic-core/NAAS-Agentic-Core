@@ -14,8 +14,8 @@ from collections.abc import Callable, Coroutine
 from pathlib import Path
 
 from app.core.logging import get_logger
-from app.services.overmind.knowledge import ProjectKnowledge
-from app.services.overmind.knowledge_structure import (
+from microservices.orchestrator_service.src.services.overmind.knowledge import ProjectKnowledge
+from microservices.orchestrator_service.src.services.overmind.knowledge_structure import (
     build_microservices_summary,
     build_project_structure,
     get_file_details,
@@ -326,7 +326,7 @@ class MCPToolRegistry:
 
     async def _list_functions(self, path: str = "app") -> dict[str, object]:
         """قائمة الدوال في مسار معين."""
-        from app.services.overmind.knowledge_structure import _analyze_directory
+        from microservices.orchestrator_service.src.services.overmind.knowledge_structure import _analyze_directory
 
         target_path = self.project_root / path
         if not target_path.exists():

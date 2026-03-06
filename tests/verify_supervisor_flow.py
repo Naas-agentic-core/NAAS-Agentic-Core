@@ -34,7 +34,7 @@ sys.modules["microservices.research_agent.src.search_engine.retriever"] = mock_r
 sys.modules["microservices.research_agent.src.search_engine.llama_retriever"] = MagicMock()
 
 # Mock Overmind Factory
-sys.modules["app.services.overmind.factory"] = MagicMock()
+sys.modules["microservices.orchestrator_service.src.services.overmind.factory"] = MagicMock()
 # ----------------------------------
 
 

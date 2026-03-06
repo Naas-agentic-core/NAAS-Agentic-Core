@@ -40,7 +40,7 @@ from app.services.chat.handlers.strategy_handlers import (
 from app.services.chat.intent_detector import ChatIntent, IntentDetector
 from app.services.chat.ports import IntentDetectorPort
 from app.services.chat.tools import ToolRegistry
-from app.services.overmind.identity import OvermindIdentity
+from microservices.orchestrator_service.src.services.overmind.identity import OvermindIdentity
 
 logger = logging.getLogger(__name__)
 

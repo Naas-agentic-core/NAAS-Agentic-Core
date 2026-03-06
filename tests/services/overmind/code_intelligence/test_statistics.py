@@ -1,4 +1,4 @@
-from app.services.overmind.code_intelligence.analyzers.statistics import StatisticsAnalyzer
+from microservices.orchestrator_service.src.services.overmind.code_intelligence.analyzers.statistics import StatisticsAnalyzer
 
 
 class TestStatisticsAnalyzer:

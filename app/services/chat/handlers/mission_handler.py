@@ -196,7 +196,7 @@ async def _build_project_index_with_feedback() -> dict[str, object]:
     feedback_messages.append("📊 جارٍ فهرسة المشروع للحصول على سياق عميق...\n")
 
     try:
-        from app.services.overmind.planning.deep_indexer import build_index, summarize_for_prompt
+        from microservices.orchestrator_service.src.services.overmind.planning.deep_indexer import build_index, summarize_for_prompt
 
         async def _build_index_async():
             return await asyncio.to_thread(build_index, root=".")

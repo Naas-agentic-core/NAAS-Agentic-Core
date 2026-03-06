@@ -13,7 +13,7 @@ class TestFullStackFlow(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
         # Define the modules to mock
         self.modules_to_mock = {
-            "app.services.overmind.langgraph": MagicMock(),
+            "microservices.orchestrator_service.src.services.overmind.langgraph": MagicMock(),
             "microservices.research_agent.src.search_engine": MagicMock(),
             "microservices.planning_agent.cognitive": MagicMock(),
             "app.services.chat.agents.data_access": MagicMock(),

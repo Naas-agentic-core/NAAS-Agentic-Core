@@ -214,7 +214,7 @@ class MCPIntegrations:
         """
         # جلب إحصائيات الإصلاح الحقيقية
         try:
-            from app.services.overmind.agents.self_healing import get_self_healing_agent
+            from microservices.orchestrator_service.src.services.overmind.agents.self_healing import get_self_healing_agent
 
             healing_agent = get_self_healing_agent()
             healing_stats = healing_agent.get_healing_stats()

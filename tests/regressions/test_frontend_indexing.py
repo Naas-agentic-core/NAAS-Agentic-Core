@@ -3,7 +3,7 @@ from unittest.mock import patch
 
 import pytest
 
-from app.services.overmind.planning.deep_indexer import build_index
+from microservices.orchestrator_service.src.services.overmind.planning.deep_indexer import build_index
 
 
 def test_frontend_files_are_indexed() -> None:
@@ -19,7 +19,7 @@ def test_frontend_files_are_indexed() -> None:
         pytest.skip("frontend directory not found")
 
     with patch(
-        "app.services.overmind.code_intelligence.core.StructuralCodeIntelligence._enrich_with_git_metrics",
+        "microservices.orchestrator_service.src.services.overmind.code_intelligence.core.StructuralCodeIntelligence._enrich_with_git_metrics",
         return_value=None,
     ):
         analysis = build_index(".")

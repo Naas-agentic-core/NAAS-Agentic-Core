@@ -6,8 +6,8 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from app.services.overmind.agents.operator import OperatorAgent
-from app.services.overmind.domain.context import InMemoryCollaborationContext
+from microservices.orchestrator_service.src.services.overmind.agents.operator import OperatorAgent
+from microservices.orchestrator_service.src.services.overmind.domain.context import InMemoryCollaborationContext
 
 
 @pytest.mark.asyncio

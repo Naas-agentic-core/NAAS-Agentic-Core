@@ -6,15 +6,15 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from app.services.overmind.domain.super_intelligence.analyzer import SituationAnalyzer
-from app.services.overmind.domain.super_intelligence.models import (
+from microservices.orchestrator_service.src.services.overmind.domain.super_intelligence.analyzer import SituationAnalyzer
+from microservices.orchestrator_service.src.services.overmind.domain.super_intelligence.models import (
     Decision,
     DecisionCategory,
     DecisionImpact,
     DecisionPriority,
 )
-from app.services.overmind.domain.super_intelligence.synthesizer import DecisionSynthesizer
-from app.services.overmind.domain.super_intelligence.system import SuperCollectiveIntelligence
+from microservices.orchestrator_service.src.services.overmind.domain.super_intelligence.synthesizer import DecisionSynthesizer
+from microservices.orchestrator_service.src.services.overmind.domain.super_intelligence.system import SuperCollectiveIntelligence
 
 
 @pytest.fixture

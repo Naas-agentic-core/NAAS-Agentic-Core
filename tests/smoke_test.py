@@ -29,7 +29,7 @@ async def test_overmind_client_access():
     # Previously tested create_overmind factory which is now removed.
     # Instead, we verify we can import the client entrypoint.
     try:
-        from app.services.overmind.entrypoint import start_mission
+        from microservices.orchestrator_service.src.services.overmind.entrypoint import start_mission
 
         assert start_mission is not None
     except ImportError as e:

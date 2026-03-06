@@ -3,12 +3,12 @@
 Tests for CS73 Art Generators Module
 """
 
-from app.services.overmind.art.generators import (
+from microservices.orchestrator_service.src.services.overmind.art.generators import (
     CodePatternArtist,
     MetricsArtist,
     NetworkArtist,
 )
-from app.services.overmind.art.styles import ArtStyle
+from microservices.orchestrator_service.src.services.overmind.art.styles import ArtStyle
 
 
 class TestCodePatternArtist:

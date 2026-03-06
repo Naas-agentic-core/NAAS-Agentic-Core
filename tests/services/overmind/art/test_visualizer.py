@@ -3,8 +3,8 @@
 Tests for CS73 Art Visualizer Module
 """
 
-from app.services.overmind.art.styles import ArtStyle
-from app.services.overmind.art.visualizer import (
+from microservices.orchestrator_service.src.services.overmind.art.styles import ArtStyle
+from microservices.orchestrator_service.src.services.overmind.art.visualizer import (
     CodeArtVisualizer,
     DataArtGenerator,
     MissionFlowArtist,

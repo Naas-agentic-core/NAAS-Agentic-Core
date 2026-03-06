@@ -1,6 +1,6 @@
 import logging
 
-from app.services.overmind.planning.deep_indexer import build_index
+from microservices.orchestrator_service.src.services.overmind.planning.deep_indexer import build_index
 
 # Configure logging to print to console
 logging.basicConfig(level=logging.INFO)

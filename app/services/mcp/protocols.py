@@ -82,7 +82,7 @@ class StructureFetcher:
     uri = "project://structure"
 
     async def fetch(self, project_root: Path) -> dict[str, object]:
-        from app.services.overmind.knowledge_structure import build_project_structure
+        from microservices.orchestrator_service.src.services.overmind.knowledge_structure import build_project_structure
 
         return build_project_structure(project_root)
 
@@ -93,7 +93,7 @@ class MicroservicesFetcher:
     uri = "project://microservices"
 
     async def fetch(self, project_root: Path) -> dict[str, object]:
-        from app.services.overmind.knowledge_structure import build_microservices_summary
+        from microservices.orchestrator_service.src.services.overmind.knowledge_structure import build_microservices_summary
 
         return build_microservices_summary(project_root)
 
@@ -110,7 +110,7 @@ class DatabaseFetcher:
         try:
             if self._knowledge:
                 return await self._knowledge.get_database_info()
-            from app.services.overmind.knowledge import ProjectKnowledge
+            from microservices.orchestrator_service.src.services.overmind.knowledge import ProjectKnowledge
 
             pk = ProjectKnowledge()
             return await pk.get_database_info()
@@ -130,7 +130,7 @@ class EnvironmentFetcher:
         try:
             if self._knowledge:
                 return self._knowledge.get_environment_info()
-            from app.services.overmind.knowledge import ProjectKnowledge
+            from microservices.orchestrator_service.src.services.overmind.knowledge import ProjectKnowledge
 
             pk = ProjectKnowledge()
             return pk.get_environment_info()
@@ -242,7 +242,7 @@ class StatsFetcher:
     uri = "project://stats"
 
     async def fetch(self, project_root: Path) -> dict[str, object]:
-        from app.services.overmind.knowledge_structure import (
+        from microservices.orchestrator_service.src.services.overmind.knowledge_structure import (
             build_microservices_summary,
             build_project_structure,
         )

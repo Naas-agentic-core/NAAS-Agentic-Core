@@ -1,6 +1,6 @@
 import uuid
 
-from app.services.overmind.knowledge_graph_builder import (
+from microservices.orchestrator_service.src.services.overmind.knowledge_graph_builder import (
     RELATION_AWARDED_TO,
     RELATION_BIDS_ON,
     RELATION_OWNED_BY,

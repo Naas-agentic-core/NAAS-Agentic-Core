@@ -104,3 +104,24 @@ def get_context_service() -> ChatContextService:
     if _service_instance is None:
         _service_instance = ChatContextService()
     return _service_instance
+
+def format_system_principles(
+    header: str = "المبادئ الصارمة للنظام (تُطبّق على الشيفرة بالكامل):",
+    bullet: str = "-",
+    include_header: bool = True,
+) -> str:
+    """Format core system principles for AI prompting."""
+    principles = [
+        "التفكير متعدد الوكلاء ضروري: استراتيجية، تخطيط، تنفيذ، ثم تدقيق.",
+        "التوافق مع المعمارية الدقيقة (Microservices) أولوية قصوى.",
+        "استخدم نمط API-First وتجنب الاتصال المباشر بقواعد بيانات الخدمات الأخرى.",
+        "تحقق دائمًا من حالة النظام عبر بوابات الرصد والمراقبة.",
+        "تطبيق الأمان حسب الدور: تحقق من الصلاحيات قبل التنفيذ.",
+    ]
+
+    lines = []
+    if include_header:
+        lines.append(header)
+    for p in principles:
+        lines.append(f"{bullet} {p}")
+    return "\n".join(lines)

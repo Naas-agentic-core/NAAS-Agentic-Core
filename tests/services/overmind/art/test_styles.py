@@ -3,7 +3,7 @@
 Tests for CS73 Art Styles Module
 """
 
-from app.services.overmind.art.styles import (
+from microservices.orchestrator_service.src.services.overmind.art.styles import (
     ArtStyle,
     ColorPalette,
     VisualTheme,

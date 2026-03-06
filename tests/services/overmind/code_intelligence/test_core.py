@@ -2,7 +2,7 @@ from unittest.mock import patch
 
 import pytest
 
-from app.services.overmind.code_intelligence.core import StructuralCodeIntelligence
+from microservices.orchestrator_service.src.services.overmind.code_intelligence.core import StructuralCodeIntelligence
 
 
 @pytest.fixture

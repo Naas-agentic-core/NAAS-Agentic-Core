@@ -5,9 +5,9 @@
 import asyncio
 from datetime import UTC, datetime
 
-from app.services.overmind.domain.api_schemas import AgentPlanData, AgentsPlanRequest
-from app.services.overmind.plan_registry import AgentPlanRecord, AgentPlanRegistry
-from app.services.overmind.plan_service import AgentPlanService
+from microservices.orchestrator_service.src.services.overmind.domain.api_schemas import AgentPlanData, AgentsPlanRequest
+from microservices.orchestrator_service.src.services.overmind.plan_registry import AgentPlanRecord, AgentPlanRegistry
+from microservices.orchestrator_service.src.services.overmind.plan_service import AgentPlanService
 
 
 class StubStrategist:

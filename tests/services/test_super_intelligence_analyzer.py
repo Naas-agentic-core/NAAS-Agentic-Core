@@ -1,7 +1,7 @@
 import pytest
 
-from app.services.overmind.domain.super_intelligence.analyzer import SituationAnalyzer
-from app.services.overmind.domain.super_intelligence.synthesizer import DecisionSynthesizer
+from microservices.orchestrator_service.src.services.overmind.domain.super_intelligence.analyzer import SituationAnalyzer
+from microservices.orchestrator_service.src.services.overmind.domain.super_intelligence.synthesizer import DecisionSynthesizer
 
 
 @pytest.mark.asyncio

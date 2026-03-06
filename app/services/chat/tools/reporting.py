@@ -8,7 +8,7 @@ from app.core.database import async_session_factory
 from app.core.domain.chat import CustomerConversation, CustomerMessage, MessageRole
 from app.core.domain.mission import Mission, MissionStatus
 from app.core.logging import get_logger
-from app.services.overmind.user_knowledge.service import UserKnowledge
+from microservices.orchestrator_service.src.services.overmind.user_knowledge.service import UserKnowledge
 
 logger = get_logger("reporting-tools")
 

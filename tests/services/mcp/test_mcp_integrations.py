@@ -50,10 +50,10 @@ class TestMCPIntegrationsLangGraph:
             with patch.dict(
                 "sys.modules",
                 {
-                    "app.services.overmind.langgraph": MagicMock(
+                    "microservices.orchestrator_service.src.services.overmind.langgraph": MagicMock(
                         LangGraphAgentService=mock_service
                     ),
-                    "app.services.overmind.domain.api_schemas": MagicMock(
+                    "microservices.orchestrator_service.src.services.overmind.domain.api_schemas": MagicMock(
                         LangGraphRunRequest=MagicMock()
                     ),
                 },

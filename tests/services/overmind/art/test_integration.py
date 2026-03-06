@@ -3,11 +3,11 @@
 Tests for CS73 Art Integration Module
 """
 
-from app.services.overmind.art.integration import (
+from microservices.orchestrator_service.src.services.overmind.art.integration import (
     OvermindArtIntegration,
     create_art_from_overmind_data,
 )
-from app.services.overmind.art.styles import ArtStyle
+from microservices.orchestrator_service.src.services.overmind.art.styles import ArtStyle
 
 
 class TestOvermindArtIntegration:

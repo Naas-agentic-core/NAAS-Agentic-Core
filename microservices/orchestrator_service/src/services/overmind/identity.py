@@ -23,11 +23,11 @@ from microservices.orchestrator_service.src.core.logging import get_logger
 from microservices.orchestrator_service.src.services.overmind.agents.principles import (
     get_agent_principles,
 )
-from microservices.orchestrator_service.src.services.overmind.agents.system_principles import (
+from microservices.orchestrator_service.src.services.overmind.utils.context_service import (
     format_architecture_system_principles,
     format_system_principles,
-    get_architecture_system_principles,
-    get_system_principles,
+    format_architecture_system_principles,
+    format_system_principles,
 )
 from microservices.orchestrator_service.src.services.overmind.dec_pomdp_proof import (
     build_dec_pomdp_proof_summary,
@@ -115,11 +115,11 @@ class OvermindIdentity:
             AgentPrinciple(number=p.number, statement=p.statement) for p in get_agent_principles()
         ]
         schema.system_principles = [
-            AgentPrinciple(number=p.number, statement=p.statement) for p in get_system_principles()
+            AgentPrinciple(number=p.number, statement=p.statement) for p in format_system_principles()
         ]
         schema.architecture_system_principles = [
             AgentPrinciple(number=p.number, statement=p.statement)
-            for p in get_architecture_system_principles()
+            for p in format_architecture_system_principles()
         ]
 
         return schema
@@ -187,7 +187,7 @@ class OvermindIdentity:
         """
         return [p.model_dump() for p in self.identity_model.agent_principles]
 
-    def get_system_principles(self) -> list[dict[str, int | str]]:
+    def format_system_principles(self) -> list[dict[str, int | str]]:
         """
         الحصول على مبادئ النظام الصارمة بشكل منظم.
 
@@ -196,7 +196,7 @@ class OvermindIdentity:
         """
         return [p.model_dump() for p in self.identity_model.system_principles]
 
-    def get_architecture_system_principles(self) -> list[dict[str, int | str]]:
+    def format_architecture_system_principles(self) -> list[dict[str, int | str]]:
         """
         الحصول على مبادئ المعمارية وحوكمة البيانات بشكل منظم.
 

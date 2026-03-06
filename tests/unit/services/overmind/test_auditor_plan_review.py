@@ -2,7 +2,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from app.services.overmind.agents.auditor import AuditorAgent
+from microservices.orchestrator_service.src.services.overmind.agents.auditor import AuditorAgent
 
 
 @pytest.mark.asyncio

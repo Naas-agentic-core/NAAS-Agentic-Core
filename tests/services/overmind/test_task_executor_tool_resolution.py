@@ -5,7 +5,7 @@
 import pytest
 
 from app.core.domain.mission import Task
-from app.services.overmind.executor import TaskExecutor
+from microservices.orchestrator_service.src.services.overmind.executor import TaskExecutor
 
 
 class _NullStateManager:

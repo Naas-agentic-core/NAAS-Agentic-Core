@@ -1,7 +1,7 @@
 """اختبارات توصيفية لمعلومات البيئة في معرفة المشروع."""
 
 from app.core.config import get_settings
-from app.services.overmind.knowledge import ProjectKnowledge
+from microservices.orchestrator_service.src.services.overmind.knowledge import ProjectKnowledge
 
 
 def _reset_settings_cache() -> None:

@@ -7,7 +7,7 @@ The central nervous system of the toolset.
 import time
 from collections.abc import Callable
 
-from app.services.overmind.tool_canonicalizer import canonicalize_tool_name as new_canonicalizer
+from microservices.orchestrator_service.src.services.overmind.tool_canonicalizer import canonicalize_tool_name as new_canonicalizer
 
 from .core_execution import _execute_tool_with_error_handling
 from .core_metrics import _enrich_result_metadata, _record_invocation

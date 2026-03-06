@@ -3,7 +3,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from app.core.protocols import CollaborationContext
-from app.services.overmind.agents.operator import OperatorAgent
+from microservices.orchestrator_service.src.services.overmind.agents.operator import OperatorAgent
 
 
 class MockContext(CollaborationContext):

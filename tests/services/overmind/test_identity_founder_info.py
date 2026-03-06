@@ -9,7 +9,7 @@
 
 import pytest
 
-from app.services.overmind.identity import OvermindIdentity
+from microservices.orchestrator_service.src.services.overmind.identity import OvermindIdentity
 
 
 class TestOvermindIdentityFounder:

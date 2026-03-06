@@ -3,11 +3,11 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from app.core.domain.models import Mission
-from app.services.overmind.agents.architect import ArchitectAgent
-from app.services.overmind.agents.auditor import AuditorAgent
-from app.services.overmind.agents.operator import OperatorAgent
-from app.services.overmind.agents.strategist import StrategistAgent
-from app.services.overmind.domain.cognitive import SuperBrain
+from microservices.orchestrator_service.src.services.overmind.agents.architect import ArchitectAgent
+from microservices.orchestrator_service.src.services.overmind.agents.auditor import AuditorAgent
+from microservices.orchestrator_service.src.services.overmind.agents.operator import OperatorAgent
+from microservices.orchestrator_service.src.services.overmind.agents.strategist import StrategistAgent
+from microservices.orchestrator_service.src.services.overmind.domain.cognitive import SuperBrain
 
 
 @pytest.mark.asyncio

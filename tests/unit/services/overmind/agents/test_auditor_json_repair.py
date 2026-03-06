@@ -3,7 +3,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from app.services.overmind.agents.auditor import AuditorAgent
+from microservices.orchestrator_service.src.services.overmind.agents.auditor import AuditorAgent
 
 
 class TestAuditorJsonRepair:
