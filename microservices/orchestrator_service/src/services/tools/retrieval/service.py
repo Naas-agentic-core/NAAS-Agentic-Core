@@ -4,7 +4,6 @@ Application Layer.
 Coordinators domain logic, infrastructure, and fallback strategies.
 """
 
-
 import contextlib
 
 from microservices.orchestrator_service.src.core.logging import get_logger
