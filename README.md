@@ -19,6 +19,23 @@ This repository is governed by strict ethical protocols for youth safety. All re
 
 ---
 
+## 🌟 Core Project Goals
+
+Safety is the absolute core of our mission. We prioritize **measurement before protection** through a rigorous, transparent, and data-driven approach:
+
+*   📊 **Robust Benchmarking:** Build a powerful benchmark to proactively discover and quantify risks across **Arabic, French, Darija, and Arabizi**.
+*   🗄️ **Unique Dataset Creation:** Curate an exclusive dataset focused specifically on complex linguistic evasion and jailbreak attempts.
+*   🧠 **Intent-Driven Reasoning:** Utilize advanced **Reasoning** to analyze true user intent, moving beyond simple keyword matching.
+*   🛡️ **Verify-then-Reply Architecture:** Enforce a strict **Verify-then-Reply** layer backed by detailed **Audit Logs** and **Reasoning Traces** to justify and prove every decision.
+*   🚫 **Evasion Resistance:** Fortify the system against evasion tactics through intelligent language unification and code-switching detection.
+*   📡 **Telemetry & Compliance:** Provide deep **Telemetry** and absolute transparency to align with strict regulatory standards like the **EU AI Act**.
+*   🌐 **Decentralized Resilience:** Architect the system to avoid any **Single Point of Failure** in centralized control mechanisms.
+*   🚀 **Enterprise Safety API:** Evolve the project into a comprehensive **Benchmark + Safety API** designed to serve and protect enterprise institutions.
+
+> **💎 The True Value:** Exceptional Data, Rigorous Measurement, and Fully Auditable Transparency.
+
+---
+
 ## 🏛️ Executive Summary & Architecture
 
 ### The Mission
