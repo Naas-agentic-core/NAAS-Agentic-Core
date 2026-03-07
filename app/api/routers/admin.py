@@ -15,18 +15,24 @@
 import inspect
 from collections.abc import Callable
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.routers.ws_auth import extract_websocket_auth
 from app.api.schemas.admin import ConversationDetailsResponse, ConversationSummaryResponse
+from app.core.ai_gateway import AIClient, get_ai_client
+from app.core.config import get_settings
 from app.core.database import async_session_factory, get_db
 from app.core.di import get_logger
 from app.core.domain.user import User
 from app.deps.auth import CurrentUser, get_current_user, require_roles
 from app.infrastructure.clients.user_client import user_client
+from app.services.auth.token_decoder import decode_user_id
 from app.services.boundaries.admin_chat_boundary_service import AdminChatBoundaryService
+from app.services.chat.contracts import ChatDispatchRequest
 from app.services.chat.dispatcher import ChatRoleDispatcher, build_chat_dispatcher
+from app.services.chat.orchestrator import ChatOrchestrator
 from app.services.rbac import ADMIN_ROLE
 
 logger = get_logger(__name__)
@@ -153,6 +159,97 @@ async def get_admin_user_count() -> AdminUserCountResponse:
     except Exception as e:
         logger.error(f"Failed to retrieve user count: {e}")
         raise HTTPException(status_code=503, detail="User Service unavailable") from e
+
+
+@router.websocket("/api/chat/ws")
+async def chat_stream_ws(
+    websocket: WebSocket,
+    ai_client: AIClient = Depends(get_ai_client),
+    dispatcher: ChatRoleDispatcher = Depends(get_chat_dispatcher),
+    session_factory: Callable[[], AsyncSession] = Depends(get_session_factory),
+    db: AsyncSession = Depends(get_db),
+) -> None:
+    """
+    قناة WebSocket لبث محادثة المسؤول بشكل حي وآمن.
+    """
+    token, selected_protocol = extract_websocket_auth(websocket)
+    if not token:
+        await websocket.close(code=4401)
+        return
+
+    try:
+        user_id = decode_user_id(token, get_settings().SECRET_KEY)
+    except HTTPException:
+        await websocket.close(code=4401)
+        return
+
+    actor = await db.get(User, user_id)
+    if actor is None or not actor.is_active:
+        await websocket.close(code=4401)
+        return
+
+    await websocket.accept(subprotocol=selected_protocol)
+
+    if not actor.is_admin:
+        await websocket.send_json(
+            {
+                "type": "error",
+                "payload": {
+                    "details": "Standard accounts must use the customer chat endpoint.",
+                    "status_code": 403,
+                },
+            }
+        )
+        await websocket.close(code=4403)
+        return
+
+    try:
+        while True:
+            payload = await websocket.receive_json()
+            question = str(payload.get("question", "")).strip()
+            if not question:
+                await websocket.send_json(
+                    {"type": "error", "payload": {"details": "Question is required."}}
+                )
+                continue
+
+            mission_type = payload.get("mission_type")
+            metadata = {}
+            if mission_type:
+                metadata["mission_type"] = mission_type
+
+            dispatch_request = ChatDispatchRequest(
+                question=question,
+                conversation_id=payload.get("conversation_id"),
+                ai_client=ai_client,
+                session_factory=session_factory,
+                metadata=metadata,
+            )
+
+            try:
+                dispatch_result = await ChatOrchestrator.dispatch(
+                    user=actor,
+                    request=dispatch_request,
+                    dispatcher=dispatcher,
+                )
+            except HTTPException as exc:
+                await websocket.send_json(
+                    {
+                        "type": "error",
+                        "payload": {"details": exc.detail, "status_code": exc.status_code},
+                    }
+                )
+                continue
+
+            await websocket.send_json(
+                {"type": "status", "payload": {"status_code": dispatch_result.status_code}}
+            )
+
+            async for event in dispatch_result.stream:
+                await websocket.send_json(event)
+
+    except WebSocketDisconnect:
+        logger.info("Admin WebSocket disconnected")
 
 
 @router.get(
