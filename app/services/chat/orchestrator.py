@@ -34,6 +34,7 @@ from app.services.chat.handlers.strategy_handlers import (
     FileReadHandler,
     FileWriteHandler,
     HelpHandler,
+    MissionComplexHandler,
     ProjectIndexHandler,
 )
 from app.services.chat.intent_detector import ChatIntent, IntentDetector
@@ -92,6 +93,7 @@ class ChatOrchestrator:
             CodeSearchHandler(),
             ProjectIndexHandler(),
             DeepAnalysisHandler(),
+            MissionComplexHandler(),
             HelpHandler(),
             DefaultChatHandler(),  # المعالج الافتراضي
         ]

@@ -1,0 +1,17 @@
+fastapi==0.109.2
+uvicorn==0.27.1
+pydantic>=2.8.0,<3.0.0
+pydantic-settings==2.2.1
+sqlalchemy>=2.0.25
+asyncpg>=0.29.0
+psycopg2-binary>=2.9.9
+aiosqlite>=0.17.0
+openai==1.55.0
+langgraph
+dspy
+litellm==1.50.0
+llama-index-core>=0.10.0
+llama-index-llms-openai>=0.1.0
+tenacity>=8.0.0
+python-json-logger>=2.0.0
+httpx==0.27.2

@@ -19,7 +19,7 @@ async def test_process_passes_session_factory():
 
     orchestrator = ChatOrchestrator()
 
-    # Force specific handler to be the only handler for a specific intent
+    # Force MissionComplexHandler to be the only handler for a specific intent
     # Actually Orchestrator uses IntentDetector.
     # Let's mock IntentDetector to return MISSION_COMPLEX
 
@@ -29,7 +29,7 @@ async def test_process_passes_session_factory():
     )
 
     # Mock the handler execution to just return the context for verification
-    # or let it run specific handler logic which we can partially mock.
+    # or let it run MissionComplexHandler logic which we can partially mock.
 
     # Let's mock the handlers registry execution
     orchestrator._handlers = MagicMock()

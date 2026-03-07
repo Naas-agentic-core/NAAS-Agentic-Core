@@ -350,6 +350,7 @@ services:
       - RESEARCH_AGENT_URL=http://research-agent:8007
       - REASONING_AGENT_URL=http://reasoning-agent:8008
       - USER_SERVICE_URL=http://user-service:8003
+      - AUDITOR_SERVICE_URL=http://auditor-service:8009
     command: uvicorn microservices.orchestrator_service.main:app --host 0.0.0.0 --port 8006
     networks:
       - cogniforge-network
@@ -387,7 +388,27 @@ services:
       timeout: 10s
       retries: 3
 
-  # Reasoning Agent
+  # Auditor Service - The strict reviewer of the plans and execution
+  auditor-service:
+    build:
+      context: ./microservices/auditor_service
+      dockerfile: Dockerfile
+    container_name: cogniforge-auditor-service
+    ports:
+      - "8009:8009"
+    environment:
+      - SERVICE_NAME=auditor-service
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+    command: uvicorn microservices.auditor_service.src.main:app --host 0.0.0.0 --port 8009
+    networks:
+      - cogniforge-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8009/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Reasoning Agent - Handles deep thinking requests
   reasoning-agent:
     build:
       context: ./microservices/reasoning_agent
