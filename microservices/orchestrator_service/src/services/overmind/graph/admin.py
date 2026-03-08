@@ -1,5 +1,4 @@
 import re
-import typing
 from datetime import datetime
 from typing import Any
 
