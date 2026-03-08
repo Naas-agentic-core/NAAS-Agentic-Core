@@ -164,7 +164,7 @@ jobs:
       - name: 📦 Install Dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements-test.txt pytest fastapi httpx sqlalchemy pydantic-settings pyjwt uvicorn
+          pip install -r requirements-test.txt pytest fastapi httpx sqlalchemy pydantic-settings pyjwt uvicorn opentelemetry-api opentelemetry-sdk
 
       - name: 🛡️ Run Guardrails
         run: python scripts/ci_guardrails.py
@@ -268,7 +268,7 @@ jobs:
       - name: 📦 Install Dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements-test.txt
+          pip install -r requirements-test.txt opentelemetry-api opentelemetry-sdk
 
       - name: ✅ Verify Configuration
         run: |
