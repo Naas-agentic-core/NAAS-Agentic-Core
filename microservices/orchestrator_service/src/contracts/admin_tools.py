@@ -1,7 +1,6 @@
 import subprocess
 from datetime import datetime
 
-import docker
 from sqlalchemy import text
 
 from microservices.orchestrator_service.src.core.database import async_session_factory
@@ -86,9 +85,16 @@ def list_microservices() -> str:
     """List all running services"""
     validate_tool_name("admin.list_microservices")
     try:
-        client = docker.from_env()
-        containers = client.containers.list()
-        names = [c.name for c in containers]
+        result = subprocess.run(
+            ["docker", "ps", "--format", "{{.Names}}"],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if result.returncode != 0:
+            raise ToolExecutionError(result.stderr.strip() or "Docker command failed")
+
+        names = [line for line in result.stdout.splitlines() if line.strip()]
         return f"الخدمات المصغرة النشطة: {len(names)} خدمة\n" + "\n".join(f"• {n}" for n in names)
     except Exception as e:
         raise ToolExecutionError(f"ADMIN_TOOL_UNAVAILABLE: {e}") from e
