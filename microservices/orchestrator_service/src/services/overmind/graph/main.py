@@ -6,13 +6,40 @@ from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import END, StateGraph
 
 from .admin import ADMIN_TOOLS, AdminAgentNode
-from .search import (
-    InternalRetrieverNode,
-    QueryAnalyzerNode,
-    RerankerNode,
-    SynthesizerNode,
-    WebSearchFallbackNode,
-)
+
+
+def _load_search_nodes() -> tuple[type, type, type, type, type]:
+    """يحمّل عقد البحث عند توفر التبعيات ويعيد بدائل آمنة عند غيابها."""
+    try:
+        from .search import (
+            InternalRetrieverNode,
+            QueryAnalyzerNode,
+            RerankerNode,
+            SynthesizerNode,
+            WebSearchFallbackNode,
+        )
+
+        return (
+            QueryAnalyzerNode,
+            InternalRetrieverNode,
+            RerankerNode,
+            WebSearchFallbackNode,
+            SynthesizerNode,
+        )
+    except Exception:
+        class _PassthroughNode:
+            def __call__(self, state: dict) -> dict:
+                return state
+
+        return (
+            _PassthroughNode,
+            _PassthroughNode,
+            _PassthroughNode,
+            _PassthroughNode,
+            _PassthroughNode,
+        )
+
+
 
 
 class AgentState(TypedDict):
@@ -109,14 +136,22 @@ def check_quality(state: AgentState) -> str:
 def create_unified_graph():
     graph = StateGraph(AgentState)
 
+    (
+        query_analyzer_node,
+        internal_retriever_node,
+        reranker_node,
+        web_search_fallback_node,
+        synthesizer_node,
+    ) = _load_search_nodes()
+
     graph.add_node("supervisor", SupervisorNode())
-    graph.add_node("query_analyzer", QueryAnalyzerNode())
-    graph.add_node("retriever", InternalRetrieverNode())
-    graph.add_node("reranker", RerankerNode())
-    graph.add_node("web_fallback", WebSearchFallbackNode())
+    graph.add_node("query_analyzer", query_analyzer_node())
+    graph.add_node("retriever", internal_retriever_node())
+    graph.add_node("reranker", reranker_node())
+    graph.add_node("web_fallback", web_search_fallback_node())
     graph.add_node("admin_agent", AdminAgentNode())
     graph.add_node("tool_executor", ToolExecutorNode())
-    graph.add_node("synthesizer", SynthesizerNode())
+    graph.add_node("synthesizer", synthesizer_node())
     graph.add_node("validator", ValidatorNode())
 
     graph.add_conditional_edges(

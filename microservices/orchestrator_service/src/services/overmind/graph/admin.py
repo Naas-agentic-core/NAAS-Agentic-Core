@@ -1,15 +1,24 @@
+import importlib
 import subprocess
 from datetime import datetime
 from typing import Any, TypedDict
 
-import docker
 from langchain_core.messages import BaseMessage
-from langchain_openai import ChatOpenAI
 from sqlalchemy import text
 
 from microservices.orchestrator_service.src.core.database import async_session_factory
 
 from .mcp_mock import kagent_tool
+
+
+def _load_chat_openai_class():
+    """يحمّل فئة ChatOpenAI بشكل كسول لتجنب أعطال الاستيراد عند غياب التبعيات."""
+    try:
+        from langchain_openai import ChatOpenAI as chat_openai_class
+    except Exception as exc:  # pragma: no cover - defensive import for unstable environments
+        raise RuntimeError("langchain-openai dependency is unavailable") from exc
+
+    return chat_openai_class
 
 
 class AgentState(TypedDict):
@@ -40,7 +49,12 @@ async def count_db_tables() -> dict:
 def list_microservices() -> dict:
     """List all running microservices using Docker SDK."""
     try:
-        client = docker.from_env()
+        docker_spec = importlib.util.find_spec("docker")
+        if docker_spec is None:
+            return {"count": 0, "services": [], "error": "docker-sdk-unavailable", "unit": "خدمة مصغرة"}
+
+        docker_module = importlib.import_module("docker")
+        client = docker_module.from_env()
         services = client.containers.list()
         return {
             "count": len(services),
@@ -82,7 +96,8 @@ class AdminAgentNode:
     """
 
     def __init__(self):
-        self.llm = ChatOpenAI(model="gpt-4o-mini", temperature=0).bind_tools(
+        chat_openai_class = _load_chat_openai_class()
+        self.llm = chat_openai_class(model="gpt-4o-mini", temperature=0).bind_tools(
             tools=ADMIN_TOOLS,
             tool_choice="required",  # NON NEGOTIABLE
         )

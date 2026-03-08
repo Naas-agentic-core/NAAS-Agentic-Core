@@ -1,5 +1,6 @@
 import asyncio
 import hashlib
+import importlib
 import logging
 from contextlib import asynccontextmanager
 
@@ -73,9 +74,50 @@ def _resolve_chat_ws_target(route_id: str, upstream_path: str) -> str:
 
 import uuid
 
-from opentelemetry import trace
 
-tracer = trace.get_tracer(__name__)
+class _NoOpSpan:
+    """يمثل Span افتراضيًا لا ينفذ أي تتبع عند غياب حزمة OpenTelemetry."""
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        return False
+
+
+class _NoOpTracer:
+    """يوفّر واجهة تتبع بديلة تضمن استمرار عمل البوابة دون تبعيات اختيارية."""
+
+    def start_as_current_span(self, _name: str, attributes: dict[str, str] | None = None):
+        _ = attributes
+        return _NoOpSpan()
+
+
+def _build_tracer() -> object:
+    """ينشئ كائن التتبع الحقيقي إذا توفر OpenTelemetry وإلا يعيد بديلًا آمنًا."""
+    telemetry_module = importlib.import_module("opentelemetry") if importlib.util.find_spec("opentelemetry") else None
+    if telemetry_module is None:
+        return _NoOpTracer()
+
+    trace_module = telemetry_module.trace
+    return trace_module.get_tracer(__name__)
+
+
+def _inject_trace_context(headers: dict[str, str]) -> None:
+    """يحقن سياق التتبع داخل الترويسات عند توفر وحدة propagate."""
+    try:
+        propagate_spec = importlib.util.find_spec("opentelemetry.propagate")
+    except ModuleNotFoundError:
+        return
+
+    if propagate_spec is None:
+        return
+
+    propagate_module = importlib.import_module("opentelemetry.propagate")
+    propagate_module.inject(headers)
+
+
+tracer = _build_tracer()
 
 
 def log_telemetry(event_name: str, trace_id: str):
@@ -129,13 +171,12 @@ async def chat_ws_proxy(websocket: WebSocket):
     Customer Chat WebSocket (Modern Target).
     TARGET: Orchestrator Service / Conversation Service
     """
-    from opentelemetry.propagate import inject
     from starlette.websockets import WebSocketState
 
     route_id = "chat_ws_customer"
     with tracer.start_as_current_span("ws.proxy", attributes={"agent": "orchestrator"}):
         headers = {}
-        inject(headers)
+        _inject_trace_context(headers)
         logger.info(
             f"Chat WebSocket route_id={route_id} legacy_flag=false traceparent={headers.get('traceparent', 'unknown')}"
         )
@@ -160,13 +201,12 @@ async def admin_chat_ws_proxy(websocket: WebSocket):
     Admin Chat WebSocket (Modern Target).
     TARGET: Orchestrator Service / Conversation Service
     """
-    from opentelemetry.propagate import inject
     from starlette.websockets import WebSocketState
 
     route_id = "chat_ws_admin"
     with tracer.start_as_current_span("ws.proxy", attributes={"agent": "orchestrator"}):
         headers = {}
-        inject(headers)
+        _inject_trace_context(headers)
         logger.info(
             f"Chat WebSocket route_id={route_id} legacy_flag=false traceparent={headers.get('traceparent', 'unknown')}"
         )
