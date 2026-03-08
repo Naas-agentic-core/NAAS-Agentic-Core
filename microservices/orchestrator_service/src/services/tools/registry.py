@@ -34,9 +34,9 @@ def startup_registry_check(registry: dict[str, Callable]) -> None:
     """
     from microservices.orchestrator_service.src.contracts.admin_tools import ADMIN_TOOL_CONTRACT
 
-    REQUIRED_ADMIN_TOOLS = list(ADMIN_TOOL_CONTRACT.keys())
+    required_admin_tools = list(ADMIN_TOOL_CONTRACT.keys())
     registered = list(registry.keys())
-    missing = [t for t in REQUIRED_ADMIN_TOOLS if t not in registered]
+    missing = [t for t in required_admin_tools if t not in registered]
 
     if missing:
         raise CriticalStartupError(
@@ -49,9 +49,9 @@ def startup_registry_check(registry: dict[str, Callable]) -> None:
         "✅ Admin tool registry healthy",
         extra={
             "registered_tools": registered,
-            "required_tools": REQUIRED_ADMIN_TOOLS,
-            "status": "ALL_PRESENT"
-        }
+            "required_tools": required_admin_tools,
+            "status": "ALL_PRESENT",
+        },
     )
 
 
@@ -62,13 +62,13 @@ def register_all_tools() -> None:
     """
     try:
         # Import here to avoid circular dependencies
+        from microservices.orchestrator_service.src.contracts.admin_tools import ADMIN_TOOLS
         from microservices.orchestrator_service.src.services.tools.content import (
             register_content_tools,
         )
         from microservices.orchestrator_service.src.services.tools.retrieval.service import (
             search_educational_content,
         )
-        from microservices.orchestrator_service.src.contracts.admin_tools import ADMIN_TOOLS
 
         registry = get_registry()
 

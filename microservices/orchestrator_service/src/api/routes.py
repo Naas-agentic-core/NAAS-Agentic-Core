@@ -1,5 +1,6 @@
 import logging
 import uuid
+from typing import Any
 
 from fastapi import (
     APIRouter,
@@ -16,6 +17,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from microservices.orchestrator_service.src.contracts.admin_tools import ADMIN_TOOL_CONTRACT
 from microservices.orchestrator_service.src.core.config import get_settings
 from microservices.orchestrator_service.src.core.database import async_session_factory, get_db
 from microservices.orchestrator_service.src.core.event_bus import get_event_bus
@@ -36,10 +38,7 @@ from microservices.orchestrator_service.src.services.overmind.domain.api_schemas
 from microservices.orchestrator_service.src.services.overmind.entrypoint import start_mission
 from microservices.orchestrator_service.src.services.overmind.graph.main import create_unified_graph
 from microservices.orchestrator_service.src.services.overmind.state import MissionStateManager
-from typing import Any
-
 from microservices.orchestrator_service.src.services.overmind.utils.tools import tool_registry
-from microservices.orchestrator_service.src.contracts.admin_tools import ADMIN_TOOL_CONTRACT
 from microservices.orchestrator_service.src.services.tools.registry import get_registry
 
 logger = logging.getLogger(__name__)
@@ -49,19 +48,26 @@ router = APIRouter(
 )
 
 # MCP Admin Tool Endpoints dynamically generated from contract
-for tool_name in ADMIN_TOOL_CONTRACT.keys():
+for tool_name in ADMIN_TOOL_CONTRACT:
 
     @router.post(f"/api/v1/tools/{tool_name}/invoke", tags=["Admin MCP Tools"])
-    async def invoke_admin_tool(payload: dict[str, Any] = {}, name=tool_name) -> dict[str, Any]:
+    async def invoke_admin_tool(
+        payload: dict[str, Any] | None = None, name=tool_name
+    ) -> dict[str, Any]:
+        if payload is None:
+            payload = {}
         tool_fn = get_registry().get(name)
         if not tool_fn:
             raise HTTPException(status_code=404, detail="Tool not found in registry")
 
         try:
             import asyncio
+
             if hasattr(tool_fn, "ainvoke"):
                 result = await tool_fn.ainvoke(payload)
-            elif asyncio.iscoroutinefunction(tool_fn) or asyncio.iscoroutinefunction(getattr(tool_fn, "invoke", None)):
+            elif asyncio.iscoroutinefunction(tool_fn) or asyncio.iscoroutinefunction(
+                getattr(tool_fn, "invoke", None)
+            ):
                 result = await tool_fn(**payload)
             elif hasattr(tool_fn, "invoke"):
                 result = tool_fn.invoke(payload)
@@ -74,19 +80,12 @@ for tool_name in ADMIN_TOOL_CONTRACT.keys():
 
     @router.get(f"/api/v1/tools/{tool_name}/schema", tags=["Admin MCP Tools"])
     async def get_admin_tool_schema(name=tool_name) -> dict[str, Any]:
-        return {
-            "name": name,
-            "description": ADMIN_TOOL_CONTRACT.get(name),
-            "parameters": {}
-        }
+        return {"name": name, "description": ADMIN_TOOL_CONTRACT.get(name), "parameters": {}}
 
     @router.get(f"/api/v1/tools/{tool_name}/health", tags=["Admin MCP Tools"])
     async def get_admin_tool_health(name=tool_name) -> dict[str, Any]:
         tool_fn = get_registry().get(name)
-        return {
-            "name": name,
-            "status": "healthy" if tool_fn else "unavailable"
-        }
+        return {"name": name, "status": "healthy" if tool_fn else "unavailable"}
 
 
 class ChatRequest(BaseModel):
