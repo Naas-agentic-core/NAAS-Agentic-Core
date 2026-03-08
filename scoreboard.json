@@ -6,7 +6,7 @@
   "super_agent_owner": "orchestrator-service",
   "single_brain_architecture": true,
   "app_import_count_in_microservices": 0,
-  "active_overmind_duplication_metric": 132,
+  "active_overmind_duplication_metric": 128,
   "stategraph_is_runtime_backbone": true,
   "contract_gate": true,
   "tracing_gate": true

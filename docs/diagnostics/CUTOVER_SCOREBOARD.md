@@ -11,7 +11,7 @@
 | super_agent_owner | orchestrator-service |
 | single_brain_architecture | true |
 | app_import_count_in_microservices | 0 |
-| active_copy_coupling_overlap_metric | 132 |
+| active_copy_coupling_overlap_metric | 128 |
 | stategraph_is_runtime_backbone | true |
 | docs_runtime_parity | true |
 | contract_gate | true |
@@ -30,7 +30,7 @@
 
 ### 3) Phantom-limb coupling
 - Import edges (`from app` داخل microservices): **0**.
-- Copy-coupling overlap (`app/services/overmind` vs `microservices/orchestrator_service/src/services/overmind`): **132** shared files.
+- Copy-coupling overlap (`app/services/overmind` vs `microservices/orchestrator_service/src/services/overmind`): **128** shared files.
 - Overmind coupling gate (phase 2b / strict_decrease): **true**.
 
 ### 4) Service lifecycle drift
