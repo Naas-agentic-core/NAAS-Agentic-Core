@@ -57,9 +57,10 @@ class _FakeLangGraphService:
 
 def test_chat_http_messages_uses_stategraph(monkeypatch) -> None:
     """يتأكد أن POST /api/chat/messages يعيد استجابة موحدة من مسار StateGraph."""
+
     class FakeGraph:
         async def ainvoke(self, *args, **kwargs):
-                return {"final_response": "stategraph-response"}
+            return {"final_response": "stategraph-response"}
 
     def _fake_create_unified_graph():
         return FakeGraph()
@@ -85,6 +86,7 @@ from microservices.orchestrator_service.src.core.config import get_settings
 
 def test_chat_ws_customer_uses_stategraph(monkeypatch) -> None:
     """يتأكد أن WS العميل يمر عبر نفس مسار StateGraph ويرجع route_id الصحيح."""
+
     class FakeGraph:
         async def ainvoke(self, *args, **kwargs):
             return {"final_response": "Fake Graph WS Result"}
@@ -122,6 +124,7 @@ def test_chat_ws_customer_uses_stategraph(monkeypatch) -> None:
 
 def test_chat_ws_admin_uses_stategraph(monkeypatch) -> None:
     """يتأكد أن WS الإداري يستخدم StateGraph ويرجع route_id الإداري."""
+
     class FakeGraph:
         async def ainvoke(self, *args, **kwargs):
             return {"final_response": "Fake Graph Admin WS Result"}

@@ -211,28 +211,11 @@ class WebSearchFallbackNode:
         if len(reranked) == 0:
             query_str = f"بكالوريا {filters.subject} {filters.branch} {filters.year} تمرين {filters.exercise_num}"
             try:
-                from app.services.mcp.integrations import MCPIntegrations
-
-                mcp = MCPIntegrations()
-                web_results = await mcp.invoke(
-                    server="naas.tools.websearch",
-                    tool="tavily_search",
-                    params={"query": query_str, "max_results": 5, "language": "ar"},
-                )
-                docs = [
-                    LlamaDocument(text=res, metadata={"source": "الإنترنت", "score": 0.85})
-                    for res in web_results
-                ]
+                report = await research_client.deep_research(query_str)
+                docs = [LlamaDocument(text=report, metadata={"source": "الإنترنت", "score": 0.85})]
             except Exception as e:
                 error = e
-                try:
-                    report = await research_client.deep_research(query_str)
-                    docs = [
-                        LlamaDocument(text=report, metadata={"source": "الإنترنت", "score": 0.85})
-                    ]
-                except Exception as deeper_e:
-                    error = deeper_e
-                    docs = []
+                docs = []
 
             emit_telemetry(
                 node_name="WebSearchFallbackNode",
