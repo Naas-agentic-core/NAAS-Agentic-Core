@@ -14,11 +14,11 @@ from .mcp_mock import kagent_tool
 def _load_chat_openai_class():
     """يحمّل فئة ChatOpenAI بشكل كسول لتجنب أعطال الاستيراد عند غياب التبعيات."""
     try:
-        from langchain_openai import ChatOpenAI as chat_openai_class
+        from langchain_openai import ChatOpenAI
     except Exception as exc:  # pragma: no cover - defensive import for unstable environments
         raise RuntimeError("langchain-openai dependency is unavailable") from exc
 
-    return chat_openai_class
+    return ChatOpenAI
 
 
 class AgentState(TypedDict):
@@ -51,7 +51,12 @@ def list_microservices() -> dict:
     try:
         docker_spec = importlib.util.find_spec("docker")
         if docker_spec is None:
-            return {"count": 0, "services": [], "error": "docker-sdk-unavailable", "unit": "خدمة مصغرة"}
+            return {
+                "count": 0,
+                "services": [],
+                "error": "docker-sdk-unavailable",
+                "unit": "خدمة مصغرة",
+            }
 
         docker_module = importlib.import_module("docker")
         client = docker_module.from_env()

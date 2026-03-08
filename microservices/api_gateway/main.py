@@ -95,7 +95,11 @@ class _NoOpTracer:
 
 def _build_tracer() -> object:
     """ينشئ كائن التتبع الحقيقي إذا توفر OpenTelemetry وإلا يعيد بديلًا آمنًا."""
-    telemetry_module = importlib.import_module("opentelemetry") if importlib.util.find_spec("opentelemetry") else None
+    telemetry_module = (
+        importlib.import_module("opentelemetry")
+        if importlib.util.find_spec("opentelemetry")
+        else None
+    )
     if telemetry_module is None:
         return _NoOpTracer()
 

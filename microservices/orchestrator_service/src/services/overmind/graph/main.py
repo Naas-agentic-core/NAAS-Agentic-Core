@@ -27,6 +27,7 @@ def _load_search_nodes() -> tuple[type, type, type, type, type]:
             SynthesizerNode,
         )
     except Exception:
+
         class _PassthroughNode:
             def __call__(self, state: dict) -> dict:
                 return state
@@ -38,8 +39,6 @@ def _load_search_nodes() -> tuple[type, type, type, type, type]:
             _PassthroughNode,
             _PassthroughNode,
         )
-
-
 
 
 class AgentState(TypedDict):
