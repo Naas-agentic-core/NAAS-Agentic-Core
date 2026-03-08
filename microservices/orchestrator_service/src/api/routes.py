@@ -36,7 +36,7 @@ from microservices.orchestrator_service.src.services.overmind.domain.api_schemas
     MissionResponse,
 )
 from microservices.orchestrator_service.src.services.overmind.entrypoint import start_mission
-from microservices.orchestrator_service.src.services.overmind.graph.main import create_unified_graph
+from microservices.orchestrator_service.src.services.overmind.graph import create_unified_graph
 from microservices.orchestrator_service.src.services.overmind.state import MissionStateManager
 from microservices.orchestrator_service.src.services.overmind.utils.tools import tool_registry
 from microservices.orchestrator_service.src.services.tools.registry import get_registry
