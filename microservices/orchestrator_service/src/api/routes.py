@@ -632,8 +632,9 @@ async def chat_with_agent_endpoint(
     is_admin = context.get("chat_scope") == "admin" or getattr(request, "chat_scope", "") == "admin" or request.context.get("chat_scope") == "admin"
 
     if is_admin:
-        from microservices.orchestrator_service.src.services.overmind.graph.admin import admin_app
         import json
+
+        from microservices.orchestrator_service.src.services.overmind.graph.admin import admin_app
         async def _admin_stream():
             try:
                 res = await admin_app.ainvoke({"query": request.question, "is_admin_user": True})
