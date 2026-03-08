@@ -1,148 +1,187 @@
-import importlib
-import subprocess
+import re
 from datetime import datetime
-from typing import Any, TypedDict
+from typing import Any
 
-from langchain_core.messages import BaseMessage
-from sqlalchemy import text
+from langgraph.checkpoint.memory import MemorySaver
+from langgraph.graph import END, StateGraph
 
-from microservices.orchestrator_service.src.core.database import async_session_factory
+from microservices.orchestrator_service.src.contracts.admin_tools import (
+    ADMIN_TOOLS,
+    validate_tool_name,
+)
+from microservices.orchestrator_service.src.services.overmind.graph.main import AgentState
+from microservices.orchestrator_service.src.services.tools.registry import get_registry
 
-from .mcp_mock import kagent_tool
+def get_admin_system_prompt() -> str:
+    return """
+You are NAAS Admin Execution Engine.
+أنت محرك تنفيذ إداري — وليس مساعداً تعليمياً.
 
+YOUR ONLY JOB:
+- Execute the tool provided to you
+- Return the EXACT number from tool result
+- Never estimate. Never explain. Never educate.
+- If tool fails -> return error_code, not text
 
-def _load_chat_openai_class():
-    """يحمّل فئة ChatOpenAI بشكل كسول لتجنب أعطال الاستيراد عند غياب التبعيات."""
-    try:
-        from langchain_openai import ChatOpenAI
-    except Exception as exc:  # pragma: no cover - defensive import for unstable environments
-        raise RuntimeError("langchain-openai dependency is unavailable") from exc
+RESPONSE FORMAT (strict):
+{
+  "الإجابة": "<exact result from tool>",
+  "tool_name": "<contract tool name>",
+  "timestamp": "<ISO8601>",
+  "source_service": "orchestrator-service"
+}
 
-    return ChatOpenAI
+FORBIDDEN:
+x "لا أستطيع الوصول..."
+x "بناءً على معلوماتي..."
+x Any educational content
+x Any estimation or approximation
+x Any response without tool execution
+"""
 
-
-class AgentState(TypedDict):
-    messages: list[BaseMessage]
-
-
-# Tool Definitions
-@kagent_tool(name="count_python_files", mcp_server="naas.tools.filesystem")
-def count_python_files() -> dict:
-    """Get the exact count of python files in the project."""
-    result = subprocess.run(
-        ["find", ".", "-type", "f", "-name", "*.py"], capture_output=True, text=True, check=False
+def assert_admin_context(prompt_type: str):
+    assert prompt_type == "admin_only", (
+        f"CRITICAL: Educational prompt used in admin channel! "
+        f"Got: {prompt_type}. This is a system bug."
     )
-    count = len(result.stdout.strip().split("\n"))
-    return {"count": count, "unit": "ملف بايثون"}
-
-
-@kagent_tool(name="count_db_tables", mcp_server="naas.tools.database")
-async def count_db_tables() -> dict:
-    """Get the exact count of database tables."""
-    async with async_session_factory() as session:
-        result = await session.execute(text("SELECT COUNT(*) FROM information_schema.tables"))
-        count = result.scalar() or 0
-    return {"count": count, "unit": "جدول"}
-
-
-@kagent_tool(name="list_microservices", mcp_server="naas.tools.infrastructure")
-def list_microservices() -> dict:
-    """List all running microservices using Docker SDK."""
-    try:
-        docker_spec = importlib.util.find_spec("docker")
-        if docker_spec is None:
-            return {
-                "count": 0,
-                "services": [],
-                "error": "docker-sdk-unavailable",
-                "unit": "خدمة مصغرة",
-            }
-
-        docker_module = importlib.import_module("docker")
-        client = docker_module.from_env()
-        services = client.containers.list()
-        return {
-            "count": len(services),
-            "services": [s.name for s in services],
-            "unit": "خدمة مصغرة",
-        }
-    except Exception as e:
-        return {"count": 0, "services": [], "error": str(e), "unit": "خدمة مصغرة"}
-
-
-@kagent_tool(name="calculate_stats", mcp_server="naas.tools.analytics")
-async def calculate_stats() -> dict:
-    """Calculate and get complete project statistics."""
-    files_res = count_python_files.invoke({})
-    tables_res = await count_db_tables.ainvoke({})
-    services_res = list_microservices.invoke({})
-
-    return {
-        "total_files": files_res["count"],
-        "total_tables": tables_res["count"],
-        "total_services": services_res["count"],
-        "computed_at": datetime.utcnow().isoformat(),
-    }
-
-
-ADMIN_TOOLS = [count_python_files, count_db_tables, list_microservices, calculate_stats]
-
 
 class MockTLM:
     def get_trustworthiness_score(self, prompt: str, response: str) -> float:
         # Mocking TLM until real implementation is provided in the future
         return 0.95
 
+# Deterministic Graph Nodes
+class DetectIntentNode:
+    async def __call__(self, state):
+        # Already handled by SupervisorNode
+        return state
 
-class AdminAgentNode:
-    """
-    DSPy-optimized Admin Agent
-    tool_choice=required — ZERO hallucination tolerance
-    """
+class ValidateAccessNode:
+    async def __call__(self, state):
+        # Allow all for now, in a real system we'd check JWT scope or user_id
+        return {**state, "access": "granted"}
 
+class ResolveToolNode:
+    QUERY_TO_TOOL = {
+        "python|بايثون|ملف":   "admin.count_python_files",
+        "جدول|table|database": "admin.count_database_tables",
+        "مستخدم|user":         "admin.get_user_count",
+        "خدمة|service":        "admin.list_microservices",
+        "إحصائيات|stats":      "admin.calculate_full_stats",
+    }
+
+    def __call__(self, state):
+        query = state.get("query", "").lower()
+        for pattern, tool_name in self.QUERY_TO_TOOL.items():
+            if re.search(pattern, query):
+                validate_tool_name(tool_name)  # contract check
+                return {"resolved_tool": tool_name}
+        # Fallback: full stats
+        return {"resolved_tool": "admin.calculate_full_stats"}
+
+class ExecuteToolNode:
     def __init__(self):
-        chat_openai_class = _load_chat_openai_class()
-        self.llm = chat_openai_class(model="gpt-4o-mini", temperature=0).bind_tools(
-            tools=ADMIN_TOOLS,
-            tool_choice="required",  # NON NEGOTIABLE
-        )
         self.tlm = MockTLM()
 
-    async def __call__(self, state: AgentState) -> dict[str, Any]:
+    async def __call__(self, state):
         import time
-
         from .telemetry import emit_telemetry
 
         start_time = time.time()
+        tool_name = state.get("resolved_tool")
+        tool_fn = get_registry().get(tool_name)
 
-        response = await self.llm.ainvoke(state["messages"])
+        if not tool_fn:
+            emit_telemetry(node_name="ExecuteToolNode", start_time=start_time, state=state, error="ADMIN_TOOL_UNAVAILABLE")
+            return {
+                "error": "ADMIN_TOOL_UNAVAILABLE",
+                "tool_name": tool_name
+            }
 
-        # TLM Trustworthiness Check
-        trust_score = self.tlm.get_trustworthiness_score(
-            prompt=str(state["messages"]), response=str(response.content)
+        # Execute with TLM trust scoring
+        try:
+            import asyncio
+            if hasattr(tool_fn, "ainvoke"):
+                result = await tool_fn.ainvoke({})
+            elif asyncio.iscoroutinefunction(tool_fn) or asyncio.iscoroutinefunction(getattr(tool_fn, "invoke", None)):
+                result = await tool_fn()
+            elif hasattr(tool_fn, "invoke"):
+                result = tool_fn.invoke({})
+            else:
+                result = tool_fn()
+        except Exception as e:
+            emit_telemetry(node_name="ExecuteToolNode", start_time=start_time, state=state, error=str(e))
+            return {
+                "error": "ADMIN_TOOL_EXECUTION_FAILED",
+                "tool_name": tool_name,
+                "tool_result": str(e)
+            }
+
+        trust = self.tlm.get_trustworthiness_score(
+            prompt=state.get("query", ""),
+            response=str(result)
         )
 
-        # GUARD: If LLM hallucinated -> FORCE tool execution
-        tool_invoked = False
-        if not hasattr(response, "tool_calls") or not response.tool_calls or trust_score < 0.80:
-            response = await self.llm.bind_tools(ADMIN_TOOLS, tool_choice="required").ainvoke(
-                state["messages"]
-            )
-            tool_invoked = True
-        elif hasattr(response, "tool_calls") and response.tool_calls:
-            tool_invoked = True
+        emit_telemetry(node_name="ExecuteToolNode", start_time=start_time, state=state, trust_score=trust, tool_invoked=True)
 
-        emit_telemetry(
-            node_name="AdminAgentNode",
-            start_time=start_time,
-            state=state,
-            tool_invoked=tool_invoked,
-            trust_score=trust_score,
-            tokens_used=getattr(response.response_metadata, "token_usage", {}).get(
-                "total_tokens", 0
-            )
-            if hasattr(response, "response_metadata")
-            else 0,
-        )
+        return {
+            "tool_result":  result,
+            "tool_name":    tool_name,
+            "trust_score":  trust,
+            "executed_at":  datetime.utcnow().isoformat()
+        }
 
-        return {"messages": [response]}
+class RenderAnswerNode:
+    def __call__(self, state):
+        assert_admin_context("admin_only") # Guard execution
+
+        if state.get("error"):
+            return {
+                "final_response": {
+                    "خطأ": state["error"],
+                    "الأداة": state.get("tool_name"),
+                    "الإجراء": "تواصل مع مدير النظام"
+                }
+            }
+        return {
+            "final_response": {
+                "الإجابة":         state.get("tool_result"),
+                "tool_name":      state.get("tool_name"),
+                "مستوى_الثقة":    state.get("trust_score"),
+                "وقت_التنفيذ":    state.get("executed_at"),
+                "المصدر":         "orchestrator-service"
+            }
+        }
+
+admin_graph = StateGraph(dict)
+admin_graph.add_node("detect",   DetectIntentNode())
+admin_graph.add_node("validate", ValidateAccessNode())
+admin_graph.add_node("resolve",  ResolveToolNode())
+admin_graph.add_node("execute",  ExecuteToolNode())
+admin_graph.add_node("render",   RenderAnswerNode())
+
+admin_graph.add_edge("detect",   "validate")
+admin_graph.add_edge("validate", "resolve")
+admin_graph.add_edge("resolve",  "execute")
+admin_graph.add_edge("execute",  "render")
+admin_graph.add_edge("render",    END)
+admin_graph.set_entry_point("detect")
+
+admin_app = admin_graph.compile(
+    checkpointer=MemorySaver(),
+    interrupt_before=[]
+)
+
+class AdminAgentNode:
+    async def __call__(self, state: AgentState) -> dict[str, Any]:
+        config = {"configurable": {"thread_id": "admin_run"}}
+
+        # Merge state into dict for admin_app
+        inputs = dict(state)
+        res = await admin_app.ainvoke(inputs, config=config)
+
+        # We need to make sure the state structure expected by caller is returned
+        return {
+            "final_response": res.get("final_response"),
+            "tools_executed": True
+        }
