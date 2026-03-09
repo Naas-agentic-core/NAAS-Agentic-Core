@@ -46,9 +46,7 @@ def count_python_files() -> str:
 
     cmd = 'find . -type f -name "*.py" -not -path "*/.venv/*" -not -path "*/__pycache__/*" -not -path "*/node_modules/*" -not -path "*/site-packages/*" -not -path "*/.git/*" | wc -l'
 
-    result = subprocess.run(
-        cmd, shell=True, capture_output=True, text=True, check=False
-    )
+    result = subprocess.run(cmd, shell=True, capture_output=True, text=True, check=False)
     count = int(result.stdout.strip() or 0)
     return f"عدد ملفات بايثون: {count} ملف"
 
