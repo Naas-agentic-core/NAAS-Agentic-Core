@@ -13,7 +13,7 @@ from typing import Any
 
 import httpx
 from pydantic import BaseModel
-from tenacity import stop_after_attempt, wait_exponential, retry_if_exception_type
+from tenacity import AsyncRetrying, retry_if_exception_type, stop_after_attempt, wait_exponential
 
 from app.core.http_client_factory import HTTPClientConfig, get_http_client
 from app.core.settings.base import get_settings
@@ -147,7 +147,6 @@ class OrchestratorClient:
             request = client.build_request("POST", url, json=payload)
 
             # Use AsyncRetrying to directly wrap the network connection block
-            from tenacity import AsyncRetrying
             async for attempt in AsyncRetrying(
                 stop=stop_after_attempt(3),
                 wait=wait_exponential(multiplier=1, min=2, max=10),
