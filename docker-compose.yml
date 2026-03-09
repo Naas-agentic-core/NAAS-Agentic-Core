@@ -338,6 +338,7 @@ services:
       context: ./microservices/orchestrator_service
       dockerfile: Dockerfile
     container_name: cogniforge-orchestrator
+    restart: always
     ports:
       - "8006:8006"
     environment:

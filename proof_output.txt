@@ -1,0 +1,5 @@
+Output of curl http://localhost:8006/health
+{"status":"ok","service":"orchestrator-service"}
+
+Output of curl request for كم عدد ملفات بايثون
+{"status":"ok","response":"{\"الإجابة\": \"عدد ملفات بايثون: 1521 ملف\", \"tool_name\": \"admin.count_python_files\", \"مستوى_الثقة\": \"0.95\", \"وقت_التنفيذ\": \"2026-03-09T01:46:49.510238\", \"المصدر\": \"orchestrator-service\"}","run_id":"http-run","timeline":[],"graph_mode":"unified_stategraph"}
