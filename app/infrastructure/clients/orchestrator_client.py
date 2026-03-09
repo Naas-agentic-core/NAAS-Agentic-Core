@@ -9,17 +9,16 @@ from __future__ import annotations
 import json
 import logging
 from collections.abc import AsyncGenerator
-from typing import Any, Final
+from typing import Any
 
 import httpx
 from pydantic import BaseModel
+from tenacity import stop_after_attempt, wait_exponential, retry_if_exception_type
 
 from app.core.http_client_factory import HTTPClientConfig, get_http_client
 from app.core.settings.base import get_settings
 
 logger = logging.getLogger("orchestrator-client")
-
-DEFAULT_ORCHESTRATOR_URL: Final[str] = "http://orchestrator-service:8006"
 
 
 class MissionResponse(BaseModel):
@@ -40,12 +39,13 @@ class OrchestratorClient:
 
     def __init__(self, base_url: str | None = None) -> None:
         settings = get_settings()
-        # Ensure we use the configuration from settings if available
-        # Note: In docker-compose, ORCHESTRATOR_SERVICE_URL is passed to API Gateway.
-        # The Monolith (Core Kernel) might not have it set in its env if not updated.
-        # But we assume it should be reachable.
+        # Ensure we strictly use the configuration from settings to avoid routing to 'localhost'
+        # within isolated Docker containers and ensure robust Microservices service discovery.
         env_url = getattr(settings, "ORCHESTRATOR_SERVICE_URL", None)
-        resolved_url = base_url or env_url or DEFAULT_ORCHESTRATOR_URL
+        resolved_url = base_url or env_url
+        if not resolved_url:
+            raise RuntimeError("ORCHESTRATOR_SERVICE_URL must be configured")
+
         self.base_url = resolved_url.rstrip("/")
         self.config = HTTPClientConfig(
             name="orchestrator-client",
@@ -142,9 +142,23 @@ class OrchestratorClient:
             "context": context or {},
         }
 
-        client = await self._get_client()
         try:
-            async with client.stream("POST", url, json=payload) as response:
+            client = await self._get_client()
+            request = client.build_request("POST", url, json=payload)
+
+            # Use AsyncRetrying to directly wrap the network connection block
+            from tenacity import AsyncRetrying
+            async for attempt in AsyncRetrying(
+                stop=stop_after_attempt(3),
+                wait=wait_exponential(multiplier=1, min=2, max=10),
+                retry=retry_if_exception_type((httpx.ConnectError, httpx.TimeoutException)),
+                reraise=True,
+            ):
+                with attempt:
+                    response = await client.send(request, stream=True)
+
+            # Once connected, process the stream independently of the connection retry wrapper
+            try:
                 response.raise_for_status()
                 async for line in response.aiter_lines():
                     if not line.strip():
@@ -155,6 +169,9 @@ class OrchestratorClient:
                         logger.warning(f"Received non-JSON line from agent: {line[:50]}...")
                         # Fallback for raw text if Microservice isn't fully migrated
                         yield {"type": "assistant_delta", "payload": {"content": line}}
+            finally:
+                await response.aclose()
+
         except Exception as e:
             logger.error(f"Failed to chat with agent: {e}", exc_info=True)
             yield {
