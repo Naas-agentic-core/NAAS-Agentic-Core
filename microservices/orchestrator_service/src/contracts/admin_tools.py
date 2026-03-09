@@ -41,14 +41,16 @@ def validate_tool_name(name: str) -> None:
     mcp_server="naas.admin.filesystem",
 )
 def count_python_files() -> str:
-    """Count all .py files in project"""
+    """Count all .py files in project excluding virtual environments and caches"""
     validate_tool_name("admin.count_python_files")
+
+    cmd = 'find . -type f -name "*.py" -not -path "*/.venv/*" -not -path "*/__pycache__/*" -not -path "*/node_modules/*" -not -path "*/site-packages/*" -not -path "*/.git/*" | wc -l'
+
     result = subprocess.run(
-        ["find", ".", "-type", "f", "-name", "*.py"], capture_output=True, text=True, check=False
+        cmd, shell=True, capture_output=True, text=True, check=False
     )
-    files = [f for f in result.stdout.strip().split("\n") if f]
-    count = len(files)
-    return f"عدد ملفات بايثون في المشروع: {count} ملف"
+    count = int(result.stdout.strip() or 0)
+    return f"عدد ملفات بايثون: {count} ملف"
 
 
 @kagent_tool(
