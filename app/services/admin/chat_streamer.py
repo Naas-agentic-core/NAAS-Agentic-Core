@@ -151,6 +151,8 @@ class AdminChatStreamer:
         # In a perfect world, we'd validate, but for now we cast to satisfy type checker.
         history_casted = [{k: str(v) for k, v in x.items()} for x in history]
 
+        import json
+
         async for content_part in orchestrator.process(
             question=question,
             user_id=user_id,
@@ -165,7 +167,28 @@ class AdminChatStreamer:
 
             if isinstance(content_part, dict):
                 yield content_part
-            else:
+            elif isinstance(content_part, str):
+                # Check if it's a JSON string disguised as a text chunk (e.g. from orchestrator fallback)
+                if content_part.startswith("{") and content_part.endswith("}"):
+                    try:
+                        parsed_part = json.loads(content_part)
+                        if isinstance(parsed_part, dict):
+                            if "type" in parsed_part:
+                                # Found structured event (e.g. assistant_error fallback from microservice client)
+                                yield parsed_part
+                                continue
+                            elif "الإجابة" in parsed_part:
+                                # Found admin tool execution response
+                                content_part = str(parsed_part["الإجابة"])
+                            elif "final_response" in parsed_part:
+                                f_resp = parsed_part["final_response"]
+                                if isinstance(f_resp, dict) and "الإجابة" in f_resp:
+                                    content_part = str(f_resp["الإجابة"])
+                                else:
+                                    content_part = str(f_resp)
+                    except json.JSONDecodeError:
+                        pass
+
                 full_response.append(content_part)
 
                 if self._exceeds_safety_limit(full_response):
