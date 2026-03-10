@@ -1,5 +1,5 @@
+import asyncio
 import os
-import subprocess
 from datetime import datetime
 
 from sqlalchemy import text
@@ -41,17 +41,23 @@ def validate_tool_name(name: str) -> None:
     name="admin.count_python_files",
     mcp_server="naas.admin.filesystem",
 )
-def count_python_files() -> str:
+async def count_python_files() -> str:
     """Count all .py files in project excluding virtual environments and caches"""
     validate_tool_name("admin.count_python_files")
 
     # Resolve dynamic project root to work in both Docker (/workspace) and Native (uvicorn)
     project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../.."))
 
-    cmd = f'find {project_root} -type f -name "*.py" -not -path "*/.venv/*" -not -path "*/__pycache__/*" -not -path "*/site-packages/*" | wc -l'
+    cmd = f'find {project_root} -type f -name "*.py" -not -path "*/.venv/*" -not -path "*/__pycache__/*" -not -path "*/site-packages/*" -not -path "*/node_modules/*" -not -path "*/.git/*" | wc -l'
 
-    result = subprocess.run(cmd, shell=True, capture_output=True, text=True, check=False)
-    count = int(result.stdout.strip() or 0)
+    process = await asyncio.create_subprocess_shell(
+        cmd,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE
+    )
+    stdout, stderr = await process.communicate()
+
+    count = int(stdout.decode().strip() or 0)
     return f"عدد ملفات بايثون: {count} ملف"
 
 
@@ -111,7 +117,7 @@ async def calculate_full_stats() -> str:
     """Full system statistics"""
     validate_tool_name("admin.calculate_full_stats")
 
-    files = count_python_files.invoke({})
+    files = await count_python_files.ainvoke({})
     tables = await count_database_tables.ainvoke({})
 
     try:
