@@ -8,7 +8,6 @@ import logging
 import os
 import re
 from collections.abc import AsyncGenerator
-from datetime import UTC, datetime
 
 from sqlmodel import SQLModel
 
@@ -190,6 +189,7 @@ class MissionComplexHandler(IntentHandler):
         Forwarding to DefaultChatHandler to prevent 'Dispatch Failed' split-brain errors.
         """
         from app.services.chat.handlers.strategy_handlers import DefaultChatHandler
+
         handler = DefaultChatHandler()
         async for chunk in handler.execute(context):
             yield chunk
