@@ -99,25 +99,76 @@ class OrchestratorClient:
         ]
         return any(indicator in normalized for indicator in indicators)
 
-    def _count_python_files_in_project(self) -> int:
-        """يحسب عدد ملفات Python داخل جذر المشروع مع استثناء الأدلة الضخمة وغير المرتبطة."""
-        project_root = Path(__file__).resolve().parents[3]
-        ignored_dirs = {
-            ".git",
-            ".venv",
-            "venv",
-            "node_modules",
-            "__pycache__",
-            ".pytest_cache",
-            ".mypy_cache",
-        }
+    def _is_shell_file_count_question(self, question: str) -> bool:
+        """يتحقق من أن الطلب صياغته Shell لكنه يطلب فعلياً عدّ الملفات داخل المشروع."""
+        normalized = question.strip().lower()
+        count_intents = (
+            "كم عدد",
+            "عدد الملفات",
+            "احسب عدد",
+            "count",
+            "how many",
+            "wc -l",
+        )
+        shell_hints = ("shell", "find", "*.py", "python", "بايثون")
+        return any(intent in normalized for intent in count_intents) and any(
+            hint in normalized for hint in shell_hints
+        )
 
-        count = 0
-        for py_file in project_root.rglob("*.py"):
-            if any(part in ignored_dirs for part in py_file.parts):
-                continue
-            count += 1
-        return count
+    def _build_python_file_count_command(self) -> str:
+        """يبني أمر shell احترافي لعد ملفات بايثون مع استبعاد المسارات الثقيلة وغير المفيدة."""
+        return (
+            "find . "
+            "\\( -path './.git' -o -path './.venv' -o -path './venv' -o "
+            "-path './node_modules' -o -path '*/__pycache__' -o "
+            "-path '*/.pytest_cache' -o -path '*/.mypy_cache' \\) -prune -o "
+            "-type f -name '*.py' -print | wc -l"
+        )
+
+    async def _execute_shell_tool(
+        self,
+        command: str,
+        cwd: str,
+        timeout: int = 30,
+    ) -> dict[str, object]:
+        """ينفذ أداة shell عبر طبقة الأدوات لضمان حساب حقيقي قائم على التنفيذ الفعلي."""
+        from app.services.agent_tools.shell_tool import execute_shell
+
+        return await execute_shell(command=command, cwd=cwd, timeout=timeout)
+
+    async def _count_python_files_in_project(self) -> int | None:
+        """يحسب عدد ملفات بايثون فعلياً عبر أداة shell ويعيد None عند فشل التنفيذ أو التحليل."""
+        project_root = str(Path(__file__).resolve().parents[3])
+        command = self._build_python_file_count_command()
+        shell_result = await self._execute_shell_tool(command=command, cwd=project_root, timeout=45)
+
+        if not shell_result.get("success"):
+            logger.warning("Local shell file-count command failed", extra={"result": shell_result})
+            return None
+
+        stdout_value = str(shell_result.get("stdout", "")).strip()
+        if not stdout_value:
+            return None
+
+        first_line = stdout_value.splitlines()[0].strip()
+        if not first_line.isdigit():
+            logger.warning("Shell output is not a numeric file count", extra={"stdout": stdout_value})
+            return None
+
+        return int(first_line)
+
+    async def _build_local_file_count_response(self, question: str) -> str | None:
+        """ينشئ رداً محلياً بعد تنفيذ عدّ احترافي حقيقي عبر أداة shell عند الحاجة."""
+        if not (
+            self._is_python_file_count_question(question)
+            or self._is_shell_file_count_question(question)
+        ):
+            return None
+
+        files_count = await self._count_python_files_in_project()
+        if files_count is None:
+            return None
+        return f"عدد ملفات بايثون في المشروع هو: {files_count} ملف."
 
     async def _get_client(self) -> httpx.AsyncClient:
         return get_http_client(self.config)
@@ -252,12 +303,9 @@ class OrchestratorClient:
             "Failed to chat with agent across all endpoints", extra={"diagnostic": diagnostic}
         )
 
-        if self._is_python_file_count_question(question):
-            files_count = self._count_python_files_in_project()
-            yield (
-                f"عدد ملفات بايثون في المشروع هو: {files_count} ملف. "
-                "(تم تفعيل وضع الطوارئ المحلي بسبب تعذر الاتصال بخدمة orchestrator)"
-            )
+        local_fallback_response = await self._build_local_file_count_response(question)
+        if local_fallback_response:
+            yield local_fallback_response
             return
 
         user_facing_error = (
