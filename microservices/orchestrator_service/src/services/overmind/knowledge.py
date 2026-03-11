@@ -20,6 +20,7 @@
 4. Documentation Indexer: فهرسة جميع الوثائق
 """
 
+import asyncio
 from pathlib import Path
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -270,23 +271,25 @@ class ProjectKnowledge:
         """
         return build_environment_info(self.settings)
 
-    def get_project_structure(self) -> dict[str, object]:
+    async def get_project_structure(self) -> dict[str, object]:
         """
         الحصول على بنية المشروع (الملفات والمجلدات).
 
         Returns:
             dict: معلومات عن بنية المشروع
         """
-        return build_project_structure(self.project_root)
+        loop = asyncio.get_running_loop()
+        return await loop.run_in_executor(None, build_project_structure, self.project_root)
 
-    def get_microservices_info(self) -> dict[str, object]:
+    async def get_microservices_info(self) -> dict[str, object]:
         """
         الحصول على ملخص الخدمات المصغرة (Microservices).
 
         Returns:
             dict: معلومات عن عدد الخدمات وأسمائها
         """
-        return build_microservices_summary(self.project_root)
+        loop = asyncio.get_running_loop()
+        return await loop.run_in_executor(None, build_microservices_summary, self.project_root)
 
     async def get_complete_knowledge(self) -> dict[str, object]:
         """
@@ -300,20 +303,24 @@ class ProjectKnowledge:
             >>> logger.info("Tables: %s", knowledge['database']['total_tables'])
             >>> logger.info("Files: %s", knowledge['structure']['python_files'])
         """
+        structure = await self.get_project_structure()
+        microservices = await self.get_microservices_info()
+        database = await self.get_database_info()
+
         knowledge = {
             "project_name": "CogniForge",
             "version": "1.0.0",
-            "database": await self.get_database_info(),
+            "database": database,
             "environment": self.get_environment_info(),
-            "structure": self.get_project_structure(),
-            "microservices": self.get_microservices_info(),
+            "structure": structure,
+            "microservices": microservices,
             "timestamp": build_project_timestamp(self.project_root),
         }
 
         logger.info(
             f"Generated complete project knowledge: "
-            f"{knowledge['database']['total_tables']} tables, "
-            f"{knowledge['structure']['python_files']} Python files"
+            f"{knowledge['database'].get('total_tables', 0)} tables, "
+            f"{knowledge['structure'].get('python_files', 0)} Python files"
         )
 
         return knowledge

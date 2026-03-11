@@ -1,4 +1,3 @@
-import subprocess
 from unittest.mock import patch
 
 import pytest
@@ -13,8 +12,8 @@ from app.services.agent_tools.domain.metrics import (
 
 
 @pytest.fixture
-def mock_subprocess_run():
-    with patch("subprocess.run") as mock:
+def mock_asyncio_create_subprocess_exec():
+    with patch("asyncio.create_subprocess_exec") as mock:
         yield mock
 
 
@@ -25,10 +24,14 @@ def mock_os_walk():
 
 
 @pytest.mark.asyncio
-async def test_count_files_handler_git(mock_subprocess_run):
+async def test_count_files_handler_git(mock_asyncio_create_subprocess_exec):
     """Test counting files using git ls-files."""
-    mock_subprocess_run.return_value.stdout = "file1.py\nfile2.py\nfile3.txt"
-    mock_subprocess_run.return_value.returncode = 0
+    from unittest.mock import AsyncMock
+
+    mock_process = AsyncMock()
+    mock_process.communicate.return_value = (b"file1.py\nfile2.py\nfile3.txt", b"")
+    mock_process.returncode = 0
+    mock_asyncio_create_subprocess_exec.return_value = mock_process
 
     # Test all files
     result = await count_files_handler()
@@ -47,9 +50,14 @@ async def test_count_files_handler_git(mock_subprocess_run):
 
 
 @pytest.mark.asyncio
-async def test_count_files_handler_fallback(mock_subprocess_run, mock_os_walk):
+async def test_count_files_handler_fallback(mock_asyncio_create_subprocess_exec, mock_os_walk):
     """Test fallback to os.walk when git fails."""
-    mock_subprocess_run.side_effect = subprocess.CalledProcessError(1, ["git", "ls-files"])
+    from unittest.mock import AsyncMock
+
+    mock_process = AsyncMock()
+    mock_process.communicate.return_value = (b"", b"")
+    mock_process.returncode = 1
+    mock_asyncio_create_subprocess_exec.return_value = mock_process
 
     # Mock os.walk structure: (root, dirs, files)
     mock_os_walk.return_value = [(".", [], ["file1.py", "file2.py", "file3.txt"])]
@@ -63,10 +71,14 @@ async def test_count_files_handler_fallback(mock_subprocess_run, mock_os_walk):
 
 
 @pytest.mark.asyncio
-async def test_get_project_metrics_handler(mock_subprocess_run):
+async def test_get_project_metrics_handler(mock_asyncio_create_subprocess_exec):
     """Test retrieving project metrics."""
-    mock_subprocess_run.return_value.stdout = "file1.py\nfile2.py\nfile3.txt"
-    mock_subprocess_run.return_value.returncode = 0
+    from unittest.mock import AsyncMock
+
+    mock_process = AsyncMock()
+    mock_process.communicate.return_value = (b"file1.py\nfile2.py\nfile3.txt", b"")
+    mock_process.returncode = 0
+    mock_asyncio_create_subprocess_exec.return_value = mock_process
 
     # Mock the return value of build_index to match the expected test data
     from app.services.overmind.code_intelligence.models import (

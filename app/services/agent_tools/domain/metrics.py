@@ -16,6 +16,21 @@ def get_project_root() -> Path:
     return Path(os.getcwd())
 
 
+def _count_files_sync(root_path: Path, extension: str | None = None) -> int:
+    """Synchronous helper for counting files without blocking the main event loop."""
+    count = 0
+    # Common massive directories to exclude
+    excluded_dirs = {".git", ".venv", "venv", "node_modules", "__pycache__", "site-packages"}
+    for _root, dirs, filenames in os.walk(root_path):
+        # Prune excluded directories
+        dirs[:] = [d for d in dirs if d not in excluded_dirs]
+        for f in filenames:
+            if extension and not f.endswith(extension):
+                continue
+            count += 1
+    return count
+
+
 async def count_files_handler(
     directory: str = ".", extension: str | None = None
 ) -> dict[str, object]:
@@ -24,13 +39,16 @@ async def count_files_handler(
     Respects .gitignore if possible (using git ls-files if available).
     """
     try:
-        cmd = ["git", "ls-files"]
+        # Use asyncio.create_subprocess_exec to avoid blocking the event loop
+        process = await asyncio.create_subprocess_exec(
+            "git", "ls-files", stdout=subprocess.PIPE, stderr=subprocess.PIPE
+        )
+        stdout, _ = await process.communicate()
 
-        # Note: git ls-files lists all files.
-        # Filtering by directory is post-processing or strict argument.
+        if process.returncode != 0:
+            raise subprocess.CalledProcessError(process.returncode, "git ls-files")
 
-        result = subprocess.run(cmd, capture_output=True, text=True, check=True)
-        files = result.stdout.splitlines()
+        files = stdout.decode().splitlines()
 
         if extension:
             files = [f for f in files if f.endswith(extension)]
@@ -39,15 +57,11 @@ async def count_files_handler(
             files = [f for f in files if f.startswith(directory)]
 
         count = len(files)
-    except subprocess.CalledProcessError:
-        # Fallback to os.walk
-        count = 0
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        # Fallback to os.walk, running in a thread to prevent blocking the event loop
         root_path = get_project_root() / directory
-        for _, _, filenames in os.walk(root_path):
-            for f in filenames:
-                if extension and not f.endswith(extension):
-                    continue
-                count += 1
+        loop = asyncio.get_running_loop()
+        count = await loop.run_in_executor(None, _count_files_sync, root_path, extension)
 
     return {"directory": directory, "extension": extension, "count": count}
 
