@@ -166,7 +166,30 @@ class AdminChatStreamer:
                 continue
 
             if isinstance(content_part, dict):
-                yield content_part
+                # Extract text explicitly to avoid sending raw JSON dictionary
+                if "type" in content_part and content_part["type"] in ["error", "assistant_error"]:
+                    yield content_part
+                    continue
+                elif "الإجابة" in content_part:
+                    final_content = str(content_part["الإجابة"])
+                elif "final_response" in content_part:
+                    f_resp = content_part["final_response"]
+                    if isinstance(f_resp, dict) and "الإجابة" in f_resp:
+                        final_content = str(f_resp["الإجابة"])
+                    else:
+                        final_content = str(f_resp)
+                elif "payload" in content_part and isinstance(content_part["payload"], dict) and "content" in content_part["payload"]:
+                    final_content = str(content_part["payload"]["content"])
+                else:
+                    yield content_part
+                    continue
+
+                full_response.append(final_content)
+                if self._exceeds_safety_limit(full_response):
+                    yield self._create_size_limit_error()
+                    break
+                yield self._create_chunk_event(final_content)
+
             elif isinstance(content_part, str):
                 # Check if it's a JSON string disguised as a text chunk (e.g. from orchestrator fallback)
                 final_content = content_part

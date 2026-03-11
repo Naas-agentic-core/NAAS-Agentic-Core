@@ -244,11 +244,28 @@ class ChatOrchestrator:
                     context=context,
                 ):
                     if isinstance(chunk, dict):
+                        # Explicitly extract human-readable text
                         payload = chunk.get("payload", {})
-                        if isinstance(payload, dict):
+                        if isinstance(payload, dict) and "content" in payload:
                             content = payload.get("content", "")
                             if content and isinstance(content, str):
                                 full_response_buffer.append(content)
+                                yield content
+                        elif "الإجابة" in chunk:
+                            ans = str(chunk["الإجابة"])
+                            full_response_buffer.append(ans)
+                            yield ans
+                        elif "final_response" in chunk:
+                            f_resp = chunk["final_response"]
+                            if isinstance(f_resp, dict) and "الإجابة" in f_resp:
+                                ans = str(f_resp["الإجابة"])
+                            else:
+                                ans = str(f_resp)
+                            full_response_buffer.append(ans)
+                            yield ans
+                        elif "type" in chunk and chunk["type"] == "assistant_error":
+                            # It's an error dict from client fallback
+                            yield chunk
                     elif isinstance(chunk, str):
                         final_chunk = chunk
                         if final_chunk.startswith("{") and final_chunk.endswith("}"):
@@ -272,7 +289,6 @@ class ChatOrchestrator:
                         full_response_buffer.append(final_chunk)
                         yield final_chunk
                         continue
-                    yield chunk
 
                 # تخزين في الكاش
                 full_response = "".join(full_response_buffer)

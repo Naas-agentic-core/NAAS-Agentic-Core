@@ -34,3 +34,5 @@ attrs==25.4.0
 
 # LlamaIndex (Required for tests using namespace packages)
 # llama-index
+opentelemetry-api
+opentelemetry-sdk
