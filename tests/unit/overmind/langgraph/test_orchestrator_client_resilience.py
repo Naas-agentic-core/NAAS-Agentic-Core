@@ -44,7 +44,9 @@ async def test_chat_with_agent_returns_file_count_on_connectivity_failure(
 
     monkeypatch.setattr(client, "_get_client", _fake_get_client)
 
-    async def _fake_execute_shell_tool(command: str, cwd: str, timeout: int = 30) -> dict[str, object]:
+    async def _fake_execute_shell_tool(
+        command: str, cwd: str, timeout: int = 30
+    ) -> dict[str, object]:
         return {"success": True, "stdout": "1522\n", "stderr": "", "return_code": 0, "error": None}
 
     monkeypatch.setattr(client, "_execute_shell_tool", _fake_execute_shell_tool)
@@ -57,8 +59,6 @@ async def test_chat_with_agent_returns_file_count_on_connectivity_failure(
     assert isinstance(events[0], str)
     assert events[0] == "عدد ملفات بايثون في المشروع هو: 1522 ملف."
     assert "وضع الطوارئ المحلي" not in events[0]
-
-
 
 
 @pytest.mark.asyncio
@@ -75,7 +75,9 @@ async def test_chat_with_agent_returns_file_count_for_shell_style_question(
 
     shell_calls: list[dict[str, object]] = []
 
-    async def _fake_execute_shell_tool(command: str, cwd: str, timeout: int = 30) -> dict[str, object]:
+    async def _fake_execute_shell_tool(
+        command: str, cwd: str, timeout: int = 30
+    ) -> dict[str, object]:
         shell_calls.append({"command": command, "cwd": cwd, "timeout": timeout})
         return {"success": True, "stdout": "77\n", "stderr": "", "return_code": 0, "error": None}
 
@@ -95,8 +97,6 @@ async def test_chat_with_agent_returns_file_count_for_shell_style_question(
     assert "wc -l" in str(shell_calls[0]["command"])
 
 
-
-
 @pytest.mark.asyncio
 async def test_chat_with_agent_returns_structured_error_if_local_shell_count_fails(
     monkeypatch: pytest.MonkeyPatch,
@@ -107,7 +107,9 @@ async def test_chat_with_agent_returns_structured_error_if_local_shell_count_fai
     async def _fake_get_client() -> _AlwaysFailClient:
         return _AlwaysFailClient()
 
-    async def _fake_execute_shell_tool(command: str, cwd: str, timeout: int = 30) -> dict[str, object]:
+    async def _fake_execute_shell_tool(
+        command: str, cwd: str, timeout: int = 30
+    ) -> dict[str, object]:
         return {"success": False, "stdout": "", "stderr": "boom", "return_code": 1, "error": "boom"}
 
     monkeypatch.setattr(client, "_get_client", _fake_get_client)
@@ -121,6 +123,7 @@ async def test_chat_with_agent_returns_structured_error_if_local_shell_count_fai
     payload = json.loads(events[0])
     assert payload["type"] == "assistant_error"
     assert "تعذر الوصول إلى خدمة الوكيل" in payload["payload"]["content"]
+
 
 @pytest.mark.asyncio
 async def test_chat_with_agent_returns_structured_error_for_other_questions(

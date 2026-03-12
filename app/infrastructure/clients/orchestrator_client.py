@@ -152,7 +152,9 @@ class OrchestratorClient:
 
         first_line = stdout_value.splitlines()[0].strip()
         if not first_line.isdigit():
-            logger.warning("Shell output is not a numeric file count", extra={"stdout": stdout_value})
+            logger.warning(
+                "Shell output is not a numeric file count", extra={"stdout": stdout_value}
+            )
             return None
 
         return int(first_line)
