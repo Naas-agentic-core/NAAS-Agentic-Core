@@ -3,10 +3,9 @@
 from __future__ import annotations
 
 import sys
-
-import jwt
 from types import ModuleType, SimpleNamespace
 
+import jwt
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 

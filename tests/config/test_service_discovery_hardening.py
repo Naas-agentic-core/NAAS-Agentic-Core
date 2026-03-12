@@ -38,7 +38,9 @@ def test_gateway_rejects_localhost_in_container_runtime(monkeypatch: pytest.Monk
         GatewaySettings(ORCHESTRATOR_SERVICE_URL="http://localhost:8006")
 
 
-def test_gateway_allows_localhost_in_container_only_when_explicit(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_gateway_allows_localhost_in_container_only_when_explicit(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """يسمح بالـ localhost داخل الحاوية فقط عند تفعيل المتغير الصريح."""
     monkeypatch.setattr("microservices.api_gateway.config.os.path.exists", lambda _: True)
     settings = GatewaySettings(

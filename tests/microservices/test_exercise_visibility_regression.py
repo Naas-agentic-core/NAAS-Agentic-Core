@@ -29,8 +29,7 @@ async def test_exercise_request_is_visible_on_stream(monkeypatch: pytest.MonkeyP
         return None
 
     expected_exercise_text = (
-        "تمرين احتمالات: لدينا 3 كرات حمراء و5 زرقاء. "
-        "احسب احتمال سحب كرة حمراء."
+        "تمرين احتمالات: لدينا 3 كرات حمراء و5 زرقاء. احسب احتمال سحب كرة حمراء."
     )
 
     async def local_retrieval(_question: str):

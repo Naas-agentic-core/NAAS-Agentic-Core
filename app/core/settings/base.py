@@ -232,7 +232,6 @@ class AppSettings(BaseServiceSettings):
             or os.getenv("CONTAINER") == "true"
         )
 
-
     @model_validator(mode="after")
     def apply_codespaces_local_overrides(self) -> "AppSettings":
         """يضبط عناوين localhost في Codespaces عندما لا يحدد المطوّر روابط صريحة."""

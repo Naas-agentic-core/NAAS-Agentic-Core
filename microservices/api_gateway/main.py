@@ -248,7 +248,10 @@ async def admin_chat_ws_proxy(websocket: WebSocket):
                 await websocket.accept()
             if websocket.client_state == WebSocketState.CONNECTED:
                 await websocket.send_json(
-                    {"error": "تعذر فتح جلسة الدردشة الإدارية حالياً.", "request_id": str(uuid.uuid4())}
+                    {
+                        "error": "تعذر فتح جلسة الدردشة الإدارية حالياً.",
+                        "request_id": str(uuid.uuid4()),
+                    }
                 )
                 await websocket.close()
 

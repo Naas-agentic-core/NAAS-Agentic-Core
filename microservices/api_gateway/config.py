@@ -67,11 +67,14 @@ class Settings(BaseSettings):
         )
 
     @model_validator(mode="after")
-    def validate_security_and_discovery(self) -> "Settings":
+    def validate_security_and_discovery(self) -> Settings:
         """يفرض الأمان في الإنتاج ويمنع drift في ORCHESTRATOR_SERVICE_URL داخل الحاويات."""
         env = self.ENVIRONMENT.lower()
         if env in {"production", "staging"}:
-            if self.SECRET_KEY == "super_secret_key_change_in_production" or len(self.SECRET_KEY) < 32:
+            if (
+                self.SECRET_KEY == "super_secret_key_change_in_production"
+                or len(self.SECRET_KEY) < 32
+            ):
                 raise ValueError("SECRET_KEY غير آمن لبيئة production/staging")
             if self.ALLOWED_HOSTS == ["*"]:
                 raise ValueError("ALLOWED_HOSTS لا يمكن أن تكون '*' في production/staging")
@@ -79,13 +82,16 @@ class Settings(BaseSettings):
                 raise ValueError("BACKEND_CORS_ORIGINS لا يمكن أن تكون '*' في production/staging")
 
         host = (urlparse(self.ORCHESTRATOR_SERVICE_URL).hostname or "").lower()
-        if host in {"localhost", "127.0.0.1"} and self._is_container_runtime():
-            if not self.ALLOW_CONTAINER_LOCALHOST_ORCHESTRATOR:
-                raise ValueError(
-                    "ORCHESTRATOR_SERVICE_URL يشير إلى localhost داخل حاوية. "
-                    "استخدم DNS داخلياً مثل orchestrator-service أو فعّل المتغير "
-                    "ALLOW_CONTAINER_LOCALHOST_ORCHESTRATOR صراحة في التطوير المحلي فقط."
-                )
+        if (
+            host in {"localhost", "127.0.0.1"}
+            and self._is_container_runtime()
+            and not self.ALLOW_CONTAINER_LOCALHOST_ORCHESTRATOR
+        ):
+            raise ValueError(
+                "ORCHESTRATOR_SERVICE_URL يشير إلى localhost داخل حاوية. "
+                "استخدم DNS داخلياً مثل orchestrator-service أو فعّل المتغير "
+                "ALLOW_CONTAINER_LOCALHOST_ORCHESTRATOR صراحة في التطوير المحلي فقط."
+            )
 
         return self
 

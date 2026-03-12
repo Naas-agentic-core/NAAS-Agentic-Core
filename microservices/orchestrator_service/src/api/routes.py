@@ -1,9 +1,8 @@
 import logging
 import uuid
-
-import jwt
 from typing import Any
 
+import jwt
 from fastapi import (
     APIRouter,
     BackgroundTasks,
@@ -69,9 +68,12 @@ async def require_internal_admin_access(
     """يفرض مصادقة وتفويضاً مغلقين لمسارات الأدوات عبر مفتاح داخلي أو JWT إداري صريح."""
     settings = get_settings()
 
-    if x_internal_admin_key and settings.ADMIN_TOOL_API_KEY:
-        if x_internal_admin_key == settings.ADMIN_TOOL_API_KEY:
-            return 0
+    if (
+        x_internal_admin_key
+        and settings.ADMIN_TOOL_API_KEY
+        and x_internal_admin_key == settings.ADMIN_TOOL_API_KEY
+    ):
+        return 0
 
     token = extract_bearer_token(authorization)
     try:
@@ -91,6 +93,7 @@ async def require_internal_admin_access(
 def _safe_assistant_error(request_id: str) -> str:
     """يبني رسالة خطأ آمنة للمستخدم دون أي تسريب تشخيصي داخلي."""
     return f"تعذر معالجة طلب الدردشة حالياً. رقم المتابعة: {request_id}"
+
 
 # MCP Admin Tool Endpoints dynamically generated from contract
 for tool_name in ADMIN_TOOL_CONTRACT:
@@ -720,7 +723,7 @@ async def chat_with_agent_endpoint(request: ChatRequest, fastapi_req: Request) -
                 # We need to simulate a streaming response with proper chunking if caller expects it,
                 # but orchestrator client expects raw strings anyway
                 yield response_text
-            except Exception as e:
+            except Exception:
                 request_id = str(uuid.uuid4())
                 logger.error(
                     "Admin Chat Error",
@@ -739,7 +742,7 @@ async def chat_with_agent_endpoint(request: ChatRequest, fastapi_req: Request) -
             run_result = agent.run(request.question, context=context)
             async for chunk in run_result:
                 yield chunk
-        except Exception as e:
+        except Exception:
             request_id = str(uuid.uuid4())
             logger.error(
                 "Agent Chat Error",

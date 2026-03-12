@@ -156,7 +156,6 @@ class OrchestratorClient:
             return None
         return f"عدد ملفات بايثون في المشروع هو: {files_count} ملف."
 
-
     def _is_educational_retrieval_question(self, question: str) -> bool:
         """يتعرف على أسئلة استرجاع المحتوى التعليمي لضمان تدهور عادل عند تعطل طبقة التحكم."""
         normalized = question.strip().lower()
@@ -191,8 +190,6 @@ class OrchestratorClient:
         except Exception:
             logger.warning("local_retrieval_fallback_failed", exc_info=True)
             return None
-
-
 
     @staticmethod
     def _sanitize_error_for_user(*, request_id: str) -> dict[str, object]:
@@ -358,10 +355,14 @@ class OrchestratorClient:
             return
 
         try:
-            yield json.dumps(self._sanitize_error_for_user(request_id=request_id), ensure_ascii=False)
+            yield json.dumps(
+                self._sanitize_error_for_user(request_id=request_id), ensure_ascii=False
+            )
         except Exception as e:
             logger.error(f"Failed to chat with agent: {e}", exc_info=True)
-            yield json.dumps(self._sanitize_error_for_user(request_id=request_id), ensure_ascii=False)
+            yield json.dumps(
+                self._sanitize_error_for_user(request_id=request_id), ensure_ascii=False
+            )
 
 
 # Singleton
