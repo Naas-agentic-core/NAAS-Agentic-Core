@@ -36,3 +36,11 @@ attrs==25.4.0
 # llama-index
 opentelemetry-api
 opentelemetry-sdk
+
+# Missing dependencies for CI test environments
+fastapi
+httpx
+sqlalchemy
+pydantic-settings
+pyjwt
+uvicorn
