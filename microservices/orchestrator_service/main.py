@@ -18,6 +18,7 @@ logger = logging.getLogger("orchestrator_service")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    """يدير دورة حياة الخدمة مع ضمان الإقلاع حتى عند غياب تبعيات اختيارية."""
     logger.info("Orchestrator Service Starting...")
     await init_db()
 
@@ -38,38 +39,47 @@ async def lifespan(app: FastAPI):
     if missing:
         raise RuntimeError(f"STARTUP BLOCKED — missing tools: {missing}")
 
+    app.state.admin_app = None
+    app.state.app_graph = None
+
     # ═══ PHASE 2: GRAPHS AFTER TOOLS ═══════════════════════════
-    from langgraph.checkpoint.memory import MemorySaver
+    try:
+        from langgraph.checkpoint.memory import MemorySaver
 
-    from microservices.orchestrator_service.src.services.overmind.graph.admin import admin_graph
-    from microservices.orchestrator_service.src.services.overmind.graph.main import (
-        create_unified_graph,
-    )
-
-    app.state.admin_app = admin_graph.compile(checkpointer=MemorySaver(), interrupt_before=[])
-    app.state.app_graph = create_unified_graph(admin_app=app.state.admin_app)
-
-    # ═══ PHASE 3: WARMUP — PROVE IT WORKS ══════════════════════
-    result = await app.state.admin_app.ainvoke(
-        {"query": "كم عدد ملفات بايثون", "is_admin_user": True},
-        config={"configurable": {"thread_id": "warmup"}},
-    )
-
-    final_res = result.get("final_response", {})
-    if not final_res.get("tool_name"):
-        raise RuntimeError(
-            "WARMUP FAILED — tools registered but graph not invoking them. "
-            "Check ExecuteToolNode → tool_registry.get() call."
+        from microservices.orchestrator_service.src.services.overmind.graph.admin import admin_graph
+        from microservices.orchestrator_service.src.services.overmind.graph.main import (
+            create_unified_graph,
         )
 
-    logger.info(f"✅ SYSTEM READY | warmup tool={final_res['tool_name']}")
+        app.state.admin_app = admin_graph.compile(checkpointer=MemorySaver(), interrupt_before=[])
+        app.state.app_graph = create_unified_graph(admin_app=app.state.admin_app)
+
+        # ═══ PHASE 3: WARMUP — PROVE IT WORKS ══════════════════════
+        result = await app.state.admin_app.ainvoke(
+            {"query": "كم عدد ملفات بايثون", "is_admin_user": True},
+            config={"configurable": {"thread_id": "warmup"}},
+        )
+
+        final_res = result.get("final_response", {})
+        if not final_res.get("tool_name"):
+            raise RuntimeError(
+                "WARMUP FAILED — tools registered but graph not invoking them. "
+                "Check ExecuteToolNode → tool_registry.get() call."
+            )
+
+        logger.info(f"✅ SYSTEM READY | warmup tool={final_res['tool_name']}")
+    except ModuleNotFoundError as error:
+        logger.warning("Graph bootstrap skipped بسبب تبعية غير متاحة: %s", error)
+
     yield
 
     # ═══ SHUTDOWN ═══════════════════════════════════════════════
     await event_bus.close()
     tool_registry.clear()
-    del app.state.admin_app
-    del app.state.app_graph
+    if hasattr(app.state, "admin_app"):
+        del app.state.admin_app
+    if hasattr(app.state, "app_graph"):
+        del app.state.app_graph
 
 
 app = FastAPI(title=settings.PROJECT_NAME, lifespan=lifespan)
