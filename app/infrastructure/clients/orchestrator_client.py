@@ -11,14 +11,27 @@ import logging
 import os
 import uuid
 from collections.abc import AsyncGenerator
-from pathlib import Path
 
 import httpx
 from pydantic import BaseModel
 from tenacity import AsyncRetrying, retry_if_exception_type, stop_after_attempt, wait_exponential
 
+from app.contracts.chat_events import ChatEventEnvelope, ChatEventPayload, ChatEventType
 from app.core.http_client_factory import HTTPClientConfig, get_http_client
 from app.core.settings.base import get_settings
+from app.infrastructure.clients.routing_policy import ChatRoutingPolicy
+from app.services.capabilities.exercise_retrieval import (
+    ExerciseRetrievalRequest,
+    detect_exercise_retrieval,
+    make_result as make_exercise_result,
+)
+from app.services.capabilities.file_intelligence import (
+    FileIntelligenceRequest,
+    build_file_count_command,
+    default_project_root,
+    detect_file_intelligence,
+    make_result as make_file_result,
+)
 
 logger = logging.getLogger("orchestrator-client")
 
@@ -56,58 +69,24 @@ class OrchestratorClient:
         )
 
     def _build_chat_url_candidates(self) -> list[str]:
-        """يبني مسارات الدردشة من مصادر معلنة فقط دون أي فallback سحري قد يسبب انحراف التوجيه."""
-        base_candidates: list[str] = [self.base_url]
+        """يبني مرشّحات التوجيه عبر سياسة مركزية تمنع split-brain إلا في وضع breakglass."""
+        policy = ChatRoutingPolicy.from_environment(self.base_url)
+        return policy.candidate_urls()
 
-        fallback_urls_raw = os.getenv("ORCHESTRATOR_SERVICE_FALLBACK_URLS", "")
-        fallback_bases = [
-            url.strip().rstrip("/") for url in fallback_urls_raw.split(",") if url.strip()
-        ]
-        base_candidates.extend(fallback_bases)
+    def _file_intelligence_decision(self, question: str) -> tuple[bool, str | None]:
+        """يستدعي قدرة ذكاء الملفات الرسمية لإنتاج قرار موحد."""
+        decision = detect_file_intelligence(FileIntelligenceRequest(question=question))
+        return decision.recognized, decision.extension
 
-        unique_bases: list[str] = []
-        for candidate in base_candidates:
-            if candidate and candidate not in unique_bases:
-                unique_bases.append(candidate)
+    def _exercise_retrieval_decision(self, question: str) -> bool:
+        """يستدعي قدرة استرجاع التمارين الرسمية لتوحيد eligibility."""
+        decision = detect_exercise_retrieval(ExerciseRetrievalRequest(question=question))
+        return decision.recognized
 
-        return [f"{base}/agent/chat" for base in unique_bases]
 
-    def _is_python_file_count_question(self, question: str) -> bool:
-        """يتحقق مما إذا كان السؤال يطلب حساب عدد ملفات بايثون داخل المشروع."""
-        normalized = question.strip().lower()
-        indicators = [
-            "كم عدد ملفات بايثون",
-            "عدد ملفات بايثون",
-            "python files",
-            "how many python files",
-        ]
-        return any(indicator in normalized for indicator in indicators)
 
-    def _is_shell_file_count_question(self, question: str) -> bool:
-        """يتحقق من أن الطلب صياغته Shell لكنه يطلب فعلياً عدّ الملفات داخل المشروع."""
-        normalized = question.strip().lower()
-        count_intents = (
-            "كم عدد",
-            "عدد الملفات",
-            "احسب عدد",
-            "count",
-            "how many",
-            "wc -l",
-        )
-        shell_hints = ("shell", "find", "*.py", "python", "بايثون")
-        return any(intent in normalized for intent in count_intents) and any(
-            hint in normalized for hint in shell_hints
-        )
 
-    def _build_python_file_count_command(self) -> str:
-        """يبني أمر shell احترافي لعد ملفات بايثون مع استبعاد المسارات الثقيلة وغير المفيدة."""
-        return (
-            "find . "
-            "\\( -path './.git' -o -path './.venv' -o -path './venv' -o "
-            "-path './node_modules' -o -path '*/__pycache__' -o "
-            "-path '*/.pytest_cache' -o -path '*/.mypy_cache' \\) -prune -o "
-            "-type f -name '*.py' -print | wc -l"
-        )
+
 
     async def _execute_shell_tool(
         self,
@@ -120,10 +99,10 @@ class OrchestratorClient:
 
         return await execute_shell(command=command, cwd=cwd, timeout=timeout)
 
-    async def _count_python_files_in_project(self) -> int | None:
-        """يحسب عدد ملفات بايثون فعلياً عبر أداة shell ويعيد None عند فشل التنفيذ أو التحليل."""
-        project_root = str(Path(__file__).resolve().parents[3])
-        command = self._build_python_file_count_command()
+    async def _count_files_in_project(self, extension: str | None = None) -> int | None:
+        """يحسب عدد الملفات فعلياً عبر shell ويعيد None عند فشل التنفيذ أو التحليل."""
+        project_root = default_project_root()
+        command = build_file_count_command(extension=extension)
         shell_result = await self._execute_shell_tool(command=command, cwd=project_root, timeout=45)
 
         if not shell_result.get("success"):
@@ -144,52 +123,81 @@ class OrchestratorClient:
         return int(first_line)
 
     async def _build_local_file_count_response(self, question: str) -> str | None:
-        """ينشئ رداً محلياً بعد تنفيذ عدّ احترافي حقيقي عبر أداة shell عند الحاجة."""
-        if not (
-            self._is_python_file_count_question(question)
-            or self._is_shell_file_count_question(question)
-        ):
+        """ينشئ رداً محلياً بعد تنفيذ عدّ احترافي حقيقي عبر القدرة الرسمية لذكاء الملفات."""
+        recognized, extension = self._file_intelligence_decision(question)
+        if not recognized:
             return None
 
-        files_count = await self._count_python_files_in_project()
-        if files_count is None:
-            return None
-        return f"عدد ملفات بايثون في المشروع هو: {files_count} ملف."
+        files_count = await self._count_files_in_project(extension=extension)
+        result = make_file_result(extension=extension, count=files_count)
+        return result.message
 
-    def _is_educational_retrieval_question(self, question: str) -> bool:
-        """يتعرف على أسئلة استرجاع المحتوى التعليمي لضمان تدهور عادل عند تعطل طبقة التحكم."""
-        normalized = question.strip().lower()
-        retrieval_hints = (
-            "تمرين",
-            "تمارين",
-            "درس",
-            "احتمالات",
-            "بكالوريا",
-            "exercise",
-            "lesson",
-            "probability",
-        )
-        return any(hint in normalized for hint in retrieval_hints)
 
     async def _build_local_retrieval_response(self, question: str) -> str | None:
         """ينفذ استرجاعاً محلياً للمعرفة التعليمية عند تعطل service control plane."""
-        if not self._is_educational_retrieval_question(question):
+        if not self._exercise_retrieval_decision(question):
             return None
 
         try:
             from app.services.chat.tools.retrieval.service import search_educational_content
 
             result = await search_educational_content(query=question)
-            if not result or not result.strip():
-                return None
-
-            if "لم أتمكن" in result or "لم أجد" in result:
-                return result
-
-            return result
+            normalized = make_exercise_result(result)
+            return normalized.message
         except Exception:
             logger.warning("local_retrieval_fallback_failed", exc_info=True)
             return None
+
+    @staticmethod
+    def _sanitize_text_for_user(content: str) -> str:
+        """يعقّم نصًا موجّهًا للمستخدم النهائي من أي تلميحات طوبولوجيا داخلية."""
+        lowered = content.lower()
+        blocked_tokens = (
+            "orchestrator-service",
+            "localhost",
+            "127.0.0.1",
+            "host.docker.internal",
+            "orchestrator_service_url",
+            "diagnostic",
+        )
+        if any(token in lowered for token in blocked_tokens):
+            return "تعذر إتمام طلبك حالياً بسبب ضغط أو عطل مؤقت في خدمة المحادثة. حاول مرة أخرى بعد لحظات."
+        return content
+
+    def _normalize_stream_event(self, raw_event: object) -> dict[str, object]:
+        """يوحد شكل أحداث التدفق ويضمن عدم تسريب تفاصيل داخلية في مسارات الأخطاء."""
+        if isinstance(raw_event, dict):
+            raw_type = str(raw_event.get("type", ChatEventType.ASSISTANT_DELTA.value))
+            payload = raw_event.get("payload")
+            if not isinstance(payload, dict):
+                payload = {"content": str(raw_event)}
+        else:
+            raw_type = ChatEventType.ASSISTANT_DELTA.value
+            payload = {"content": str(raw_event)}
+
+        safe_payload = {
+            "content": self._sanitize_text_for_user(str(payload.get("content", "")))
+            if payload.get("content") is not None
+            else None,
+            "details": self._sanitize_text_for_user(str(payload.get("details", "")))
+            if payload.get("details") is not None
+            else None,
+            "status_code": payload.get("status_code") if isinstance(payload.get("status_code"), int) else None,
+            "request_id": str(payload.get("request_id")) if payload.get("request_id") is not None else None,
+            "retry_hint": str(payload.get("retry_hint")) if payload.get("retry_hint") is not None else None,
+        }
+
+        event_type_map = {
+            "assistant_delta": ChatEventType.ASSISTANT_DELTA,
+            "assistant_final": ChatEventType.ASSISTANT_FINAL,
+            "assistant_error": ChatEventType.ASSISTANT_ERROR,
+            "status": ChatEventType.STATUS,
+        }
+        envelope = ChatEventEnvelope(
+            type=event_type_map.get(raw_type, ChatEventType.ASSISTANT_DELTA),
+            payload=ChatEventPayload(**safe_payload),
+        )
+        return envelope.model_dump(exclude_none=True)
 
     @staticmethod
     def _sanitize_error_for_user(*, request_id: str) -> dict[str, object]:
@@ -291,10 +299,23 @@ class OrchestratorClient:
             "context": context or {},
         }
 
-        candidate_urls = self._build_chat_url_candidates()
+        routing_policy = ChatRoutingPolicy.from_environment(self.base_url)
+        candidate_urls = routing_policy.candidate_urls()
         client = await self._get_client()
         request_id = str(uuid.uuid4())
         connection_errors: list[str] = []
+        contract_version = routing_policy.contract_version
+        fallback_enabled = routing_policy.fallback_enabled
+
+        logger.info(
+            "chat_contract_route_start",
+            extra={
+                "request_id": request_id,
+                "contract_version": contract_version,
+                "candidate_count": len(candidate_urls),
+                "fallback_enabled": fallback_enabled,
+            },
+        )
 
         for candidate_url in candidate_urls:
             try:
@@ -323,10 +344,11 @@ class OrchestratorClient:
                         if not line.strip():
                             continue
                         try:
-                            yield json.loads(line)
+                            parsed_line = json.loads(line)
+                            yield self._normalize_stream_event(parsed_line)
                         except json.JSONDecodeError:
                             logger.warning(f"Received non-JSON line from agent: {line[:50]}...")
-                            yield {"type": "assistant_delta", "payload": {"content": line}}
+                            yield self._normalize_stream_event(line)
                     return
                 finally:
                     await response.aclose()
@@ -344,15 +366,16 @@ class OrchestratorClient:
             "Failed to chat with agent across all endpoints", extra={"diagnostic": diagnostic}
         )
 
-        local_file_count_response = await self._build_local_file_count_response(question)
-        if local_file_count_response:
-            yield local_file_count_response
-            return
+        if fallback_enabled:
+            local_file_count_response = await self._build_local_file_count_response(question)
+            if local_file_count_response:
+                yield local_file_count_response
+                return
 
-        local_retrieval_response = await self._build_local_retrieval_response(question)
-        if local_retrieval_response:
-            yield local_retrieval_response
-            return
+            local_retrieval_response = await self._build_local_retrieval_response(question)
+            if local_retrieval_response:
+                yield local_retrieval_response
+                return
 
         try:
             yield json.dumps(

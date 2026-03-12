@@ -5,6 +5,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 
+COMPATIBILITY_FACADE_MODE = True
+CANONICAL_EXECUTION_AUTHORITY = "research-agent-content-domain"
+
 router = APIRouter(prefix="/v1/content", tags=["content"])
 
 

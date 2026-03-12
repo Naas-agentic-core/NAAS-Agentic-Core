@@ -37,6 +37,9 @@ from app.services.rbac import ADMIN_ROLE
 
 logger = get_logger(__name__)
 
+COMPATIBILITY_FACADE_MODE = True
+CANONICAL_EXECUTION_AUTHORITY = "app.services.chat.orchestrator.ChatOrchestrator"
+
 router = APIRouter(
     prefix="/admin",
     tags=["Admin"],

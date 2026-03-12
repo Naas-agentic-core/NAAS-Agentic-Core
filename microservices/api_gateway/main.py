@@ -64,8 +64,24 @@ def _to_ws_base_url(http_base_url: str) -> str:
 
 
 def _resolve_chat_target_base(route_id: str, identity: str, rollout_percent: int) -> str:
-    """يوحد قرار الوجهة بين HTTP وWS لمنع divergence لنفس النية."""
+    """يوحد قرار الوجهة بين HTTP وWS ويمنع التوجيه إلى Conversation قبل إثبات parity."""
     use_conversation = _should_route_to_conversation(identity, rollout_percent)
+    parity_verified = bool(settings.CONVERSATION_PARITY_VERIFIED)
+    capability_level = str(settings.CONVERSATION_CAPABILITY_LEVEL).lower().strip()
+    capability_ready = capability_level in {"parity_ready", "production_eligible"}
+
+    if use_conversation and (not parity_verified or not capability_ready):
+        reason = "parity_not_verified" if not parity_verified else "capability_not_ready"
+        logger.warning(
+            "conversation_capability_blocked route_id=%s identity=%s rollout=%s capability=%s reason=%s",
+            route_id,
+            identity,
+            rollout_percent,
+            capability_level,
+            reason,
+        )
+        use_conversation = False
+
     if use_conversation:
         target_base = settings.CONVERSATION_SERVICE_URL.rstrip("/")
         target_service = "conversation-service"
@@ -74,12 +90,14 @@ def _resolve_chat_target_base(route_id: str, identity: str, rollout_percent: int
         target_service = "orchestrator-service"
 
     logger.info(
-        "chat_routing_decision route_id=%s identity=%s rollout=%s target_service=%s target_base=%s",
+        "canonical_route_selected route_id=%s identity=%s rollout=%s target_service=%s target_base=%s parity_verified=%s capability=%s",
         route_id,
         identity,
         rollout_percent,
         target_service,
         target_base,
+        parity_verified,
+        capability_level,
     )
     return target_base
 

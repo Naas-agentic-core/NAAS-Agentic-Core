@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import os
+
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.responses import JSONResponse
 
@@ -19,8 +21,16 @@ def _response_envelope(question: str, route_id: str) -> dict[str, str]:
 
 @app.get("/health")
 async def health() -> JSONResponse:
-    """يوفر نقطة صحة قياسية للخدمة الجديدة."""
-    return JSONResponse({"status": "ok", "service": "conversation-service"})
+    """يوفر نقطة صحة قياسية مع إعلان مستوى القدرة لتفعيل admission control."""
+    capability_level = os.getenv("CONVERSATION_CAPABILITY_LEVEL", "stub")
+    return JSONResponse(
+        {
+            "status": "ok",
+            "service": "conversation-service",
+            "capability_level": capability_level,
+            "parity_ready": capability_level in {"parity_ready", "production_eligible"},
+        }
+    )
 
 
 @app.api_route(

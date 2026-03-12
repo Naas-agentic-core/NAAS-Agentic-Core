@@ -31,6 +31,10 @@ class Settings(BaseSettings):
     ROUTE_CHAT_HTTP_CONVERSATION_ROLLOUT_PERCENT: int = 0
     ROUTE_CHAT_WS_CONVERSATION_ROLLOUT_PERCENT: int = 0
 
+    # Safety gate: conversation service cannot receive critical traffic before parity proof.
+    CONVERSATION_PARITY_VERIFIED: bool = False
+    CONVERSATION_CAPABILITY_LEVEL: str = "stub"
+
     # Candidate target for WS cutover (kept disabled by default in PR#1)
     CONVERSATION_WS_URL: str = "ws://conversation-service:8010"
 
@@ -80,6 +84,22 @@ class Settings(BaseSettings):
                 raise ValueError("ALLOWED_HOSTS لا يمكن أن تكون '*' في production/staging")
             if self.BACKEND_CORS_ORIGINS == ["*"]:
                 raise ValueError("BACKEND_CORS_ORIGINS لا يمكن أن تكون '*' في production/staging")
+
+        rollout_requested = (
+            self.ROUTE_CHAT_HTTP_CONVERSATION_ROLLOUT_PERCENT > 0
+            or self.ROUTE_CHAT_WS_CONVERSATION_ROLLOUT_PERCENT > 0
+        )
+        if rollout_requested and not self.CONVERSATION_PARITY_VERIFIED:
+            raise ValueError(
+                "Conversation rollout > 0 requires CONVERSATION_PARITY_VERIFIED=true to prevent accidental cutover to a parity stub."
+            )
+
+        capability = self.CONVERSATION_CAPABILITY_LEVEL.lower().strip()
+        allowed_capabilities = {"parity_ready", "production_eligible"}
+        if rollout_requested and capability not in allowed_capabilities:
+            raise ValueError(
+                "Conversation rollout > 0 requires CONVERSATION_CAPABILITY_LEVEL in {parity_ready, production_eligible}."
+            )
 
         host = (urlparse(self.ORCHESTRATOR_SERVICE_URL).hostname or "").lower()
         if (

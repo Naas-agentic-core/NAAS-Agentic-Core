@@ -17,10 +17,28 @@ class _AlwaysFailClient:
 
 
 @pytest.mark.asyncio
-async def test_build_chat_url_candidates_prefers_local_then_container(
+async def test_build_chat_url_candidates_uses_single_canonical_target_by_default(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """يتحقق من أولوية مسار localhost ثم مسارات Docker الاحتياطية في بناء endpoints."""
+    """يفرض مرشحًا وحيدًا افتراضيًا لمنع split-brain في مسار الدردشة."""
+    monkeypatch.setenv(
+        "ORCHESTRATOR_SERVICE_FALLBACK_URLS",
+        "http://orchestrator-service:8006,http://host.docker.internal:8006",
+    )
+    monkeypatch.delenv("ORCHESTRATOR_ALLOW_MULTI_TARGET_CHAT", raising=False)
+    client = OrchestratorClient(base_url="http://localhost:8006")
+
+    candidates = client._build_chat_url_candidates()
+
+    assert candidates == ["http://localhost:8006/agent/chat"]
+
+
+@pytest.mark.asyncio
+async def test_build_chat_url_candidates_allows_multi_target_only_in_breakglass(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """يسمح بتعدد المرشحات فقط عند تفعيل breakglass صراحة."""
+    monkeypatch.setenv("ORCHESTRATOR_ALLOW_MULTI_TARGET_CHAT", "1")
     monkeypatch.setenv(
         "ORCHESTRATOR_SERVICE_FALLBACK_URLS",
         "http://orchestrator-service:8006,http://host.docker.internal:8006",
