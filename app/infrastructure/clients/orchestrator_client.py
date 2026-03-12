@@ -9,9 +9,9 @@ from __future__ import annotations
 import json
 import logging
 import os
+import uuid
 from collections.abc import AsyncGenerator
 from pathlib import Path
-from urllib.parse import urlparse
 
 import httpx
 from pydantic import BaseModel
@@ -56,7 +56,7 @@ class OrchestratorClient:
         )
 
     def _build_chat_url_candidates(self) -> list[str]:
-        """يبني قائمة مرتبة لمسارات الدردشة المحتملة لضمان الاستمرارية عبر البيئات المختلفة."""
+        """يبني مسارات الدردشة من مصادر معلنة فقط دون أي فallback سحري قد يسبب انحراف التوجيه."""
         base_candidates: list[str] = [self.base_url]
 
         fallback_urls_raw = os.getenv("ORCHESTRATOR_SERVICE_FALLBACK_URLS", "")
@@ -64,22 +64,6 @@ class OrchestratorClient:
             url.strip().rstrip("/") for url in fallback_urls_raw.split(",") if url.strip()
         ]
         base_candidates.extend(fallback_bases)
-
-        parsed = urlparse(self.base_url)
-        if parsed.hostname in {"localhost", "127.0.0.1"}:
-            base_candidates.extend(
-                [
-                    "http://orchestrator-service:8006",
-                    "http://host.docker.internal:8006",
-                ]
-            )
-        else:
-            base_candidates.extend(
-                [
-                    "http://localhost:8006",
-                    "http://127.0.0.1:8006",
-                ]
-            )
 
         unique_bases: list[str] = []
         for candidate in base_candidates:
@@ -172,6 +156,56 @@ class OrchestratorClient:
             return None
         return f"عدد ملفات بايثون في المشروع هو: {files_count} ملف."
 
+
+    def _is_educational_retrieval_question(self, question: str) -> bool:
+        """يتعرف على أسئلة استرجاع المحتوى التعليمي لضمان تدهور عادل عند تعطل طبقة التحكم."""
+        normalized = question.strip().lower()
+        retrieval_hints = (
+            "تمرين",
+            "تمارين",
+            "درس",
+            "احتمالات",
+            "بكالوريا",
+            "exercise",
+            "lesson",
+            "probability",
+        )
+        return any(hint in normalized for hint in retrieval_hints)
+
+    async def _build_local_retrieval_response(self, question: str) -> str | None:
+        """ينفذ استرجاعاً محلياً للمعرفة التعليمية عند تعطل service control plane."""
+        if not self._is_educational_retrieval_question(question):
+            return None
+
+        try:
+            from app.services.chat.tools.retrieval.service import search_educational_content
+
+            result = await search_educational_content(query=question)
+            if not result or not result.strip():
+                return None
+
+            if "لم أتمكن" in result or "لم أجد" in result:
+                return result
+
+            return result
+        except Exception:
+            logger.warning("local_retrieval_fallback_failed", exc_info=True)
+            return None
+
+
+
+    @staticmethod
+    def _sanitize_error_for_user(*, request_id: str) -> dict[str, object]:
+        """ينتج رسالة خطأ آمنة للمستخدم بدون أي تفاصيل طوبولوجيا أو تشخيص داخلي."""
+        return {
+            "type": "assistant_error",
+            "payload": {
+                "content": "تعذر إتمام طلبك حالياً بسبب ضغط أو عطل مؤقت في خدمة المحادثة. حاول مرة أخرى بعد لحظات.",
+                "request_id": request_id,
+                "retry_hint": "يمكنك إعادة المحاولة بعد دقيقة.",
+            },
+        }
+
     async def _get_client(self) -> httpx.AsyncClient:
         return get_http_client(self.config)
 
@@ -262,11 +296,15 @@ class OrchestratorClient:
 
         candidate_urls = self._build_chat_url_candidates()
         client = await self._get_client()
+        request_id = str(uuid.uuid4())
         connection_errors: list[str] = []
 
         for candidate_url in candidate_urls:
             try:
-                logger.info("Attempting orchestrator chat endpoint", extra={"url": candidate_url})
+                logger.info(
+                    "chat_routing_attempt",
+                    extra={"candidate_url": candidate_url, "request_id": request_id},
+                )
                 response: httpx.Response | None = None
 
                 async for attempt in AsyncRetrying(
@@ -298,40 +336,32 @@ class OrchestratorClient:
 
             except Exception as e:
                 connection_errors.append(f"{candidate_url} => {e}")
-                logger.error("Orchestrator chat endpoint failed", exc_info=True)
+                logger.error(
+                    "chat_routing_failed",
+                    exc_info=True,
+                    extra={"request_id": request_id, "candidate_url": candidate_url},
+                )
 
         diagnostic = " | ".join(connection_errors) if connection_errors else "No endpoint attempted"
         logger.error(
             "Failed to chat with agent across all endpoints", extra={"diagnostic": diagnostic}
         )
 
-        local_fallback_response = await self._build_local_file_count_response(question)
-        if local_fallback_response:
-            yield local_fallback_response
+        local_file_count_response = await self._build_local_file_count_response(question)
+        if local_file_count_response:
+            yield local_file_count_response
             return
 
-        user_facing_error = (
-            "تعذر الوصول إلى خدمة الوكيل حالياً. "
-            "تحقق من تشغيل orchestrator-service أو اضبط ORCHESTRATOR_SERVICE_URL بشكل صحيح."
-        )
+        local_retrieval_response = await self._build_local_retrieval_response(question)
+        if local_retrieval_response:
+            yield local_retrieval_response
+            return
 
         try:
-            yield json.dumps(
-                {
-                    "type": "assistant_error",
-                    "payload": {
-                        "content": f"{user_facing_error} (diagnostic: {diagnostic})",
-                    },
-                }
-            )
+            yield json.dumps(self._sanitize_error_for_user(request_id=request_id), ensure_ascii=False)
         except Exception as e:
             logger.error(f"Failed to chat with agent: {e}", exc_info=True)
-            yield json.dumps(
-                {
-                    "type": "assistant_error",
-                    "payload": {"content": "تعذر إنشاء استجابة خطأ من خدمة الوكيل."},
-                }
-            )
+            yield json.dumps(self._sanitize_error_for_user(request_id=request_id), ensure_ascii=False)
 
 
 # Singleton

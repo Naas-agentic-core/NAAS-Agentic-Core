@@ -30,6 +30,10 @@ class Settings(BaseSettings):
     # Security
     SECRET_KEY: str = Field(default="dev_secret_key", validation_alias="SECRET_KEY")
     API_V1_STR: str = "/api/v1"
+    ADMIN_TOOL_API_KEY: str | None = Field(
+        default=None,
+        description="Shared key for internal admin-tool endpoints",
+    )
 
     # CORS
     BACKEND_CORS_ORIGINS: list[str] = Field(default=["*"], description="CORS Allowed Origins")
@@ -37,20 +41,19 @@ class Settings(BaseSettings):
     # Database
     POSTGRES_USER: str = "postgres"
     POSTGRES_PASSWORD: str = "password"
-    POSTGRES_HOST: str = "localhost"  # Safe default
+    POSTGRES_HOST: str = "localhost"
     POSTGRES_DB: str = "orchestrator_db"
     POSTGRES_PORT: int = 5432
     DATABASE_URL: str = Field(default="", validation_alias="ORCHESTRATOR_DATABASE_URL")
 
     # Redis
-    REDIS_URL: str = "redis://localhost:6379"  # Safe default
+    REDIS_URL: str = "redis://localhost:6379"
 
     # AI Config
     OPENAI_API_KEY: str | None = Field(None, description="OpenAI API Key")
     OPENROUTER_API_KEY: str | None = Field(None, description="OpenRouter API Key")
 
     # Microservices URLs (Dynamic Resolution)
-    # Default is None so validator can set the correct default based on env
     PLANNING_AGENT_URL: str | None = Field(default=None, validate_default=True)
     MEMORY_AGENT_URL: str | None = Field(default=None, validate_default=True)
     RESEARCH_AGENT_URL: str | None = Field(default=None, validate_default=True)
@@ -87,7 +90,6 @@ class Settings(BaseSettings):
         if is_codespaces is None:
             is_codespaces = os.getenv("CODESPACES") == "true"
 
-        # Map: Field -> (Local Port, Docker Host, Docker Port)
         service_map = {
             "USER_SERVICE_URL": ("8003", "user-service", "8000"),
             "RESEARCH_AGENT_URL": ("8007", "research-agent", "8007"),
@@ -97,37 +99,39 @@ class Settings(BaseSettings):
         }
 
         if field_name not in service_map:
-            # Fallback
             return "http://localhost:8000"
 
         local_port, host, docker_port = service_map[field_name]
-
         if is_codespaces:
             return f"http://localhost:{local_port}"
-
-        # Default to Docker service name (for production/docker-compose)
         return f"http://{host}:{docker_port}"
 
-    def model_post_init(self, __context):
+    def model_post_init(self, __context: object) -> None:
         if not self.DATABASE_URL:
-            # Construct DB URL from components
-            self.DATABASE_URL = f"postgresql+asyncpg://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}@{self.POSTGRES_HOST}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
+            self.DATABASE_URL = (
+                f"postgresql+asyncpg://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}"
+                f"@{self.POSTGRES_HOST}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
+            )
 
     @model_validator(mode="after")
     def validate_production_security(self) -> "Settings":
-        """Enforces security rules in production."""
-        if self.ENVIRONMENT == "production":
+        """Enforces security rules in production and staging."""
+        if self.ENVIRONMENT in ("production", "staging"):
             if self.DEBUG:
                 raise ValueError("DEBUG must be False in production")
             if self.SECRET_KEY == "dev_secret_key" or len(self.SECRET_KEY) < 32:
                 raise ValueError("SECRET_KEY must be strong in production")
             if self.BACKEND_CORS_ORIGINS == ["*"]:
                 raise ValueError("SECURITY RISK: BACKEND_CORS_ORIGINS cannot be '*' in production.")
+            if not self.ADMIN_TOOL_API_KEY or len(self.ADMIN_TOOL_API_KEY) < 24:
+                raise ValueError(
+                    "ADMIN_TOOL_API_KEY must be configured and strong in production/staging"
+                )
         return self
 
 
 @lru_cache
-def get_settings():
+def get_settings() -> Settings:
     return Settings()
 
 

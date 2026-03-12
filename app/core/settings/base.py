@@ -14,6 +14,7 @@ Standards:
 import functools
 import os
 from typing import Literal
+from urllib.parse import urlparse
 
 from pydantic import Field, ValidationInfo, computed_field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -140,6 +141,10 @@ class AppSettings(BaseServiceSettings):
     PLANNING_AGENT_URL: str | None = Field(None, description="Planning Agent URL")
     REASONING_AGENT_URL: str | None = Field(None, description="Reasoning Agent URL")
     ORCHESTRATOR_SERVICE_URL: str | None = Field(None, description="Orchestrator Service URL")
+    ALLOW_CONTAINER_LOCALHOST_ORCHESTRATOR: bool = Field(
+        False,
+        description="يسمح باستخدام localhost للخدمة المنسقة داخل الحاوية فقط عند ضبطه صراحة.",
+    )
 
     # AI (Missing fields restored)
     OPENAI_API_KEY: str | None = Field(None, description="OpenAI API Key")
@@ -205,7 +210,7 @@ class AppSettings(BaseServiceSettings):
             "RESEARCH_AGENT_URL": ("8007", "research-agent", "8007"),
             "PLANNING_AGENT_URL": ("8001", "planning-agent", "8000"),
             "REASONING_AGENT_URL": ("8008", "reasoning-agent", "8008"),
-            "ORCHESTRATOR_SERVICE_URL": ("8006", "localhost", "8006"),
+            "ORCHESTRATOR_SERVICE_URL": ("8006", "orchestrator-service", "8006"),
         }
 
         if field_name not in service_map:
@@ -217,6 +222,44 @@ class AppSettings(BaseServiceSettings):
             return f"http://localhost:{local_port}"
 
         return f"http://{host}:{docker_port}"
+
+    @staticmethod
+    def _is_container_runtime() -> bool:
+        """يتحقق من التشغيل داخل حاوية Docker/Kubernetes لاكتشاف أخطاء اكتشاف الخدمات مبكرًا."""
+        return (
+            os.path.exists("/.dockerenv")
+            or os.getenv("KUBERNETES_SERVICE_HOST") is not None
+            or os.getenv("CONTAINER") == "true"
+        )
+
+
+    @model_validator(mode="after")
+    def apply_codespaces_local_overrides(self) -> "AppSettings":
+        """يضبط عناوين localhost في Codespaces عندما لا يحدد المطوّر روابط صريحة."""
+        if not self.CODESPACES:
+            return self
+
+        env_to_attr = {
+            "USER_SERVICE_URL": "USER_SERVICE_URL",
+            "RESEARCH_AGENT_URL": "RESEARCH_AGENT_URL",
+            "PLANNING_AGENT_URL": "PLANNING_AGENT_URL",
+            "REASONING_AGENT_URL": "REASONING_AGENT_URL",
+            "ORCHESTRATOR_SERVICE_URL": "ORCHESTRATOR_SERVICE_URL",
+        }
+        local_ports = {
+            "USER_SERVICE_URL": "8003",
+            "RESEARCH_AGENT_URL": "8007",
+            "PLANNING_AGENT_URL": "8001",
+            "REASONING_AGENT_URL": "8008",
+            "ORCHESTRATOR_SERVICE_URL": "8006",
+        }
+
+        for env_name, attr_name in env_to_attr.items():
+            if os.getenv(env_name):
+                continue
+            setattr(self, attr_name, f"http://localhost:{local_ports[attr_name]}")
+
+        return self
 
     @model_validator(mode="after")
     def validate_production_security(self) -> "AppSettings":
@@ -253,6 +296,29 @@ class AppSettings(BaseServiceSettings):
                 raise ValueError("ADMIN_EMAIL must be customized in production")
             if not _is_valid_email(admin_email):
                 raise ValueError("ADMIN_EMAIL must be a valid email address in production")
+        return self
+
+    @model_validator(mode="after")
+    def validate_orchestrator_service_discovery(self) -> "AppSettings":
+        """يفرض عدم استخدام localhost بين الخدمات داخل الحاويات إلا بتصريح صريح."""
+        orchestrator_url = self.ORCHESTRATOR_SERVICE_URL or ""
+        hostname = (urlparse(orchestrator_url).hostname or "").lower()
+        is_localhost = hostname in {"localhost", "127.0.0.1"}
+        if not is_localhost:
+            return self
+
+        running_in_container = self._is_container_runtime()
+        explicit_allowance = self.ALLOW_CONTAINER_LOCALHOST_ORCHESTRATOR
+        if self.CODESPACES:
+            return self
+
+        if running_in_container and not explicit_allowance:
+            raise ValueError(
+                "ORCHESTRATOR_SERVICE_URL points to localhost داخل بيئة حاوية. "
+                "استخدم DNS داخلياً مثل http://orchestrator-service:8006 أو فعّل "
+                "ALLOW_CONTAINER_LOCALHOST_ORCHESTRATOR صراحةً في بيئة التطوير فقط."
+            )
+
         return self
 
 

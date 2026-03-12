@@ -3,6 +3,7 @@ import hashlib
 import importlib
 import logging
 from contextlib import asynccontextmanager
+from urllib.parse import urlparse
 
 import uvicorn
 from fastapi import Depends, FastAPI, Request, WebSocket
@@ -54,22 +55,45 @@ def _should_route_to_conversation(identity: str, rollout_percent: int) -> bool:
     return _rollout_bucket(identity) < normalized
 
 
-def _resolve_chat_ws_target(route_id: str, upstream_path: str) -> str:
-    """يحدد هدف WS الحديث بين orchestrator وconversation وفق canary تدريجي."""
-    identity = f"{route_id}:{upstream_path}"
-    use_conversation = _should_route_to_conversation(
-        identity, settings.ROUTE_CHAT_WS_CONVERSATION_ROLLOUT_PERCENT
-    )
-    if use_conversation:
-        candidate = settings.CONVERSATION_WS_URL.rstrip("/")
-        logger.info("chat_ws_candidate route_id=%s legacy=false target=%s", route_id, candidate)
-        return f"{candidate}/{upstream_path}"
+def _to_ws_base_url(http_base_url: str) -> str:
+    """يحوّل عنوان HTTP إلى WS بشكل صريح لتوحيد وجهة التوجيه بين HTTP وWebSocket."""
+    parsed = urlparse(http_base_url)
+    scheme = "wss" if parsed.scheme == "https" else "ws"
+    netloc = parsed.netloc
+    return f"{scheme}://{netloc}".rstrip("/")
 
-    fallback_target = settings.ORCHESTRATOR_SERVICE_URL.replace("http", "ws", 1).rstrip("/")
+
+def _resolve_chat_target_base(route_id: str, identity: str, rollout_percent: int) -> str:
+    """يوحد قرار الوجهة بين HTTP وWS لمنع divergence لنفس النية."""
+    use_conversation = _should_route_to_conversation(identity, rollout_percent)
+    if use_conversation:
+        target_base = settings.CONVERSATION_SERVICE_URL.rstrip("/")
+        target_service = "conversation-service"
+    else:
+        target_base = settings.ORCHESTRATOR_SERVICE_URL.rstrip("/")
+        target_service = "orchestrator-service"
+
     logger.info(
-        "chat_ws_orchestrator route_id=%s legacy=false target=%s", route_id, fallback_target
+        "chat_routing_decision route_id=%s identity=%s rollout=%s target_service=%s target_base=%s",
+        route_id,
+        identity,
+        rollout_percent,
+        target_service,
+        target_base,
     )
-    return f"{fallback_target}/{upstream_path}"
+    return target_base
+
+
+def _resolve_chat_ws_target(route_id: str, upstream_path: str) -> str:
+    """يحدد هدف WS الحديث باستخدام نفس محرك القرار الخاص بمسار HTTP."""
+    identity = f"{route_id}:{upstream_path}"
+    target_base = _resolve_chat_target_base(
+        route_id=route_id,
+        identity=identity,
+        rollout_percent=settings.ROUTE_CHAT_WS_CONVERSATION_ROLLOUT_PERCENT,
+    )
+    ws_base = _to_ws_base_url(target_base)
+    return f"{ws_base}/{upstream_path}"
 
 
 import uuid
@@ -194,7 +218,7 @@ async def chat_ws_proxy(websocket: WebSocket):
                 await websocket.accept()
             if websocket.client_state == WebSocketState.CONNECTED:
                 await websocket.send_json(
-                    {"error": "فشل الاتصال بالوكيل الذكي", "session_id": str(uuid.uuid4())}
+                    {"error": "تعذر فتح جلسة الدردشة حالياً.", "request_id": str(uuid.uuid4())}
                 )
                 await websocket.close()
 
@@ -224,7 +248,7 @@ async def admin_chat_ws_proxy(websocket: WebSocket):
                 await websocket.accept()
             if websocket.client_state == WebSocketState.CONNECTED:
                 await websocket.send_json(
-                    {"error": "فشل الاتصال بالوكيل الإداري", "session_id": str(uuid.uuid4())}
+                    {"error": "تعذر فتح جلسة الدردشة الإدارية حالياً.", "request_id": str(uuid.uuid4())}
                 )
                 await websocket.close()
 
@@ -492,11 +516,11 @@ async def chat_http_proxy(path: str, request: Request) -> StreamingResponse:
     """
     logger.info("Route accessed: /api/chat/%s (modern routing)", path)
     identity = request.headers.get("x-request-id", request.url.path)
-    target_url = settings.ORCHESTRATOR_SERVICE_URL
-    if _should_route_to_conversation(
-        identity, settings.ROUTE_CHAT_HTTP_CONVERSATION_ROLLOUT_PERCENT
-    ):
-        target_url = settings.CONVERSATION_SERVICE_URL
+    target_url = _resolve_chat_target_base(
+        route_id="chat_http",
+        identity=identity,
+        rollout_percent=settings.ROUTE_CHAT_HTTP_CONVERSATION_ROLLOUT_PERCENT,
+    )
 
     return await proxy_handler.forward(
         request,

@@ -1,11 +1,14 @@
 import logging
 import uuid
+
+import jwt
 from typing import Any
 
 from fastapi import (
     APIRouter,
     BackgroundTasks,
     Depends,
+    Header,
     HTTPException,
     Request,
     WebSocket,
@@ -23,6 +26,7 @@ from microservices.orchestrator_service.src.core.database import async_session_f
 from microservices.orchestrator_service.src.core.event_bus import get_event_bus
 from microservices.orchestrator_service.src.core.security import (
     decode_user_id,
+    extract_bearer_token,
     extract_websocket_auth,
 )
 from microservices.orchestrator_service.src.models.mission import Mission
@@ -47,10 +51,55 @@ router = APIRouter(
     tags=["Overmind (Super Agent)"],
 )
 
+
+def _is_admin_payload(payload: dict[str, object]) -> bool:
+    """يتحقق من صلاحيات الإدارة داخل حمولة JWT وفق مبدأ أقل صلاحية وfail-closed."""
+    role = str(payload.get("role", "")).lower().strip()
+    scope_text = str(payload.get("scope", "")).lower()
+    has_admin_role = role in {"admin", "super_admin", "superadmin"}
+    has_admin_flag = payload.get("is_admin") is True
+    has_admin_scope = "admin" in scope_text and "tool" in scope_text
+    return has_admin_role or has_admin_flag or has_admin_scope
+
+
+async def require_internal_admin_access(
+    authorization: str | None = Header(default=None),
+    x_internal_admin_key: str | None = Header(default=None),
+) -> int:
+    """يفرض مصادقة وتفويضاً مغلقين لمسارات الأدوات عبر مفتاح داخلي أو JWT إداري صريح."""
+    settings = get_settings()
+
+    if x_internal_admin_key and settings.ADMIN_TOOL_API_KEY:
+        if x_internal_admin_key == settings.ADMIN_TOOL_API_KEY:
+            return 0
+
+    token = extract_bearer_token(authorization)
+    try:
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=["HS256"])
+    except jwt.PyJWTError as exc:
+        raise HTTPException(status_code=401, detail="Invalid token") from exc
+
+    if not _is_admin_payload(payload):
+        raise HTTPException(status_code=403, detail="forbidden")
+
+    user_id = decode_user_id(token, settings.SECRET_KEY)
+    if user_id <= 0:
+        raise HTTPException(status_code=403, detail="forbidden")
+    return user_id
+
+
+def _safe_assistant_error(request_id: str) -> str:
+    """يبني رسالة خطأ آمنة للمستخدم دون أي تسريب تشخيصي داخلي."""
+    return f"تعذر معالجة طلب الدردشة حالياً. رقم المتابعة: {request_id}"
+
 # MCP Admin Tool Endpoints dynamically generated from contract
 for tool_name in ADMIN_TOOL_CONTRACT:
 
-    @router.post(f"/api/v1/tools/{tool_name}/invoke", tags=["Admin MCP Tools"])
+    @router.post(
+        f"/api/v1/tools/{tool_name}/invoke",
+        tags=["Admin MCP Tools"],
+        dependencies=[Depends(require_internal_admin_access)],
+    )
     async def invoke_admin_tool(
         payload: dict[str, Any] | None = None, name=tool_name
     ) -> dict[str, Any]:
@@ -78,11 +127,19 @@ for tool_name in ADMIN_TOOL_CONTRACT:
         except Exception as e:
             return {"status": "error", "message": str(e)}
 
-    @router.get(f"/api/v1/tools/{tool_name}/schema", tags=["Admin MCP Tools"])
+    @router.get(
+        f"/api/v1/tools/{tool_name}/schema",
+        tags=["Admin MCP Tools"],
+        dependencies=[Depends(require_internal_admin_access)],
+    )
     async def get_admin_tool_schema(name=tool_name) -> dict[str, Any]:
         return {"name": name, "description": ADMIN_TOOL_CONTRACT.get(name), "parameters": {}}
 
-    @router.get(f"/api/v1/tools/{tool_name}/health", tags=["Admin MCP Tools"])
+    @router.get(
+        f"/api/v1/tools/{tool_name}/health",
+        tags=["Admin MCP Tools"],
+        dependencies=[Depends(require_internal_admin_access)],
+    )
     async def get_admin_tool_health(name=tool_name) -> dict[str, Any]:
         tool_fn = get_registry().get(name)
         return {"name": name, "status": "healthy" if tool_fn else "unavailable"}
@@ -664,8 +721,13 @@ async def chat_with_agent_endpoint(request: ChatRequest, fastapi_req: Request) -
                 # but orchestrator client expects raw strings anyway
                 yield response_text
             except Exception as e:
-                logger.error(f"Admin Chat Error: {e}", exc_info=True)
-                yield f"Error: {e}"
+                request_id = str(uuid.uuid4())
+                logger.error(
+                    "Admin Chat Error",
+                    exc_info=True,
+                    extra={"request_id": request_id},
+                )
+                yield _safe_assistant_error(request_id)
 
         return StreamingResponse(_admin_stream(), media_type="text/plain")
 
@@ -678,8 +740,13 @@ async def chat_with_agent_endpoint(request: ChatRequest, fastapi_req: Request) -
             async for chunk in run_result:
                 yield chunk
         except Exception as e:
-            logger.error(f"Agent Chat Error: {e}", exc_info=True)
-            yield f"Error: {e}"
+            request_id = str(uuid.uuid4())
+            logger.error(
+                "Agent Chat Error",
+                exc_info=True,
+                extra={"request_id": request_id},
+            )
+            yield _safe_assistant_error(request_id)
 
     return StreamingResponse(_stream_generator(), media_type="text/plain")
 
