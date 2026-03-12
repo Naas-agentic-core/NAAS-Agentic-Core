@@ -21,7 +21,7 @@ async def test_build_chat_url_candidates_prefers_local_then_container(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """يتحقق من أولوية مسار localhost ثم مسارات Docker الاحتياطية في بناء endpoints."""
-    monkeypatch.delenv("ORCHESTRATOR_SERVICE_FALLBACK_URLS", raising=False)
+    monkeypatch.setenv("ORCHESTRATOR_SERVICE_FALLBACK_URLS", "http://orchestrator-service:8006,http://host.docker.internal:8006")
     client = OrchestratorClient(base_url="http://localhost:8006")
 
     candidates = client._build_chat_url_candidates()
@@ -122,7 +122,7 @@ async def test_chat_with_agent_returns_structured_error_if_local_shell_count_fai
     assert len(events) == 1
     payload = json.loads(events[0])
     assert payload["type"] == "assistant_error"
-    assert "تعذر الوصول إلى خدمة الوكيل" in payload["payload"]["content"]
+    assert "عطل مؤقت في خدمة المحادثة" in payload["payload"]["content"]
 
 
 @pytest.mark.asyncio
@@ -144,4 +144,4 @@ async def test_chat_with_agent_returns_structured_error_for_other_questions(
     assert len(events) == 1
     payload = json.loads(events[0])
     assert payload["type"] == "assistant_error"
-    assert "تعذر الوصول إلى خدمة الوكيل" in payload["payload"]["content"]
+    assert "عطل مؤقت في خدمة المحادثة" in payload["payload"]["content"]
