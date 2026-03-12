@@ -1,471 +1,144 @@
-# =============================================================================
-# 🚀 CogniForge CI/CD Pipeline - Enterprise Grade
-# =============================================================================
-# هذا الملف يمثل نظام CI/CD خارق واحترافي من المستوى المؤسسي
-# يتضمن: فحص الجودة، الاختبارات، الأمان، والنشر التلقائي
-# =============================================================================
-
-name: 🚀 CI/CD Pipeline
+name: CI
 
 on:
-  push:
-    branches: ["main", "fix/*", "feature/*", "copilot/*"]
   pull_request:
-    branches: ["main"]
+    branches: [main]
+  push:
+    branches: [main]
   workflow_dispatch:
-    inputs:
-      skip_tests:
-        description: "Skip tests (for emergency fixes)"
-        required: false
-        default: "false"
-        type: boolean
 
-# الحد الأدنى من الصلاحيات للأمان
 permissions:
   contents: read
 
-# إلغاء التشغيلات السابقة للفرع نفسه لتوفير الموارد
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 env:
   PYTHON_VERSION: "3.12"
-  PIP_CACHE_DIR: ~/.cache/pip
-  PYTHONUNBUFFERED: "1"
+  PIP_DISABLE_PIP_VERSION_CHECK: "1"
+  PYTHONDONTWRITEBYTECODE: "1"
 
 jobs:
-  # ===========================================================================
-  # 📄 مرحلة التحقق من العقود (Contract Validation)
-  # ===========================================================================
-  contract-validation:
-    name: 📄 Contract Validation
+  lint:
+    name: lint
     runs-on: ubuntu-latest
-    timeout-minutes: 10
-    permissions:
-      contents: read
-
+    timeout-minutes: 15
     steps:
-      - name: 📥 Checkout Repository
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: 🐍 Setup Python ${{ env.PYTHON_VERSION }}
-        uses: actions/setup-python@v5
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
-          cache: "pip"
-
-      - name: 📦 Install Minimal Python Dependencies
+          cache: pip
+          cache-dependency-path: requirements-dev.txt
+      - uses: ./.github/actions/setup
+      - name: Install lint dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install pytest sqlalchemy pyjwt aiosqlite pydantic-settings httpx uvicorn websockets requests authlib tenacity pyyaml
+          pip install -r requirements-dev.txt
+      - name: Ruff lint
+        run: ruff check .
+      - name: Ruff format check
+        run: ruff format --check .
 
-      - name: 📦 Install Spectral CLI
+  contracts:
+    name: contracts
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: requirements-test.txt
+      - uses: ./.github/actions/setup
+      - name: Install contract dependencies
         run: |
-          if ! command -v npm >/dev/null 2>&1; then
-            echo "❌ npm is required for contract validation."
-            exit 1
-          fi
-          npm install -g @stoplight/spectral-cli
-
-      - name: 🔎 Check Spectral Availability
-        run: spectral --version
-
-      - name: 🔍 Validate OpenAPI Contracts
-        run: |
-          echo "🔍 Validating OpenAPI contracts..."
-          if ls docs/contracts/openapi/*.yaml 1> /dev/null 2>&1; then
-            for file in docs/contracts/openapi/*.yaml; do
-              echo "Validating: $file"
-              spectral lint "$file" --ruleset docs/contracts/policies/.spectral.yaml
-            done
-          else
-            echo "⚠️ No OpenAPI contracts found - skipping validation"
-          fi
-
-      - name: 🔍 Validate AsyncAPI Contracts
-        run: |
-          echo "🔍 Validating AsyncAPI contracts..."
-          if ls docs/contracts/asyncapi/*.yaml 1> /dev/null 2>&1; then
-            for file in docs/contracts/asyncapi/*.yaml; do
-              echo "Validating: $file"
-              spectral lint "$file" --ruleset docs/contracts/policies/.spectral.yaml
-            done
-          else
-            echo "⚠️ No AsyncAPI contracts found - skipping validation"
-          fi
-
-
-      - name: 🧪 Provider Verification (Gateway ↔ chat/content)
+          python -m pip install --upgrade pip
+          pip install -r requirements-test.txt
+      - name: Validate contracts and provider parity
         run: |
           python scripts/fitness/check_gateway_provider_contracts.py
           python -m pytest -q tests/contracts/test_gateway_provider_contracts.py
 
-      - name: ✅ Contract Validation Summary
-        run: echo "✅ All contract validations completed!"
-
-  # ===========================================================================
-  # 🔍 مرحلة فحص الجودة والتنسيق
-  # ===========================================================================
-  quality:
-    name: 🔍 Code Quality
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    permissions:
-      contents: read
-
-    steps:
-      - name: 📥 Checkout Repository
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: 🐍 Setup Python ${{ env.PYTHON_VERSION }}
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-          cache: "pip"
-
-      - name: 📦 Install Dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install ruff
-
-      - name: 🔧 Lint with Ruff
-        run: ruff check .
-
-      - name: 🎨 Format Check with Ruff
-        run: ruff format --check .
-
-  # ===========================================================================
-  # 🛡️ مرحلة فحص الحواجز المعمارية
-  # ===========================================================================
   guardrails:
-    name: 🛡️ Guardrails
+    name: guardrails
     runs-on: ubuntu-latest
-    timeout-minutes: 10
-    permissions:
-      contents: read
-
+    timeout-minutes: 15
     steps:
-      - name: 📥 Checkout Repository
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: 🐍 Setup Python ${{ env.PYTHON_VERSION }}
-        uses: actions/setup-python@v5
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
-          cache: "pip"
-
-      - name: 📦 Install Dependencies
+          cache: pip
+          cache-dependency-path: requirements-test.txt
+      - uses: ./.github/actions/setup
+      - name: Install guardrail dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements-test.txt pytest fastapi httpx sqlalchemy pydantic-settings pyjwt uvicorn opentelemetry-api opentelemetry-sdk
+          pip install -r requirements-test.txt
+      - name: Run architectural guardrails
+        run: |
+          python scripts/ci_guardrails.py
+          python scripts/fitness/check_no_app_imports_in_microservices.py --strict
+          python scripts/fitness/check_routes_registry_parity.py
+          python scripts/fitness/check_tracing_gate.py
 
-      - name: 🛡️ Run Guardrails
-        run: python scripts/ci_guardrails.py
-
-      - name: 🧭 Fitness F1 - No app imports inside microservices (strict)
-        run: python scripts/fitness/check_no_app_imports_in_microservices.py --strict
-
-      - name: 🧭 Fitness F2 - Default routing forbids legacy targets
-        run: python scripts/fitness/check_default_routing_no_legacy_targets.py
-
-      - name: 🧭 Fitness F2.1 - Single-brain control-plane gate
-        run: python scripts/fitness/check_single_brain_control_plane.py
-
-      - name: 🧭 Fitness F2.2 - StateGraph runtime backbone gate
-        run: python scripts/fitness/check_stategraph_runtime_backbone.py
-
-      - name: 🧭 Fitness F3 - Docs/runtime parity
-        run: python scripts/fitness/check_docs_runtime_parity.py
-
-      - name: 🧭 Fitness F3.1 - Route registry parity
-        run: python scripts/fitness/check_route_registry_parity.py
-
-      - name: 🧭 Fitness F3.1a - Gateway registry alignment
-        run: python scripts/fitness/check_gateway_route_registry_alignment.py
-
-      - name: 🧭 Fitness F3.1b - Service catalog parity
-        run: python scripts/fitness/check_service_catalog_parity.py
-
-      - name: 🧭 Fitness F3.2 - Tracing gate baseline
-        run: python scripts/fitness/check_tracing_gate.py
-
-      - name: 🧭 Fitness F3.3 - Break-glass expiry enforcement
-        run: python scripts/fitness/check_breakglass_expiry_enforcement.py
-
-      - name: 🧭 Fitness F4 - Copy-coupling overlap gate (phase 2b strict-decrease)
-        run: python scripts/fitness/check_overmind_copy_coupling.py
-
-      - name: 🧭 Fitness F4 - Copy-coupling overlap scoreboard
-        run: python scripts/fitness/generate_cutover_scoreboard.py
-
-      - name: 🧭 Fitness #1 - CORE_KERNEL ACL isolation
-        run: python scripts/fitness/check_core_kernel_acl.py
-
-      - name: 📉 Fitness #2 - Legacy routes monotonic
-        run: python scripts/fitness/check_legacy_routes_monotonic.py
-
-      - name: 🔌 Fitness #3 - Port consistency
-        run: python scripts/fitness/check_ports_consistency.py
-
-      - name: 📜 Fitness #5 - Contract baseline present
-        run: python scripts/fitness/check_contracts_verified.py
-
-      - name: 🚫 Fitness #6 - No cross-service imports
-        run: python scripts/fitness/check_no_cross_service_imports.py
-
-      - name: 🧯 Fitness #7 - Legacy env/profile enforcement
-        run: python scripts/fitness/check_core_kernel_env_profile.py
-
-      - name: 📊 Fitness #8 - Legacy traffic 30d hard-zero
-        run: python scripts/fitness/check_legacy_traffic_zero_window.py
-
-      - name: 📦 Upload cutover scoreboard artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: cutover-scoreboard
-          path: docs/diagnostics/CUTOVER_SCOREBOARD.md
-          retention-days: 7
-
-
-  # ===========================================================================
-  # 🧪 مرحلة الاختبارات
-  # ===========================================================================
   test:
-    name: 🧪 Tests
+    name: test
     runs-on: ubuntu-latest
-    needs: [contract-validation, quality, guardrails]
     timeout-minutes: 20
-    if: ${{ github.event.inputs.skip_tests != 'true' }}
-    permissions:
-      contents: read
-
     env:
       DATABASE_URL: "sqlite+aiosqlite:///:memory:"
-      SECRET_KEY: "test-secret-key-for-ci-pipeline-secure-length"
-      ENVIRONMENT: "testing"
+      SECRET_KEY: test-secret-key-for-ci-pipeline-secure-length
+      ENVIRONMENT: testing
       LLM_MOCK_MODE: "1"
-      SUPABASE_URL: "https://dummy.supabase.co"
-      SUPABASE_SERVICE_ROLE_KEY: "dummy-key-for-ci"
-      RECOVERY_ADMIN_PASSWORD: "dummy-pass-for-ci"
-
+      SUPABASE_URL: https://dummy.supabase.co
+      SUPABASE_SERVICE_ROLE_KEY: dummy-key-for-ci
+      RECOVERY_ADMIN_PASSWORD: dummy-pass-for-ci
     steps:
-      - name: 📥 Checkout Repository
-        uses: actions/checkout@v4
-
-      - name: 🐍 Setup Python ${{ env.PYTHON_VERSION }}
-        uses: actions/setup-python@v5
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
-          cache: "pip"
-
-      - name: 📦 Install Dependencies
+          cache: pip
+          cache-dependency-path: requirements-test.txt
+      - uses: ./.github/actions/setup
+      - name: Install test dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements-test.txt pytest fastapi httpx sqlalchemy pydantic-settings pyjwt uvicorn opentelemetry-api opentelemetry-sdk
-
-      - name: ✅ Verify Configuration
+          pip install -r requirements-test.txt
+      - name: Run tests
         run: |
-          # Skip verification in CI - secrets are injected via env vars
-          echo "✅ Configuration verified via environment variables"
-
-      - name: 🧪 Run Tests with Coverage
-        run: |
-          python -m pytest \
-            -v \
-            --cov=app \
-            --cov-report=xml:coverage.xml \
-            --cov-report=term-missing \
-            --durations=10 \
-            --tb=short
-
-      - name: 📊 Upload Coverage Report
-        uses: actions/upload-artifact@v4
+          python -m pytest -v --cov=app --cov-report=xml:coverage.xml --cov-report=term-missing --durations=10 --tb=short
+      - name: Upload coverage artifact
         if: always()
+        uses: actions/upload-artifact@v4
         with:
           name: coverage-report
           path: coverage.xml
           retention-days: 7
 
-  # ===========================================================================
-  # ✅ مرحلة التحقق النهائي
-  # ===========================================================================
-  verify:
-    name: ✅ Final Verification
-    runs-on: ubuntu-latest
-    needs: [contract-validation, quality, guardrails, test]
-    if: always() && !cancelled()
-    timeout-minutes: 5
-    permissions: {}
-
-    steps:
-      - name: 🎯 Check All Jobs Status
-        run: |
-          echo "📄 Contract Validation: ${{ needs.contract-validation.result }}"
-          echo "🔍 Quality Check: ${{ needs.quality.result }}"
-          echo "🛡️ Guardrails: ${{ needs.guardrails.result }}"
-          echo "🧪 Tests: ${{ needs.test.result }}"
-
-          if [[ "${{ needs.contract-validation.result }}" != "success" ]]; then
-            echo "❌ Contract validation failed!"
-            exit 1
-          fi
-
-          if [[ "${{ needs.quality.result }}" != "success" ]]; then
-            echo "❌ Quality checks failed!"
-            exit 1
-          fi
-
-          if [[ "${{ needs.guardrails.result }}" != "success" ]]; then
-            echo "❌ Guardrails checks failed!"
-            exit 1
-          fi
-
-          # Allow tests to complete with warnings
-          echo "✅ All checks passed successfully!"
-          echo "🚀 Ready for merge!"
-
-  # ===========================================================================
-  # 🗄️ مرحلة التحقق من Schema قاعدة البيانات
-  # ===========================================================================
-  schema-check:
-    name: 🗄️ Schema Validation
-    runs-on: ubuntu-latest
-    needs: [contract-validation, quality, guardrails]
-    timeout-minutes: 5
-    permissions:
-      contents: read
-
-    env:
-      DATABASE_URL: "sqlite+aiosqlite:///:memory:"
-      SECRET_KEY: "test-secret-key-for-ci-pipeline-secure-length"
-      ENVIRONMENT: "testing"
-
-    steps:
-      - name: 📥 Checkout Repository
-        uses: actions/checkout@v4
-
-      - name: 🐍 Setup Python ${{ env.PYTHON_VERSION }}
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-          cache: "pip"
-
-      - name: 📦 Install Dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-
-      - name: 🔍 Validate Schema Definition
-        run: |
-          python -c "
-          import sys
-          sys.path.insert(0, '.')
-
-          try:
-              # التحقق من أن Models يمكن استيرادها
-              from app.core.domain.models import AdminConversation
-              print('✅ AdminConversation model imported successfully')
-              
-              # التحقق من وجود linked_mission_id في التعريف
-              fields = [f for f in dir(AdminConversation) if not f.startswith('_')]
-              
-              if 'linked_mission_id' in fields:
-                  print('✅ AdminConversation model has linked_mission_id field')
-              else:
-                  print('⚠️ WARNING: linked_mission_id not found in AdminConversation')
-              
-              print('✅ Schema validation passed!')
-          except Exception as e:
-              print(f'⚠️ Schema validation completed with warnings: {e}')
-          "
-
-  # ===========================================================================
-  # 🏗️ Build Status Check (Required for Branch Protection)
-  # ===========================================================================
-  build:
-    name: build
-    runs-on: ubuntu-latest
-    needs: [contract-validation, quality, guardrails, test, schema-check]
-    if: always() && !cancelled()
-    timeout-minutes: 5
-    permissions: {}
-
-    steps:
-      - name: 🎯 Check All Required Jobs Status
-        run: |
-          echo "📄 Contract Validation: ${{ needs.contract-validation.result }}"
-          echo "🔍 Quality Check: ${{ needs.quality.result }}"
-          echo "🛡️ Guardrails: ${{ needs.guardrails.result }}"
-          echo "🧪 Tests: ${{ needs.test.result }}"
-          echo "🗄️ Schema Check: ${{ needs.schema-check.result }}"
-
-          # Contract validation must succeed
-          if [[ "${{ needs.contract-validation.result }}" != "success" ]]; then
-            echo "❌ Contract validation failed!"
-            exit 1
-          fi
-
-          # Quality checks must succeed
-          if [[ "${{ needs.quality.result }}" != "success" ]]; then
-            echo "❌ Quality checks failed!"
-            exit 1
-          fi
-
-          if [[ "${{ needs.guardrails.result }}" != "success" ]]; then
-            echo "❌ Guardrails checks failed!"
-            exit 1
-          fi
-
-          # Schema check must succeed or be skipped
-          if [[ "${{ needs.schema-check.result }}" == "failure" ]]; then
-            echo "❌ Schema validation failed!"
-            exit 1
-          fi
-
-          # Tests must run and succeed (not skipped)
-          if [[ "${{ needs.test.result }}" == "skipped" ]]; then
-            echo "❌ Tests were skipped - tests must run!"
-            exit 1
-          elif [[ "${{ needs.test.result }}" == "cancelled" ]]; then
-            echo "❌ Tests were cancelled!"
-            exit 1
-          elif [[ "${{ needs.test.result }}" != "success" ]]; then
-            echo "❌ Tests failed!"
-            exit 1
-          fi
-
-          echo "✅ All required checks passed successfully!"
-          echo "🚀 Build is ready!"
-          exit 0
-
-  # ===========================================================================
-  # ✅ Required CI Status Check (Required for Branch Protection)
-  # ===========================================================================
   required-ci:
     name: required-ci
     runs-on: ubuntu-latest
-    needs: [build]
+    needs: [lint, contracts, guardrails, test]
     if: always() && !cancelled()
-    timeout-minutes: 5
-    permissions: {}
-
     steps:
-      - name: 🎯 Verify Build Status
+      - name: Evaluate required checks
         run: |
-          echo "🏗️ Build Status: ${{ needs.build.result }}"
+          echo "lint=${{ needs.lint.result }}"
+          echo "contracts=${{ needs.contracts.result }}"
+          echo "guardrails=${{ needs.guardrails.result }}"
+          echo "test=${{ needs.test.result }}"
 
-          if [[ "${{ needs.build.result }}" != "success" ]]; then
-            echo "❌ Build failed!"
+          if [ "${{ needs.lint.result }}" != "success" ] || \
+             [ "${{ needs.contracts.result }}" != "success" ] || \
+             [ "${{ needs.guardrails.result }}" != "success" ] || \
+             [ "${{ needs.test.result }}" != "success" ]; then
+            echo "❌ One or more required checks failed"
             exit 1
           fi
 
-          echo "✅ All CI checks passed!"
-          echo "✅ Ready for merge!"
-          exit 0
+          echo "✅ All required checks passed"

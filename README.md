@@ -1,7 +1,7 @@
 # 🛡️ North African AI Safety Lab (NAAS Lab)
 ## Project: EL-NUKHBA (The Elite) | NAAS-Agentic-Core
 
-![Status](https://img.shields.io/badge/Status-Active_Research-success?style=for-the-badge) ![Grant Application](https://img.shields.io/badge/Grant_Application-EMEA_Youth_%26_Wellbeing_2026_(Submitted)-0b7285?style=for-the-badge) ![License](https://img.shields.io/badge/License-MIT-blue.svg?style=for-the-badge) ![Tech](https://img.shields.io/badge/Architecture-Agentic_RAG-orange?style=for-the-badge) ![Python](https://img.shields.io/badge/Python-3.10%2B-blue?style=for-the-badge) ![Governance](https://img.shields.io/badge/Governance-Safeguarding_%2B_Data_Policy-red?style=for-the-badge) ![Cite](https://img.shields.io/badge/Cite-CITATION.cff-lightgrey?style=for-the-badge)
+![Status](https://img.shields.io/badge/Status-Active_Research-success?style=for-the-badge) ![License](https://img.shields.io/badge/License-MIT-blue.svg?style=for-the-badge) ![Python](https://img.shields.io/badge/Python-3.12-blue?style=for-the-badge) ![CI](https://img.shields.io/badge/Required_Check-required--ci-brightgreen?style=for-the-badge) ![Governance](https://img.shields.io/badge/Governance-Safeguarding_%2B_Data_Policy-red?style=for-the-badge) ![Cite](https://img.shields.io/badge/Cite-CITATION.cff-lightgrey?style=for-the-badge)
 
 > **The "Elite" Verify-then-Reply Framework:** A safeguarding-first agentic tutoring framework for North African education that reduces AI-related harm in Arabic/French/Darija code-switching contexts through verification, risk screening, and measurable outcomes.
 
@@ -100,22 +100,20 @@ We also track simple, auditable indicators (definitions in `docs/IMPACT_MEASUREM
 
 ---
 
-## 🗺️ Repository Map
+## 🗺️ Repository Map (Current)
 
 ```text
 .
-├── docs/                       # Evaluation protocols, impact plans, and transparency reports
-├── toolkit/                    # Operational tools: screening checklists, incident logs
-├── src/                        # Core agentic logic and safety verification code
-├── evaluation/                 # Code-switching test suites and benchmarking tools
-├── briefs/                     # Stakeholder-facing brief templates
-├── .github/                    # CI/CD workflows and engineering automation notes
-├── CITATION.cff                # Citation metadata
-├── DATA_POLICY.md              # Privacy-by-design and data handling rules
-├── SAFEGUARDING.md             # Youth safety, supervision, and escalation protocols
-├── SECURITY.md                 # Vulnerability reporting policy
-├── CONTRIBUTING.md             # Developer and researcher contribution guide
-└── README.md                   # Project overview
+├── app/                        # Main FastAPI application + domain/core modules
+├── microservices/              # Service-island implementations (gateway, user, planning, etc.)
+├── tests/                      # Contract, architecture, guardrail, API, integration, security tests
+├── scripts/                    # CI guardrails, fitness checks, operational tooling
+├── docs/                       # Architecture constitution, ADRs, governance, contracts, guides
+├── infra/                      # Kubernetes, Terraform, ArgoCD, monitoring assets
+├── toolkit/                    # Partner-facing operational resources
+├── knowledge_base/             # Ingestion source documents
+├── frontend/                   # Frontend application modules
+└── .github/                    # Workflows, templates, governance automation
 ```
 
 ---
@@ -123,23 +121,27 @@ We also track simple, auditable indicators (definitions in `docs/IMPACT_MEASUREM
 ## 🚀 Quick Start
 
 ### 👨‍💻 For Developers & Researchers
-**Note:** The following commands are examples. Please align paths to your specific environment.
 
 ```bash
-# 1. Clone the repository
 git clone https://github.com/HOUSSAM16ai/NAAS-Agentic-Core.git
 cd NAAS-Agentic-Core
+python3.12 -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
+pip install -r requirements-dev.txt
+pip install -r requirements-test.txt
 
-# 2. Install dependencies (requires Python 3.10+)
-pip install -r requirements.txt
-
-# 3. Configure environment variables (see .env.example)
-cp .env.example .env
-
-# 4. Run the code-switching evaluation suite
-# Example command:
-python -m evaluation.run --suite code-switching-v1 --output results/report.json
+# Required local gates (mirror required-ci jobs)
+ruff check .
+ruff format --check .
+python scripts/ci_guardrails.py
+pytest -v --cov=app --cov-report=term-missing --tb=short
 ```
+
+### ✅ Mergeability Rule
+
+For `main`, branch protection should require **only** `required-ci`.
+This check aggregates lint, contracts, guardrails, and tests.
 
 ### 🤝 For Partners & Educators
 1.  Read `toolkit/START_HERE.md`

@@ -1,53 +1,56 @@
 # Security Policy
 
-The North African AI Safety Lab (NAAS Lab) takes the security of our software and the protection of youth data seriously. We value the security community and encourage responsible disclosure of vulnerabilities.
-
 ## Supported Versions
 
-Only the latest stable release is currently supported with security updates.
+Only the latest release line on `main` is supported for security patches.
 
-| Version | Supported |
-| ------- | ------------------ |
-| 0.1.x | :white_check_mark: |
-| < 0.1 | :x: |
+| Version line | Supported |
+| --- | --- |
+| latest on `main` | ✅ |
+| older tags/branches | ❌ |
 
-## Reporting a Vulnerability
+## Reporting a Vulnerability (Private Only)
 
-**Please do not report security vulnerabilities through public GitHub issues.**
+**Do not open public GitHub issues for vulnerabilities.**
 
-If you believe you have found a security vulnerability in the NAAS-Agentic-Core repository, please report it to our team privately.
+Report via:
+- Email: `security@naas-lab.org`
+- GitHub Security Advisory (if enabled)
 
-### How to Report
+Include:
+1. Impacted component and commit/tag.
+2. Reproduction steps (minimal PoC).
+3. Security impact (confidentiality/integrity/availability).
+4. Suggested mitigation (if known).
 
-1.  **Email:** Contact the repository maintainers directly (see profile contact or `SECURITY.md` history).
-2.  **Private GitHub Advisory:** If enabled, use the "Report a vulnerability" tab in the Security section of this repository.
+## Response SLA
 
-### What to Include
+- Acknowledgement: within **72 hours**.
+- Initial triage: within **5 business days**.
+- Critical vulnerability mitigation target: **14 days**.
 
-*   A clear description of the potential vulnerability.
-*   Steps to reproduce the issue (PoC).
-*   Any relevant logs or screenshots.
-*   The version of the software you are running.
+## Disclosure Process
 
-### Our Response
-
-We will acknowledge receipt of your vulnerability report within **72 hours**. We aim to resolve critical security issues as quickly as possible.
-
-1.  **Triage:** We will investigate and verify the report.
-2.  **Patch:** If valid, we will develop and test a fix.
-3.  **Release:** We will release a security patch or advisory.
-4.  **Credit:** We will publicly acknowledge your contribution (with your permission) in the release notes.
+1. Validate and assign severity.
+2. Prepare and test fix in private branch/fork.
+3. Publish patched release + advisory.
+4. Credit reporter (optional, with consent).
 
 ## Scope
 
-This policy applies to the core agentic logic, evaluation suites, and documentation within this repository. It does not cover vulnerabilities in third-party dependencies unless the vulnerability stems from our specific usage or configuration.
+In scope:
+- `app/`
+- `microservices/`
+- `scripts/` used in CI/CD or release flow
+- authentication/authorization paths
+- data handling and safeguarding enforcement
+
+Out of scope:
+- vulnerabilities only in third-party dependencies without repository-specific exploitability.
 
 ## Safe Harbor
 
-We support safe harbor for security researchers who:
-
-*   Make a good faith effort to avoid privacy violations, destruction of data, and interruption or degradation of our service.
-*   Only interact with accounts they own or have explicit permission to test.
-*   Report vulnerabilities to us rather than to the public.
-
-Thank you for helping keep the NAAS-Agentic-Core project safe.
+We support good-faith research that:
+- avoids privacy violations and service disruption,
+- does not exfiltrate real data,
+- reports findings privately and responsibly.

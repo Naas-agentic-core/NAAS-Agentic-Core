@@ -1,0 +1,53 @@
+name: Bug report
+description: Report a reproducible defect with actionable debugging data.
+title: "[BUG] "
+labels:
+  - type:bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ⚠️ Remove all PII, student data, secrets, and production tokens before submitting.
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: What is broken and what did you expect instead?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Reproduction steps
+      description: Provide deterministic steps from a clean checkout.
+      placeholder: |
+        1) git checkout ...
+        2) pip install -r requirements-test.txt
+        3) pytest tests/... -k ...
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Logs / traces / screenshots
+      description: Paste stack trace, CI link, and any relevant artifact.
+    validations:
+      required: true
+  - type: input
+    id: commit
+    attributes:
+      label: Affected commit/branch
+      placeholder: main@<sha> or PR #
+    validations:
+      required: true
+  - type: dropdown
+    id: impact
+    attributes:
+      label: Severity
+      options:
+        - critical (production outage / security risk)
+        - high (major feature broken)
+        - medium (workaround exists)
+        - low (minor issue)
+    validations:
+      required: true

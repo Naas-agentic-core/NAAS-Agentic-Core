@@ -1,0 +1,23 @@
+# Global fallback owners
+* @HOUSSAM16ai
+
+# Platform core
+/app/ @HOUSSAM16ai
+/tests/ @HOUSSAM16ai
+/scripts/ @HOUSSAM16ai
+
+# Microservices ownership boundaries
+/microservices/api_gateway/ @HOUSSAM16ai
+/microservices/user_service/ @HOUSSAM16ai
+/microservices/observability_service/ @HOUSSAM16ai
+/microservices/planning_agent/ @HOUSSAM16ai
+
+# Governance & delivery
+/.github/ @HOUSSAM16ai
+/docs/ @HOUSSAM16ai
+/infra/ @HOUSSAM16ai
+
+# Security and policy files require security owner review
+/SECURITY.md @HOUSSAM16ai
+/DATA_POLICY.md @HOUSSAM16ai
+/SAFEGUARDING.md @HOUSSAM16ai

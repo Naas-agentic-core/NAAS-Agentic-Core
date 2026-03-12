@@ -1,62 +1,37 @@
-# 🧠 Elite Branch Protection Template — GitHub Pro Mode
-*(By HOUSSAM16AI — 2025 Edition)*
+# Branch Protection Guide (Authoritative)
 
----
+This repository uses a **single mergeability truth**: `required-ci`.
 
-## ⚙️ Branch Pattern
-**Branch name pattern:**
+## Required settings for `main`
 
-main
+- Require pull request before merging: **enabled**
+- Require approvals: **1+** (increase to 2 when team grows)
+- Dismiss stale approvals when new commits are pushed: **enabled**
+- Require review from Code Owners: **enabled**
+- Require status checks to pass before merging: **enabled**
+- Require branches to be up to date before merging: **enabled**
+- Restrict who can push directly to matching branches: **enabled**
+- Do not allow bypassing the above settings: **enabled**
+- Allow force pushes: **disabled**
+- Allow deletions: **disabled**
 
----
+## Required status checks
 
-## ✅ Enabled Rules
+Exactly one required check:
+- `required-ci`
 
-- [x] Require a pull request before merging  
-- [x] Require status checks to pass before merging  
-- [x] Require branches to be up to date before merging  
+`required-ci` already aggregates `lint`, `contracts`, `guardrails`, and `test`.
+Do **not** require both aggregate and underlying jobs in branch protection.
 
----
+## Why this model
 
-## 🧩 Required Status Checks
+- Prevents duplicated failure surfaces (`build` + `verify` + `required-ci`).
+- Keeps PR failure reason obvious in one workflow.
+- Reduces configuration drift between docs and GitHub settings.
 
-required-ci build
+## Change control
 
----
-
-## 🚫 Optional Rules (Not Enabled)
-- Require conversation resolution before merging  
-- Require signed commits  
-- Require linear history  
-- Require deployments to succeed before merging  
-
----
-
-## 🔒 Admin & Permissions
-- [ ] Lock branch  
-- [ ] Do not allow bypassing the above settings  
-- [ ] Allow force pushes  
-- [ ] Allow deletions  
-
----
-
-## 🧱 Summary
-| Rule | Status | Purpose |
-|------|---------|----------|
-| Require PR before merge | ✅ | Ensures review workflow |
-| Status checks (CI/CD) | ✅ | Prevents broken builds |
-| Up-to-date with main | ✅ | Enforces latest testing |
-| Admin bypass | ❌ | Increases repo security |
-
----
-
-## 🧩 Developer Note
-All merges to `main` **must**:
-1. Come via Pull Request.  
-2. Pass `required-ci` and `build`.  
-3. Be tested with the latest commit on `main`.  
-
----
-
-**Maintained by:** HOUSSAM16AI  
-**Version:** v1.0 — November 2025
+Any change to required checks must update, in one PR:
+1. `.github/workflows/ci.yml`
+2. `.github/BRANCH_PROTECTION_GUIDE.md`
+3. `CONTRIBUTING.md`

@@ -1,0 +1,34 @@
+name: Feature request
+description: Propose a scoped enhancement tied to architecture and governance goals.
+title: "[FEAT] "
+labels:
+  - type:feature
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem statement
+      description: What concrete pain exists today?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: Describe behavior, boundaries, and affected modules.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+    validations:
+      required: true
+  - type: checkboxes
+    id: governance
+    attributes:
+      label: Governance impact
+      options:
+        - label: This change updates docs/contracts when behavior changes.
+        - label: This change does not add duplicate CI checks.
+        - label: Ownership and review path are clear (CODEOWNERS-compatible).

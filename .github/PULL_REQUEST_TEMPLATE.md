@@ -1,19 +1,39 @@
-## Description
-Please include a summary of the change and which issue is fixed.
+## Summary
+<!-- What changed and why now? Include operational impact. -->
 
-## Type of Change
-- [ ] Bug fix (non-breaking change which fixes an issue)
-- [ ] New feature (non-breaking change which adds functionality)
-- [ ] Breaking change (fix or feature that would cause existing functionality to not work as expected)
-- [ ] Documentation update
+## Change Type
+- [ ] bug fix
+- [ ] feature
+- [ ] refactor
+- [ ] governance / documentation
+- [ ] security hardening
 
-## Safeguarding & Ethics Check
-- [ ] **PII**: I have ensured no Personally Identifiable Information is included.
-- [ ] **Content**: I have verified that any new test prompts do not violate the Code of Conduct.
-- [ ] **Tests**: I have added tests that prove my fix is effective or that my feature works.
+## Affected Areas
+- [ ] app core
+- [ ] microservices
+- [ ] contracts / guardrails
+- [ ] CI/CD
+- [ ] docs / governance
 
-## Checklist:
-- [ ] My code follows the style guidelines of this project
-- [ ] I have performed a self-review of my own code
-- [ ] I have commented my code, particularly in hard-to-understand areas
-- [ ] I have made corresponding changes to the documentation
+## Risk & Rollback
+- **Risk level:** low / medium / high
+- **Rollback plan:**
+
+## Validation Evidence
+<!-- Paste exact commands + short outputs. -->
+- [ ] `ruff check .`
+- [ ] `ruff format --check .`
+- [ ] `pytest ...`
+
+## Governance Checklist (Required)
+- [ ] I updated docs when runtime/CI behavior changed.
+- [ ] I did not add duplicate CI truth layers.
+- [ ] I confirmed mergeability depends on `required-ci`.
+- [ ] I removed or justified any skipped tests.
+- [ ] I verified no PII or sensitive secrets were added.
+
+## Safeguarding Impact
+<!-- Required for product-facing changes. For infra-only changes, write N/A. -->
+
+## Reviewer Guide
+<!-- Tell reviewers where to focus first. -->
