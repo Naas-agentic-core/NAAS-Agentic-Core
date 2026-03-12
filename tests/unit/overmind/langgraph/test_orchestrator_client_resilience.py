@@ -21,7 +21,10 @@ async def test_build_chat_url_candidates_prefers_local_then_container(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """يتحقق من أولوية مسار localhost ثم مسارات Docker الاحتياطية في بناء endpoints."""
-    monkeypatch.setenv("ORCHESTRATOR_SERVICE_FALLBACK_URLS", "http://orchestrator-service:8006,http://host.docker.internal:8006")
+    monkeypatch.setenv(
+        "ORCHESTRATOR_SERVICE_FALLBACK_URLS",
+        "http://orchestrator-service:8006,http://host.docker.internal:8006",
+    )
     client = OrchestratorClient(base_url="http://localhost:8006")
 
     candidates = client._build_chat_url_candidates()

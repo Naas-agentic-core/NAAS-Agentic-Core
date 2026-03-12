@@ -121,6 +121,7 @@ def _build_tracer() -> object:
     """ينشئ كائن التتبع الحقيقي إذا توفر OpenTelemetry وإلا يعيد بديلًا آمنًا."""
     if importlib.util.find_spec("opentelemetry"):
         import opentelemetry.trace
+
         return opentelemetry.trace.get_tracer(__name__)
     return _NoOpTracer()
 
