@@ -16,7 +16,7 @@ class ChatRoutingPolicy:
     contract_version: str
 
     @classmethod
-    def from_environment(cls, canonical_base_url: str) -> "ChatRoutingPolicy":
+    def from_environment(cls, canonical_base_url: str) -> ChatRoutingPolicy:
         """يبني السياسة من المتغيرات البيئية مع افتراض canonical صارم افتراضيًا."""
         breakglass_multi_target = os.getenv("ORCHESTRATOR_ALLOW_MULTI_TARGET_CHAT", "0") == "1"
         bases: list[str] = [canonical_base_url.rstrip("/")]

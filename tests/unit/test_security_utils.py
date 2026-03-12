@@ -8,7 +8,7 @@ from app.security.passwords import pwd_context
 
 
 def test_generate_service_token_includes_subject(monkeypatch) -> None:
-    secret_key = "test-secret-key"
+    secret_key = "test-secret-key-that-is-very-long-and-secure-enough-for-tests-v4"
     monkeypatch.setattr(security, "get_settings", lambda: SimpleNamespace(SECRET_KEY=secret_key))
 
     token = security.generate_service_token("user-123")
@@ -21,7 +21,7 @@ def test_generate_service_token_includes_subject(monkeypatch) -> None:
 
 
 def test_generate_service_token_has_short_expiry(monkeypatch) -> None:
-    secret_key = "another-secret-key"
+    secret_key = "test-secret-key-that-is-very-long-and-secure-enough-for-tests-v4"
     monkeypatch.setattr(security, "get_settings", lambda: SimpleNamespace(SECRET_KEY=secret_key))
 
     token = security.generate_service_token("service")

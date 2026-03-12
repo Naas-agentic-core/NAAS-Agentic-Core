@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import json
 import logging
-import os
 import uuid
 from collections.abc import AsyncGenerator
 
@@ -23,6 +22,8 @@ from app.infrastructure.clients.routing_policy import ChatRoutingPolicy
 from app.services.capabilities.exercise_retrieval import (
     ExerciseRetrievalRequest,
     detect_exercise_retrieval,
+)
+from app.services.capabilities.exercise_retrieval import (
     make_result as make_exercise_result,
 )
 from app.services.capabilities.file_intelligence import (
@@ -30,6 +31,8 @@ from app.services.capabilities.file_intelligence import (
     build_file_count_command,
     default_project_root,
     detect_file_intelligence,
+)
+from app.services.capabilities.file_intelligence import (
     make_result as make_file_result,
 )
 

@@ -9,7 +9,7 @@ from app.core.settings.base import AppSettings
 @pytest.fixture
 def mock_settings():
     settings = MagicMock(spec=AppSettings)
-    settings.SECRET_KEY = "test-secret-key"
+    settings.SECRET_KEY = "test-secret-key-that-is-very-long-and-secure-enough-for-tests-v4"
     return settings
 
 
