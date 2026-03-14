@@ -1,381 +1,538 @@
 WARNING:
-This report is a forensic diagnostic audit only.
+This report is a final forensic diagnostic audit only.
 No source code was modified.
 No fixes were implemented.
 No files were created except this rewritten diagnostic report.
-Every major claim in this report is intended to be evidence-based.
-Where proof is incomplete, the report marks the claim as Likely Risk or Insufficient Evidence rather than treating it as fact.
+Major claims are tied to repository evidence as precisely as possible.
+Where exact proof is incomplete, the report explicitly downgrades the claim rather than overstating certainty.
 
 ## 1. Title
-Forensic-Grade Architecture and Systems Audit — HOUSSAM16ai/NAAS-Agentic-Core
+ULTRA FORENSIC DIAGNOSTIC — HOUSSAM16ai/NAAS-Agentic-Core (Final Hardening Pass)
 
-## 2. Scope and Audit Method
-- **Scope audited:** repository structure, runtime entrypoints, gateway/proxy paths, websocket lifecycle, outbox/eventing path, AI orchestration graph/tool surfaces, settings/security defaults, test/CI evidence.
-- **Hard method used:**
-  1) Extract claimed architecture from docs/config (`docs/API_FIRST_SUMMARY.md`, `docs/ARCHITECTURE.md`, `docs/architecture/MICROSERVICES_CONSTITUTION.md`, route ownership registry).
-  2) Trace actual runtime entrypoints (`app/main.py`, `app/kernel.py`, `microservices/api_gateway/main.py`, orchestrator routes/graph/state).
-  3) Compare claims vs runtime behavior and classify each gap as **CONFIRMED DEFECT / CONFIRMED WEAKNESS / LIKELY RISK / INSUFFICIENT EVIDENCE**.
-  4) Evaluate against elite 3–5 year standards (determinism, bounded complexity, failure semantics, auditability).
-- **Evidence discipline:** all major findings include file paths + symbols + line anchors.
-- **No runtime execution claims:** this report is repository-forensic, not production-traffic verification.
+## 2. Scope and Final Audit Method
+- Scope: runtime entrypoints, route ownership, websocket lifecycle, event contracts, type boundaries, AI control-plane enforcement, security defaults, docs/runtime congruence.
+- Method:
+  1. Extract declared architecture and ownership from docs/config artifacts.
+  2. Trace executable runtime owners and route bindings from FastAPI boot files and router registries.
+  3. Cross-check event producer/consumer shapes at source and bridge points.
+  4. Classify each claim under strict evidence discipline: **CONFIRMED DEFECT / CONFIRMED WEAKNESS / LIKELY RISK / INSUFFICIENT EVIDENCE**.
+  5. Apply elite disqualifier test per finding (standard violated, proof, structural/local, debt/risk, short-term operability, elite fail reason).
+- Evidence policy: short quote excerpts (3–12 words) only for load-bearing claims.
+- Confidence model:
+  - High = direct symbol+line proof.
+  - Medium = direct partial proof + bounded inference.
+  - Low = sparse topology or missing runtime artifacts.
 
 ## 3. Executive Verdict
-- **Final verdict:** **NOT ELITE**.
-- **Primary reason:** multiple **Elite Disqualifiers** are confirmed in code, not just inferred from docs.
-- **Architecture truth:** this repository is a **transitional hybrid with distributed-monolith characteristics**, not a clean finished microservice architecture.
-- **AI stack truth:** LangGraph/DSPy/MCP/Kagent are present, but core governance and typing boundaries are too permissive and partially mocked for elite reliability.
+- Final verdict: **NOT ELITE**.
+- Core reason: structural contradictions between declared single-owner API-first microservice authority and actual multi-owner runtime with overlapping chat/event/control-plane ownership.
+- Primary disqualifiers confirmed in code:
+  - Duplicated runtime authority across app kernel and gateway/orchestrator.
+  - Event contract drift (object vs dict, missing stable event identity).
+  - Security defaults permissive until environment-gated validators engage.
+  - AI trust/access/tool-control gates implemented as permissive or mock behavior.
+  - WebSocket lifecycle lacks explicit backpressure/bounds/heartbeat enforcement.
 
-## 4. Elite Gate Matrix (Pass/Fail)
-| Elite Gate | Result | Evidence | Elite-Disqualifying if failed? |
+## 4. Final Elite Gate Matrix
+| Elite gate | Status | Evidence anchor | Classification |
 |---|---|---|---|
-| Single authoritative architecture | **FAIL** | `app/main.py` boots `RealityKernel`; `docker-compose.yml` routes primary traffic through `api-gateway`; both expose chat/runtime surfaces. (`app/main.py`, `docker-compose.yml`, `microservices/api_gateway/main.py`) | **Yes** |
-| Clean bounded contexts | **FAIL** | Copy-coupling baseline explicitly tracks overlap between `app/services/overmind` and `microservices/.../overmind` (`config/overmind_copy_coupling_baseline.json`). | **Yes** |
-| Deterministic event correctness | **FAIL** | Redis bridge contains unresolved contract-break commentary and forwards dict payloads with missing IDs (`app/core/redis_bus.py`); outbox publish is best-effort immediate push (`.../state.py`). | **Yes** |
-| Secure-by-default posture | **FAIL** | Defaults include wildcard CORS/hosts and default admin password in app settings (`app/core/settings/base.py`), dev-secret defaults in orchestrator (`.../src/core/config.py`), default weak-ish shared secret string in user service (`microservices/user_service/settings.py`). | **Yes** |
-| Hardened realtime lifecycle | **FAIL** | No explicit heartbeat, queue bounds, or backpressure in gateway WS proxy and frontend reconnect queue (`microservices/api_gateway/websockets.py`, `frontend/app/hooks/useRealtimeConnection.js`). | **Yes** |
-| Strict type contracts at orchestration boundaries | **FAIL** | pervasive `Any` in integration kernel and orchestrator graph state (`app/core/integration_kernel/runtime.py`, `microservices/.../graph/main.py`) despite strict-governance claims (`app/core/governance/contracts.py`). | **Yes** |
-| Observable distributed execution | **PARTIAL** | CI guardrails and health checks exist (`.github/workflows/ci.yml`, gateway `/health`); telemetry core relies on in-memory buffers + background sync (`app/telemetry/unified_observability.py`). | No |
-| Risk-based test depth | **PARTIAL** | Broad CI and coverage exists (`.github/workflows/ci.yml`), but no clear load/chaos WS/eventing verification path found in active test suites. | No |
-| Auditable AI graph/tool boundaries | **FAIL** | Dynamic admin-tool invocation with broad payload dicts and exception string return (`.../src/api/routes.py`), mocked TLM trust score (`.../graph/admin.py`). | **Yes** |
-| Long-horizon maintainability | **FAIL** | Parallel legacy+new ownership plus overlap metric indicates unresolved migration debt (`config/overmind_copy_coupling_baseline.json`, route/runtime duplication). | **Yes** |
+| Single authoritative runtime owner | FAIL | `app/main.py` booting `RealityKernel` + `microservices/api_gateway/main.py` owning external `:8000` and chat WS routes + route registry owner claims | CONFIRMED DEFECT |
+| Singular chat WS ownership | FAIL | App routers expose `/api/chat/ws` and `/admin/api/chat/ws`; gateway exposes same public surfaces | CONFIRMED DEFECT |
+| Deterministic event contract integrity | FAIL | `state.py` emits dict envelope; bridge and consumers perform adaptation commentary/conversion paths | CONFIRMED DEFECT |
+| Secure-by-default posture | FAIL | Wildcard CORS/hosts and default credentials/keys in non-production defaults | CONFIRMED WEAKNESS |
+| Typed AI control boundaries | FAIL | `Any` in state and tool payload boundaries, dynamic invoke endpoints | CONFIRMED DEFECT |
+| WebSocket lifecycle safety completeness | FAIL | No queue limits, no heartbeat/ping contracts, no slow-consumer strategy | CONFIRMED WEAKNESS |
+| Trust/verification realism in agent tools | FAIL | `MockTLM` constant trust score; access validator grants all | CONFIRMED DEFECT |
+| Contract-driven docs/runtime consistency | FAIL | Docs promise 100% API-first certainty; runtime is transitional dual-authority | CONFIRMED DEFECT |
 
 ## 5. System Reality Inferred From Code
-1. **Two concurrent runtime narratives exist**:
-   - Monolithic kernel runtime in `app/` (`app/main.py`, `app/kernel.py`, `app/api/routers/registry.py`).
-   - Gateway-first microservices runtime in `microservices/` + `docker-compose.yml` (`api-gateway` on `:8000`).
-2. **Chat and orchestration are not singularly owned**:
-   - App provides `/api/chat/ws` via `customer_chat.py` and also admin WS at `/api/chat/ws` via `admin.py`.
-   - Gateway proxies `/api/chat/ws` and `/admin/api/chat/ws` to orchestrator/conversation targets.
-3. **Eventing correctness is mixed-mode**:
-   - Transactional outbox entities exist.
-   - Publish path is still immediate best-effort Redis Pub/Sub with fallback comments and shape conversion workarounds.
-4. **AI stack is component-rich but control-plane integrity is inconsistent**:
-   - LangGraph state graph present.
-   - State schema and tool invocation boundaries are permissive (`Any`, dynamic payloads, mocks).
+- Runtime is dual-plane, not singular:
+  - App kernel plane: `app/main.py` instantiates `RealityKernel`.
+  - Gateway plane: `docker-compose.yml` exposes `api-gateway` on `8000:8000`; gateway defines public chat WS endpoints.
+- Ownership overlap is explicit, not inferred:
+  - App customer WS: `@router.websocket("/ws")` under `/api/chat`.
+  - App admin WS: `@router.websocket("/api/chat/ws")` under `/admin`.
+  - Gateway WS: `@app.websocket("/api/chat/ws")` and `@app.websocket("/admin/api/chat/ws")`.
+- Eventing is hybrid and adaptive:
+  - Outbox + immediate best-effort publish in same flow.
+  - Consumers include conversion logic for dict payloads lacking expected object attributes.
+- AI stack is present but control-plane discipline is mixed:
+  - Real LangGraph graph compile and conditional edges exist.
+  - State/schema/type and trust/access invariants are partially unbounded or mocked.
+- Confidence: **High**.
 
-## 6. Claimed Architecture vs Actual Runtime
-| Claimed | Runtime Evidence | Mismatch Severity | Consequence |
-|---|---|---|---|
-| “100% API-First” (`docs/API_FIRST_SUMMARY.md`) | Kernel + monolith routers still active runtime code (`app/main.py`, `app/kernel.py`, `app/api/routers/registry.py`) alongside gateway/microservices runtime (`docker-compose.yml`). | **High** | Ambiguous operational truth, incident routing ambiguity. |
-| “Strict service boundaries” (`docs/ARCHITECTURE.md`) | Overmind overlap tracked explicitly: owner + legacy snapshot and overlap metric (`config/overmind_copy_coupling_baseline.json`). | **Critical** | Duplicated authority, drift risk, inconsistent bugfix propagation. |
-| “Contract-first deterministic interfaces” | Redis bridge and mission stream contain contract mismatch workaround comments and dict-to-model reconstruction (`app/core/redis_bus.py`, `.../services/overmind/state.py`). | **Critical** | Event shape drift under failure/replay; consumer correctness fragile. |
-| “Secure defaults” (`app/core/settings/base.py` docstring) | Runtime defaults include `BACKEND_CORS_ORIGINS=['*']`, `ALLOWED_HOSTS=['*']`, default admin password, dev-secret defaults elsewhere. | **High** | Deployment misconfiguration can carry dangerous defaults to real environments. |
+## 6. Runtime Authority Conflict Matrix
+| Surface / capability | Legacy owner | New owner | Evidence | Conflict type | Runtime consequence | Elite-disqualifying? (Yes/No) |
+|---|---|---|---|---|---|---|
+| Customer chat websocket `/api/chat/ws` | `app/api/routers/customer_chat.py::chat_stream_ws` | `microservices/api_gateway/main.py::chat_ws_proxy` -> orchestrator/conversation | App route decorator + gateway route decorator + route registry owner=`orchestrator-service` | Duplicated authority | Ambiguous canonical execution path, divergent error/envelope behaviors | Yes |
+| Admin chat websocket `/admin/api/chat/ws` | `app/api/routers/admin.py::chat_stream_ws` | `microservices/api_gateway/main.py::admin_chat_ws_proxy` | Dual decorators on same public surface | Duplicated authority | Inconsistent auth/error semantics and operational ownership ambiguity | Yes |
+| Orchestration entrypoint | `app/services/chat/orchestrator.ChatOrchestrator` referenced by app routers | `microservices/orchestrator_service` routes + overmind graph | `CANONICAL_EXECUTION_AUTHORITY` constants vs gateway routing to orchestrator | Transitional conflict | Partial migration drift, debugging ambiguity | Yes |
+| Mission event stream | In-process `app/core/event_bus.py` queue + `app/core/redis_bus.py` bridge | Orchestrator Redis event bus | Dict/object adaptation comments and conversion logic | Contract/transport mismatch | Stream consumers need repair logic; deterministic replay weakened | Yes |
+| Gateway proxy path ownership | App routers mounted directly in kernel | Gateway wildcard smart routing and WS proxy | gateway “MUST BE FIRST” WS ordering + wildcard API routes | Routing authority layering | Shadowing risks and diagnostics complexity | Yes |
+| Registry-declared owner vs boot path | `config/route_ownership_registry.json` owner=`orchestrator-service` | App still boots chat routers via registry | Route registry vs app base router includes `admin` and `customer_chat` | Declared/runtime contradiction | Docs/config cannot be treated as executable truth | Yes |
 
-## 7. Overall Weighted Score
-- **Overall score:** **49/100**.
-- **Elite threshold used:** **90/100**.
-- **Confidence:** High for architecture/type/eventing/security-default findings; medium for operational SLO maturity where runtime deployment evidence is absent.
+## 7. Claimed Architecture vs Actual Runtime
+- Claimed: “100% API-First” certainty and clean architectural confidence.
+- Observed runtime: simultaneous monolith-kernel and gateway-microservice orchestration surfaces.
+- Contradiction mechanics:
+  - Declared owner registry sets orchestrator ownership for chat WS/HTTP.
+  - App runtime still mounts legacy/admin/customer chat routes.
+  - Gateway additionally proxies same WS surfaces and canary-routes between orchestrator and conversation service.
+- Classification: **CONFIRMED DEFECT**.
+- Confidence: **High**.
 
-## 8. Category Scores With Evidence
-| Category | Score /10 | Why this score (evidence) |
-|---|---:|---|
-| Computer science rigor | 5.0 | Good abstractions exist (`Config -> AppState -> WeavedApp` in `app/core/app_blueprint.py`), but contract discipline is violated by `Any` in core orchestration interfaces. |
-| Software architecture | 4.0 | Simultaneous monolith kernel and microservices gateway topology with overlapping domains. |
-| Distributed systems | 4.0 | Outbox present but delivery semantics are best-effort + Redis Pub/Sub non-durable path and adapter hacks. |
-| Backend engineering | 6.0 | Structured FastAPI composition and DI patterns exist; failure semantics and boundary ownership are inconsistent. |
-| Frontend/realtime engineering | 4.0 | Reconnect logic exists; no bounded queue, heartbeat, or explicit backpressure in WS paths. |
-| Data engineering | 5.0 | Service-specific databases declared in compose; insufficient hard evidence of indexing/RLS enforcement governance at runtime boundaries. |
-| Security | 4.0 | Production validators exist, but insecure defaults and broad tool invocation surfaces remain. |
-| Reliability/SRE | 5.0 | CI gates are good; distributed telemetry and incident-grade observability are partial/in-memory-centered. |
-| AI systems engineering | 4.0 | LangGraph integration exists; typed state and trust enforcement are weak/partially mocked. |
-| Agentic orchestration | 4.0 | Orchestration graph exists; deterministic controls coexist with permissive dynamic tool execution and loose payload typing. |
-| Future-proof maintainability | 4.0 | Explicit copy-coupling + dual ownership indicates ongoing structural debt with compounding risk. |
+## 8. Docs vs Runtime Contradiction Ledger
+| Claimed statement | Source document | Runtime evidence | Contradiction type | Severity | Consequence |
+|---|---|---|---|---|---|
+| “project is 100% API-First” | `docs/API_FIRST_SUMMARY.md` line with absolute claim | Dual authority in app kernel + gateway runtime planes | Absolutist claim vs transitional runtime | Critical | Governance truth source becomes unreliable |
+| “single clear API ownership” (implied by docs narrative) | `docs/API_FIRST_SUMMARY.md` architecture blocks | Chat WS surfaces duplicated in app and gateway | Ownership contradiction | Critical | Incident triage ambiguity |
+| Microservice independence principle | `docs/architecture/MICROSERVICES_CONSTITUTION.md` (independence/clear API boundaries) | `config/overmind_copy_coupling_baseline.json` tracks active copy overlap between legacy/new overmind trees | Structural coupling contradiction | High | Migration debt persists as active architecture risk |
+| WS outgoing contract `status,response` | `docs/contracts/consumer/gateway_chat_content_contracts.json` | Runtime sends envelope `{ "type": ..., "payload": ... }` in app chat routers | Schema contradiction | High | Consumer parsing drift risk |
 
-## 9. Elite Disqualifiers
-1. **Duplicated domain authority across legacy/app and microservices/orchestrator paths**.
-2. **Deterministic event correctness not proven; bridge/outbox contract drift explicitly documented in code comments.**
-3. **Realtime lifecycle lacks explicit hardening for slow consumers and bounded buffering.**
-4. **Strict typing claims contradicted by `Any` in AI/orchestration boundaries.**
-5. **Secure-by-default posture fails due to permissive defaults that can escape via environment misconfiguration.**
+## 9. Overall Weighted Score
+- Architecture integrity: 48/100
+- Runtime ownership clarity: 32/100
+- Event contract determinism: 41/100
+- AI control-plane integrity: 38/100
+- Security default safety: 46/100
+- Realtime lifecycle rigor: 39/100
+- Verification/observability adequacy: 57/100
+- **Weighted total: 43/100 (Not Elite)**
 
-## 10. Critical Findings
-### CF-1 — Split Runtime Authority (Monolith + Microservices)
-- **Classification:** CONFIRMED DEFECT
-- **Severity:** Elite Disqualifier
-- **Evidence:**
-  - `app/main.py` -> `RealityKernel` boot (`settings`, `_kernel`, `app`).
-  - `app/api/routers/registry.py` includes chat/admin/system/content routers.
-  - `docker-compose.yml` exposes `api-gateway` on `8000` as primary external edge.
-  - `microservices/api_gateway/main.py` defines edge WS and HTTP proxy routes.
-- **Technical interpretation:** The repository keeps two active runtime authorities for API behavior.
-- **Why it matters:** Operational ownership, incident triage, and contract evolution become ambiguous.
-- **Failure mode:** bug fixed in one runtime path but not the other; production behavior depends on deploy topology.
-- **Blast radius:** API contracts, auth behavior, websocket behavior, and observability correlations.
-- **Competent implementation:** temporary dual-path behind explicit kill-switches + deprecation timetable.
-- **Elite implementation:** one authoritative runtime topology enforced by CI gate and release policy.
+## 10. Category Scores With Evidence
+| Category | Score | Key evidence anchors | Confidence |
+|---|---:|---|---|
+| Architecture | 45 | dual runtime boot/proxy, overlap baseline | High |
+| Backend | 52 | permissive startup exception handling, dynamic tool invocation | High |
+| Realtime/WS | 39 | no queue bounds heartbeat/backpressure contracts | High |
+| Data/Eventing | 44 | outbox+best-effort publish + dict/object adaptation | High |
+| AI/Agents | 38 | Any-heavy state, mock trust, permissive access node | High |
+| Security | 46 | wildcard defaults + dev secrets guarded only by env validators | High |
+| Reliability/Observability | 57 | health/CI exists; in-memory buffering and no hard SLO proofs | Medium |
+| Testing/Verification | 55 | CI breadth present; no definitive chaos/load proof in audited scope | Medium |
 
-### CF-2 — Event Contract Drift in Redis Bridge / Mission Stream Path
-- **Classification:** CONFIRMED DEFECT
-- **Severity:** Elite Disqualifier
-- **Evidence:**
-  - `app/core/redis_bus.py` comments (lines around payload mismatch, missing event id, “BREAKING CHANGE”, “fix later”).
-  - `microservices/orchestrator_service/src/services/overmind/state.py` reconstructs transient `MissionEvent` from dict in `monitor_mission_events`.
-  - Same file logs outbox as transactional intention, then immediate best-effort publish.
-- **Technical interpretation:** Event consumers rely on mixed object/dict payloads with ad hoc repair logic.
-- **Why it matters:** replay, ordering, dedupe, and idempotency semantics cannot be trusted under failure.
-- **Failure mode:** lost/duplicated/malformed events causing UI state divergence or stuck workflows.
-- **Blast radius:** mission timeline, websocket streaming, downstream consumers, audit trail integrity.
-- **Competent implementation:** versioned event schema + immutable event IDs + strict parser.
-- **Elite implementation:** durable stream semantics, idempotent consumer offsets, formally tested failure matrix.
+## 11. Elite Disqualifiers
+1. **Duplicated runtime authority on public chat surfaces** — structural.
+2. **Event contract drift requiring runtime adaptation** — structural.
+3. **AI trust/access controls not operationally strict (mock/permissive)** — structural.
+4. **Security defaults permissive until environment gate** — structural.
+5. **Critical boundary typing includes `Any` and broad dict payloads** — structural.
+6. **WebSocket lifecycle under-specified for overload/slow-consumer behavior** — structural.
 
-### CF-3 — Type Discipline Collapse at AI/Orchestration Boundaries
-- **Classification:** CONFIRMED DEFECT
-- **Severity:** Elite Disqualifier
-- **Evidence:**
-  - `app/core/governance/contracts.py` claims forbidding loose contracts.
-  - `app/core/integration_kernel/runtime.py` uses `Any` for driver registration and return payloads.
-  - `microservices/orchestrator_service/src/services/overmind/graph/main.py` defines `AgentState` with multiple `Any` fields.
-- **Technical interpretation:** critical boundaries are dynamically typed where determinism is required.
-- **Why it matters:** contract drift becomes runtime-only failure; static analysis value is sharply reduced.
-- **Failure mode:** latent schema mismatch and unsafe tool payload propagation.
-- **Blast radius:** AI orchestration correctness, tool routing, audit logs, API responses.
-- **Competent implementation:** typed DTOs at every external/internal boundary.
-- **Elite implementation:** schema evolution governance + typed contracts with compatibility tests.
+## 12. Elite Disqualifier Proof Pack
+### ED-1: Duplicated runtime authority (CONFIRMED DEFECT)
+- Elite standard violated: singular authoritative ownership of external surfaces.
+- Code proof:
+  - `app/api/routers/customer_chat.py:83` quote: `"@router.websocket(\"/ws\")"`.
+  - `microservices/api_gateway/main.py:251` quote: `"@app.websocket(\"/api/chat/ws\")"`.
+- Why it proves violation: same customer WS surface is bound in two runtime planes.
+- Structural/local: **Structural**.
+- Debt or active risk: **Active architecture risk**.
+- Short-term safe operation possible?: **Yes, with strict traffic steering discipline**.
+- Why still non-elite: elite requires singular authority, not operational workaround.
 
-## 11. High Severity Findings
-### HF-1 — Realtime Lifecycle Not Production-Hardened
-- **Classification:** CONFIRMED WEAKNESS
-- **Severity:** High
-- **Evidence:**
-  - `microservices/api_gateway/websockets.py` loops forward messages with no queue bounds, no heartbeat, no explicit rate/backpressure policy.
-  - `frontend/app/hooks/useRealtimeConnection.js` has unbounded `pendingQueue` and reconnection loop with no max queue size.
-- **Technical interpretation:** functional websocket transport exists but stress behavior is uncontrolled.
-- **Failure mode:** memory growth, fanout collapse, reconnect storm amplification.
-- **Blast radius:** chat UX, gateway stability, orchestrator load.
-- **Competent:** bounded queues + drop/priority policy + ping/pong health.
-- **Elite:** protocol contract + per-connection budgets + load-tested reconnect/fanout behavior.
+### ED-2: Event contract drift (CONFIRMED DEFECT)
+- Elite standard violated: deterministic producer/consumer contract integrity.
+- Code proof:
+  - `state.py:651-657` quote: `"Handle dict events from Redis Bridge"` and `"event.get(\"payload_json\") or event.get(\"data\")"`.
+  - `app/core/redis_bus.py:85` quote: `"This is a BREAKING CHANGE"`.
+- Why it proves violation: consumer path explicitly repairs inconsistent shapes instead of enforcing one contract.
+- Structural/local: **Structural**.
+- Debt or active risk: **Active risk**.
+- Short-term safe operation possible?: **Partially** (repair logic masks failures).
+- Why still non-elite: elite systems do not normalize undefined contracts at hot runtime boundaries.
 
-### HF-2 — Security Defaults Unsafe Outside Strict Production Validation
-- **Classification:** CONFIRMED WEAKNESS
-- **Severity:** High
-- **Evidence:**
-  - `app/core/settings/base.py`: defaults `BACKEND_CORS_ORIGINS=['*']`, `ALLOWED_HOSTS=['*']`, default `ADMIN_PASSWORD`.
-  - `microservices/orchestrator_service/src/core/config.py`: `SECRET_KEY='dev_secret_key'`, CORS `['*']` until env gated.
-  - `microservices/user_service/settings.py`: fallback secret string values.
-- **Technical interpretation:** security is policy-enforced only in production/staging branches; defaults remain permissive.
-- **Failure mode:** staging-like or mis-tagged production deployment runs with permissive trust surfaces.
-- **Blast radius:** auth/session abuse, cross-origin exposure, admin account compromise risk.
-- **Competent:** secure defaults + explicit local-dev override mechanism.
-- **Elite:** deny-by-default in all environments, policy-as-code for exception scopes.
+### ED-3: AI trust gate is mock/permissive (CONFIRMED DEFECT)
+- Elite standard violated: operationally meaningful trust and access verification.
+- Code proof:
+  - `graph/admin.py:49-50` quote: `"Mocking TLM"` and `"return 0.95"`.
+  - `graph/admin.py:62-63` quote: `"Allow all for now"`.
+- Why it proves violation: trust and access are placeholders, not enforceable controls.
+- Structural/local: **Structural**.
+- Debt or active risk: **Active architecture risk**.
+- Short-term safe operation possible?: **Only with external compensating controls**.
+- Why still non-elite: elite status requires intrinsic, auditable enforcement.
 
-### HF-3 — Dynamic Admin Tool Invocation Returns Raw Exception Text
-- **Classification:** CONFIRMED WEAKNESS
-- **Severity:** High
-- **Evidence:** `microservices/orchestrator_service/src/api/routes.py` dynamic `/api/v1/tools/{tool}/invoke` handlers accept `dict[str, Any]` payload and return `{"message": str(e)}` on exceptions.
-- **Technical interpretation:** tool invocation surface is broad and error output is directly propagated.
-- **Failure mode:** internal details leakage + weak input boundary control.
-- **Blast radius:** admin interface, internal tool ecosystem, security posture.
-- **Competent:** explicit typed request models per tool with sanitized error taxonomy.
-- **Elite:** policy-guarded tool broker, signed capability tokens, full audit trail and red-team tests.
+### ED-4: Security defaults permissive (CONFIRMED WEAKNESS)
+- Elite standard violated: secure defaults independent of deployment discipline.
+- Code proof:
+  - `app/core/settings/base.py:125-127` quote: `"BACKEND_CORS_ORIGINS ... [\"*\"]"` / `"ALLOWED_HOSTS ... [\"*\"]"`.
+  - `orchestrator config.py:31` quote: `"SECRET_KEY: ... \"dev_secret_key\""`.
+- Why it proves violation: unsafe defaults are valid unless environment promotion triggers stricter checks.
+- Structural/local: **Structural**.
+- Debt or active risk: **Active risk**.
+- Short-term safe operation possible?: **Yes, if env discipline perfect**.
+- Why still non-elite: elite posture is deny-by-default, not policy-dependent permissiveness.
 
-## 12. Medium Severity Findings
-### MF-1 — Outbox Relay Is Optional While Immediate Publish Is Preferred
-- **Classification:** CONFIRMED WEAKNESS
-- **Severity:** Medium
-- **Evidence:** `.../src/core/config.py` `OUTBOX_RELAY_ENABLED=False` by default; `.../state.py` immediately attempts publish after commit and marks outbox states.
-- **Interpretation:** reliability path exists but default operational path remains best-effort latency path.
-- **Failure mode:** transient Redis failure yields delayed/partial dissemination until manual/system relay action.
-- **Blast radius:** mission event delivery and user-visible progress streams.
+### ED-5: Type boundary breaches in control-plane (CONFIRMED DEFECT)
+- Elite standard violated: strict typed contracts on orchestration/tool boundaries.
+- Code proof:
+  - `graph/main.py:43` quote: `"messages: Annotated[list[Any], add]"`.
+  - `api/routes.py:168-169` quote: `"payload: dict[str, Any]"`.
+- Why it proves violation: key control-plane interfaces accept unconstrained dynamic structures.
+- Structural/local: **Structural**.
+- Debt or active risk: **Active risk**.
+- Short-term safe operation possible?: **Yes, with careful operator behavior**.
+- Why still non-elite: elite architecture requires machine-verifiable contracts, not human discipline.
 
-### MF-2 — Docs Claiming Deterministic Contracts Conflict with Runtime Envelope Diversity
-- **Classification:** CONFIRMED WEAKNESS
-- **Severity:** Medium
-- **Evidence:** `docs/contracts/consumer/gateway_chat_content_contracts.json` outgoing required fields `status,response`; runtime WS handlers send `type/payload` envelopes (`app/api/routers/customer_chat.py`, `app/api/routers/admin.py`).
-- **Interpretation:** contract docs and runtime message schemas are not clearly converged.
-- **Failure mode:** client parser mismatch and brittle compatibility handling.
-- **Blast radius:** frontend clients, gateway transformations, contract testing accuracy.
+### ED-6: WS lifecycle not hardened (CONFIRMED WEAKNESS)
+- Elite standard violated: bounded realtime lifecycle under slow/failing peers.
+- Code proof:
+  - `useRealtimeConnection.js:18` quote: `"const pendingQueue = useRef([])"`.
+  - `app/core/event_bus.py:66` quote: `"asyncio.Queue()"` (no maxsize).
+- Why it proves violation: queue growth has no explicit hard bound at client or in-process bus edge.
+- Structural/local: **Structural**.
+- Debt or active risk: **Active risk**.
+- Short-term safe operation possible?: **Yes at low/moderate load**.
+- Why still non-elite: elite realtime paths include explicit resource budgets and load proofs.
 
-### MF-3 — Observability Core Uses In-Memory Buffers + Background Sync
-- **Classification:** CONFIRMED WEAKNESS
-- **Severity:** Medium
-- **Evidence:** `app/telemetry/unified_observability.py` uses deque buffers and periodic flush loops.
-- **Interpretation:** this is workable but not equivalent to guaranteed end-to-end distributed telemetry durability.
-- **Failure mode:** signal loss on process crash/restart before flush.
-- **Blast radius:** post-incident forensic quality.
+## 13. Critical Findings
+### CF-1 Duplicated public websocket ownership
+- Label: **CONFIRMED DEFECT**.
+- Severity: Critical.
+- Anchor: `app/api/routers/customer_chat.py:83`, `app/api/routers/admin.py:167`, `microservices/api_gateway/main.py:251,281`.
+- Quote: `"@router.websocket(\"/ws\")"`, `"@router.websocket(\"/api/chat/ws\")"`, `"@app.websocket(\"/api/chat/ws\")"`.
+- Why quote matters: proves direct overlapping handlers on identical public capabilities.
+- Elite-disqualifying: **Yes** (structural authority conflict).
 
-## 13. Confirmed Weaknesses
-- Runtime topology ambiguity between app kernel and microservice gateway paths.
-- Realtime transport without explicit bounded memory/backpressure contracts.
-- Security posture depends heavily on correct environment tagging.
-- Tool governance uses dynamic payload dicts at sensitive boundaries.
-- Observability pipeline partially custom/in-memory.
+### CF-2 Event shape repair path indicates contract drift
+- Label: **CONFIRMED DEFECT**.
+- Severity: Critical.
+- Anchor: `app/core/redis_bus.py:73-101`, `state.py:651-669`.
+- Quote: `"This is a BREAKING CHANGE"`, `"Failed to convert Redis event dict"`.
+- Why quote matters: comments and runtime fallback confirm producer/consumer mismatch is known in code path.
+- Elite-disqualifying: **Yes**.
 
-## 14. Likely Risks
-- **Retry storm risk under partial failures** in websocket reconnect flows due exponential retries + no global coordination (`frontend/.../useRealtimeConnection.js`).
-- **Contract drift risk** between docs and runtime where envelope schemas differ.
-- **Operational drift risk** because legacy and modern copies of overmind code remain tracked with high overlap metric (`config/overmind_copy_coupling_baseline.json`).
+### CF-3 AI trust/access controls are placeholder-level
+- Label: **CONFIRMED DEFECT**.
+- Severity: Critical.
+- Anchor: `graph/admin.py:47-63`.
+- Quote: `"Mocking TLM"`, `"Allow all for now"`.
+- Why quote matters: direct proof that trust/access gates are non-enforcing stubs.
+- Elite-disqualifying: **Yes**.
 
-## 15. Insufficient Evidence Areas
-- **RLS enforcement truth for Supabase:** references to Supabase vector store exist, but repo evidence here does not prove active RLS policies in deployed DB.
-- **Chaos/load validation depth:** CI and tests are broad, but definitive sustained-load websocket/eventing chaos harness evidence was not confirmed in active workflows.
-- **mTLS/zero-trust internal service enforcement at runtime:** infra manifests exist, but repository evidence here does not prove active enforcement in running environments.
+### CF-4 Route ownership registry contradicted by active boot paths
+- Label: **CONFIRMED DEFECT**.
+- Severity: Critical.
+- Anchor: `config/route_ownership_registry.json:114-130`, `app/api/routers/registry.py:27-32`.
+- Quote: `"owner": "orchestrator-service"`, `"(admin.router, \"\")"`.
+- Why quote matters: declared owner is orchestrator; active app still mounts admin/customer routers.
+- Elite-disqualifying: **Yes**.
 
-## 16. Architecture Forensics
-### A. Architecture Truth Answers
-- **Microservices vs distributed monolith vs hybrid:** **Hybrid with distributed-monolith traits**.
-- **Duplicated domain ownership between `app/` and `microservices/`:** **Confirmed** (chat/orchestration surfaces and overmind copy-coupling baseline).
-- **Gateway as clean edge boundary or migration crutch:** currently **migration crutch + edge**; includes rollout/parity guard logic targeting conversation/orchestrator switching.
-- **Single authoritative topology:** **No**; multiple overlapping truths exist.
+## 14. High Severity Findings
+### HF-1 Dynamic admin tool invocation with broad payload and raw exception message
+- Label: **CONFIRMED WEAKNESS**.
+- Anchor: `api/routes.py:163-193`.
+- Quote: `"payload: dict[str, Any]"`, `"\"message\": str(e)"`.
+- Why quote matters: broad input + direct exception text serialization on admin tool surface.
+- Elite-disqualifying: **Yes** (control-plane safety boundary).
 
-## 17. Backend Forensics
-### B. FastAPI / Backend Truth Answers
-- **Business logic in routers:** mixed; some routers delegate properly, others host dynamic tool dispatch and direct SQL operations (`.../src/api/routes.py`).
-- **DI/lifespan discipline:** present but inconsistent fail-fast behavior (`app/kernel.py` catches and logs startup failures then continues for several components).
-- **Transport/domain boundaries:** partially clean; breached by broad dict payloads and raw exception responses in tool APIs.
-- **Failure semantics deterministic?:** not fully deterministic across startup and eventing paths.
+### HF-2 Security defaults permissive in non-prod baseline
+- Label: **CONFIRMED WEAKNESS**.
+- Anchor: `app/core/settings/base.py:125-136`, `orchestrator config.py:31,39`, `user_service/settings.py:30`.
+- Quote: `"[\"*\"]"`, `"dev_secret_key"`, `"SECRET_KEY: ... \"changeme\""`.
+- Why quote matters: insecure defaults exist before environment validators hard-fail.
+- Elite-disqualifying: **Yes**.
 
-## 18. Realtime / WebSocket Forensics
-### D. Realtime Truth Answers
-- **Protocol contract or just functional passing?** Functional passing with partial contract docs; runtime envelopes vary (`type/payload`), doc contract expects different required fields.
-- **Heartbeat/auth lifecycle/cancellation/backpressure/limits:**
-  - Auth lifecycle exists (JWT subprotocol + fallback query token restrictions by env).
-  - Heartbeat/backpressure/queue bounds: **not explicitly enforced** in observed code.
-- **Stress behavior:** slow consumers and reconnect storms can accumulate queued messages on client and unbounded forwarding tasks on proxy.
+### HF-3 Graph state and tool control typed with `Any`
+- Label: **CONFIRMED DEFECT**.
+- Anchor: `graph/main.py:43,46-50`, `api/routes.py:168-169`.
+- Quote: `"list[Any]"`, `"filters: Any"`.
+- Why quote matters: key orchestration state fields and admin invoke payload bypass strict schema guarantees.
+- Elite-disqualifying: **Yes**.
 
-## 19. Data / Cache / Eventing Forensics
-### C + E Truth Answers
-- **Data layer engineered vs merely wired:** engineered in parts (dedicated DB services in compose, model schemas), but event correctness surfaces remain partially wired/adaptive.
-- **Outbox correctness under failure:** implementation exists but semantics are mixed (best-effort publish + optional relay + conversion hacks).
-- **Redis role:** used as pub/sub transport where durability is not intrinsic.
-- **Retries/timeouts/idempotency rigor:** idempotency fields exist, but end-to-end proof of exactly-once/at-least-once contract is absent.
-- **First correctness break point in partial failure:** event dissemination path (Redis publish/bridge/consumer shape handling).
+### HF-4 Lifespan startup failures downgraded to warnings
+- Label: **CONFIRMED WEAKNESS**.
+- Anchor: `app/kernel.py:202-224`.
+- Quote: `"Schema validation warning"`, `"Failed to start Redis Event Bridge"`.
+- Why quote matters: startup dependency failures do not force fail-fast termination.
+- Elite-disqualifying: **No** (high risk but potentially acceptable in controlled migration).
 
-## 20. AI / Agents / Reasoning Forensics
-### G Truth Answers
-- **LangGraph real state machine or branding?** Real `StateGraph` usage is present (`graph/main.py`, `graph/admin.py`).
-- **Graph state schemas explicit/enforceable?** Partially explicit via `TypedDict`, but diluted by `Any` fields.
-- **Node transitions controlled?** Explicit edges/conditional edges exist, but fallback pass-through nodes on import failure reduce guarantees (`_load_search_nodes`).
-- **Multi-agent boundaries justified?** Partially; overlap between legacy and microservice overmind paths weakens boundary authority.
-- **Tool routing typed/bounded/auditable?** Not sufficiently; dynamic dict payload invoke routes, permissive schema `extra='ignore'`, and mock wrappers.
-- **Retrieval/reranking placement:** present architecturally in graph chain, but reliability and evaluation evidence insufficient for elite confidence.
-- **DSPy usage meaningful/evaluation-backed?** DSPy classifier invoked; rigorous evaluation framework proof is insufficient in reviewed runtime paths.
-- **MCP exposure necessary/safe?** MCP metadata and tool contracts exist; safety boundary is partial due to dynamic invocation and broad exception handling.
-- **TLM/Kagent coherent?** `MockTLM` returns constant score 0.95; this is explicit placeholder, not operational trust system.
-- **Can loops recurse/drift/fail opaquely?** conditional loops exist (`validator` can route to supervisor on fail), and failures can degrade into generic errors without strict typed remediation.
-- **Any usage impact in AI-critical paths:** materially degrades contract integrity.
+## 15. Medium Severity Findings
+- MF-1 Outbox relay optional while immediate publish preferred. **CONFIRMED WEAKNESS**. Anchor: `orchestrator config.py:53`, `state.py:455-470`.
+- MF-2 Frontend reconnect queue unbounded. **CONFIRMED WEAKNESS**. Anchor: `useRealtimeConnection.js:18,123`.
+- MF-3 OpenTelemetry tracing has no-op fallback in gateway. **LIKELY RISK**. Anchor: `api_gateway/main.py:172-187`.
 
-## 21. Security Forensics
-### F Truth Answers
-- **Defaults secure or conditionally secure?** conditionally secure.
-- **Secrets/CORS/hosts/tool execution/WS auth hardened?** partially; production validators are strong, defaults remain permissive, and tool invoke path is broad.
-- **Non-prod laxness escaping to deployment risk?** confirmed risk due default permissive values and environment-dependent gates.
-- **Exception leakage paths?** yes, tool invocation returns `str(e)`.
+## 16. Confirmed Weaknesses
+- Permissive security defaults requiring environment discipline.
+- WS lifecycle lacks explicit boundedness and heartbeat specification.
+- Dynamic admin tool invoke payloads and returned error text.
+- Optional relay + best-effort event publication sequencing.
 
-## 22. Reliability / Observability Forensics
-### H Truth Answers
-- **Do we have incident-grade observability?** partial.
-- **Evidence:** CI guardrails and health checks are substantial; telemetry implementation includes custom in-memory buffers and periodic flush.
-- **Gap:** clear evidence of fully durable distributed trace correlation across services/tool calls is insufficient.
+## 17. Likely Risks
+- Reconnect storm amplification during network partitions (client exponential retries without global coordination).
+- Queue memory growth under slow consumers due absent max queue sizes at key hop points.
+- Canary routing complexity in gateway increasing operator error probability during migration.
 
-## 23. Testing / Verification Forensics
-- CI pipeline runs lint, contracts, guardrails, and pytest with coverage (`.github/workflows/ci.yml`).
-- Contract scripts and architectural guardrails exist.
-- **Gap:** explicit load/chaos/security-abuse/AI-eval depth is not conclusively demonstrated in audited active workflows.
-- **Conclusion:** safety to evolve is **partial**, not elite-assured.
+## 18. Insufficient Evidence Areas
+- End-to-end production mTLS/service-mesh enforcement proof.
+- Sustained load/chaos WS and event stream validation evidence in active CI scope.
+- Retrieval quality measurement framework (ground truth datasets, scoring gates) proving operational relevance.
 
-## 24. Performance / Scalability Forensics
-- Good signals: dedicated service databases and compose topology for separation.
-- Weak signals: websocket and eventing paths lack explicit bounded-resource controls.
-- No confirmed evidence here of sustained high-load benchmark discipline in repository workflows.
+## 19. Event Contract Mismatch Table
+| Producer | Transport | Consumer | Expected shape | Actual shape | Repair/adaptation logic | Failure risk | Elite-disqualifying? (Yes/No) |
+|---|---|---|---|---|---|---|---|
+| `MissionStateManager.log_event` | Redis Pub/Sub | `monitor_mission_events` path | `MissionEvent` with stable ID/order assumptions | Dict with `mission_id/event_type/payload_json/created_at` | Consumer reconstructs transient `MissionEvent` from dict | Ordering/dedup ambiguity when IDs absent | Yes |
+| Orchestrator event bus | Redis bridge -> app internal bus | app WS stream consumers | Object-like event with `.id` | Dict from bridge JSON | Bridge forwards dict; consumer includes dict branch handling | Contract drift masked at runtime | Yes |
+| Chat WS providers | WS envelope | frontend consumers/docs | Docs require `status,response` | Runtime uses `type,payload` | Frontend generic event dispatch; no strict contract validator visible | Parsing incompatibility with strict clients | No (high but localizable) |
 
-## 25. Future-Proofing Forensics
-- **Will this survive team/product/AI complexity growth?** not in current shape without boundary consolidation.
-- **Design choices that age badly first:** duplicated overmind authority, permissive typing in orchestration interfaces, and mixed event contracts.
-- **Compounding weaknesses:** each added agent/tool increases drift and operational ambiguity unless canonical control-plane contracts are enforced.
+## 20. Type-Discipline Breach Table
+| Symbol | File | Dynamic typing issue | Why boundary is critical | Runtime risk | Severity |
+|---|---|---|---|---|---|
+| `AgentState.messages` | `graph/main.py` | `list[Any]` | Core state passed across multiple graph nodes | Unvalidated message structures alter branch behavior | High |
+| `AgentState.filters/final_response` | `graph/main.py` | `Any` | Retrieval/rerank/output contracts | Silent schema drift and brittle node assumptions | High |
+| `invoke_admin_tool` payload | `api/routes.py` | `dict[str, Any]` | Admin capability execution interface | Unbounded input surface and weak validation | Critical |
+| `IntegrationKernel.register_driver` | `app/core/integration_kernel/runtime.py` | `driver: Any` | Driver governance boundary | Runtime capability mismatch undetected until execution | High |
+| `IntegrationKernel` return types | same | `dict[str, Any]` across run/search/act | Inter-service orchestration outputs | Contract ambiguity and downstream coercion logic | High |
 
-## 26. Top 10 Gaps Blocking Elite Status
-1. Dual runtime authority (app kernel + gateway/microservices).
-2. Duplicated overmind ownership with measured overlap.
-3. Event bus contract drift and dict/model duality.
-4. Redis pub/sub used as critical path without durable semantics proof.
-5. Unbounded WS queueing/backpressure controls absent.
-6. `Any` in AI-critical orchestration schemas and drivers.
-7. Dynamic admin tool invocation with broad payloads + exception leakage.
-8. Security defaults permissive until environment gates are correctly set.
-9. TLM trust gate is mocked, not operational.
-10. Docs overclaim certainty beyond runtime proof.
+## 21. WebSocket Lifecycle Safety Table
+| Lifecycle concern | Code evidence | Explicitly enforced? | Failure mode | Severity |
+|---|---|---|---|---|
+| Heartbeat / ping-pong | No explicit ping loop in gateway proxy/client hook | No | Half-open sockets persist undetected | High |
+| Queue bounds | `pendingQueue` client array; event bus `asyncio.Queue()` no maxsize | No | Memory growth under prolonged disconnect/slow consumer | High |
+| Backpressure | `target_to_client` forwards immediately | No | Upstream or client overload cascades | High |
+| Slow consumer handling | No per-connection budget/drop policy | No | Fanout lag and queue accumulation | High |
+| Reconnect storm control | Exponential backoff with jitter, no fleet coordination | Partial | Herd reconnect under outage windows | Medium |
+| Cancellation cleanup | gateway cancels pending task on first completion | Partial | In-flight message loss around cancellation boundary | Medium |
+| Auth refresh / re-auth | fatal code stop exists; no mid-session token refresh | Partial | Session expiry requires reconnect; UX interruption | Medium |
+| Message ordering expectations | DB catchup + queue live blend with dedupe by optional id | Partial | Out-of-order or duplicated transient events | High |
+| Memory growth containment | no hard caps shown | No | Unbounded RAM under degraded links | High |
 
-## 27. What a Truly Elite Version Would Require
-- Single executable architecture truth, enforced in CI and deployment manifests.
-- Hard decommission of duplicate authority paths with compatibility proxy sunset plan.
-- Versioned, typed event contracts with deterministic idempotency and replay-safe semantics.
-- WS protocol spec with explicit heartbeat, bounded queues, backpressure, and load tests.
-- Typed tool contracts per capability with policy guardrails, audit logs, and sanitized errors.
-- Replace `Any` at orchestration boundaries with strict schemas and compatibility tests.
-- Real trust gate replacing mock TLM, with measurable evaluation and rollback policies.
-- Security defaults deny-by-default in all environments with explicit development exemptions.
+## 22. AI Control-Plane Invariants Table
+| Invariant that should exist | Evidence it exists / does not exist | Enforced where? | Broken by what? | Consequence | Classification |
+|---|---|---|---|---|---|
+| Graph state schema integrity | TypedDict exists but includes `Any` | `graph/main.py` | `Any` fields on critical keys | Schema drift not blocked | CONFIRMED DEFECT |
+| Deterministic node transitions | Conditional edges defined | `create_unified_graph` | `check_quality` always returns `"pass"` | Validator loop guard is nominal | CONFIRMED WEAKNESS |
+| Fallback on node-load failure should preserve semantics | Fallback passthrough nodes return input state | `_load_search_nodes` | Swallows import/load failures into silent degraded behavior | Hidden functional degradation | CONFIRMED WEAKNESS |
+| Tool selection boundedness | Deterministic map exists | `resolve_tool_deterministic` | Dynamic invoke endpoints bypass per-tool schema typing | Capability surface remains porous | CONFIRMED DEFECT |
+| Access validation reality | Explicit validation node exists | `ValidateAccessNode` | Grants all (`"Allow all for now"`) | Authorization invariant absent | CONFIRMED DEFECT |
+| Trust-score realism | Trust score field emitted | `MockTLM` path | Constant `0.95` placeholder | Misleading trust telemetry | CONFIRMED DEFECT |
+| Typed tool payload guarantees | Not present at invoke endpoint | `api/routes.py` | `dict[str, Any]` payload | Runtime-specific shape errors and policy bypass | CONFIRMED DEFECT |
+| Failure remediation path typed/auditable | Partial via error keys and logs | admin graph nodes | Generic exception string propagation | Ambiguous incident classification | CONFIRMED WEAKNESS |
+| Loop boundedness | validator->supervisor fail edge exists | graph edges | `check_quality` fixed pass means safeguard not substantive | Guard logic non-operational | LIKELY RISK |
+| Mock-vs-real control gate distinction | Mock classes explicit by name | `MockTLM`, `mcp_mock.py` | Mock artifacts present in runtime tree | Production readiness ambiguity | CONFIRMED WEAKNESS |
 
-## 28. Final Answer: Is This Repository Elite?
+## 23. Architecture Forensics
+- Structural diagnosis: transitional hybrid with distributed-monolith traits.
+- Evidence:
+  - Registry says orchestrator owns chat WS.
+  - App still mounts chat/admin routes.
+  - Gateway concurrently proxies same public WS routes and supports canary target switching.
+- Classification: **CONFIRMED DEFECT**.
+- Confidence: **High**.
+
+## 24. Backend Forensics
+- Findings:
+  - Dynamic admin tool surface accepts broad payloads and returns raw exception text.
+  - Lifespan startup error handling often logs warnings and continues.
+- Classification: **CONFIRMED WEAKNESS**.
+- Confidence: **High**.
+
+## 25. Realtime / WebSocket Forensics
+- Findings:
+  - No hard queue bounds, no explicit heartbeat contracts, no slow-consumer policy.
+  - Proxy cancellation strategy exists but no explicit ordering/loss guarantees.
+- Classification: **CONFIRMED WEAKNESS**.
+- Confidence: **High**.
+
+## 26. Data / Cache / Eventing Forensics
+- Findings:
+  - Outbox exists, but immediate publish is best-effort and relay is optional.
+  - Consumer conversion logic evidences event contract drift.
+- Classification: **CONFIRMED DEFECT**.
+- Confidence: **High**.
+
+## 27. AI / Agents / Reasoning Forensics
+- LangGraph:
+  - Real graph composition and conditional edges are present.
+  - `_load_search_nodes` fallback to passthrough nodes can hide dependency failures.
+  - `check_quality` fixed `pass` weakens validator branch meaningfulness.
+- DSPy:
+  - Used in `SupervisorNode` classifier invocation.
+  - No repo-local hard evidence of evaluation/optimization trace gates tied to production decisions.
+  - Classification: centrality = partial; evidence of eval rigor = insufficient.
+- LlamaIndex/retrieval/reranker:
+  - Retrieval/reranker nodes are in graph chain by name.
+  - No direct measured quality contract in audited scope; score governance not proven.
+- MCP/Kagent/tools:
+  - Mock wrapper `kagent_tool` attaches metadata only.
+  - Admin invoke endpoints are broad dict interfaces; capability boundaries are porous.
+- Trust/verification:
+  - Mock trust scoring and permissive access node make control plane non-defensive.
+- Agent loops/boundedness:
+  - Graph loop edge exists but quality function is non-discriminative (`pass`), reducing actual control value.
+- Overall classification: **CONFIRMED DEFECT** (control-plane enforcement), plus **INSUFFICIENT EVIDENCE** (eval rigor).
+- Confidence: **High** for code-enforced claims; **Medium** for evaluation absence inference.
+
+## 28. Security Forensics
+- Confirmed:
+  - Wildcard defaults and dev keys exist.
+  - Production/staging validators add constraints but are conditional.
+- Key contradiction: “secure defaults” narrative versus permissive baseline values.
+- Classification: **CONFIRMED WEAKNESS**.
+- Confidence: **High**.
+
+## 29. Reliability / Observability Forensics
+- Confirmed:
+  - Health checks and telemetry hooks exist.
+  - Gateway can operate with no-op tracer if dependency absent.
+- Risk:
+  - No decisive proof of durable cross-service trace integrity under dependency failure.
+- Classification: **LIKELY RISK**.
+- Confidence: **Medium**.
+
+## 30. Testing / Verification Forensics
+- CI/guardrail presence is established in repository.
+- Not established in audited scope:
+  - repeatable WS chaos tests,
+  - contract-fuzz tests at event adaptation boundaries,
+  - AI trust/control regression gates.
+- Classification: **INSUFFICIENT EVIDENCE**.
+- Confidence: **Medium**.
+
+## 31. Performance / Scalability Forensics
+- Positive: microservice decomposition and dedicated data stores in compose.
+- Negative: unbounded queues and no explicit WS backpressure strategy at critical paths.
+- Classification: **LIKELY RISK**.
+- Confidence: **Medium**.
+
+## 32. Future-Proofing Forensics
+- The principal long-horizon liability is overlapping ownership plus adaptive contracts.
+- Every new tool/agent increases drift pressure unless boundaries become singular and typed.
+- Classification: **CONFIRMED WEAKNESS**.
+- Confidence: **High**.
+
+## 33. What Would Need To Become True To Remove The Current Elite Disqualifiers
+Only architecture/proof conditions (no implementation steps):
+1. Public chat WS/HTTP ownership must be singular in executable runtime (one canonical owner, one external route plane).
+2. Event contract must become one immutable shape with explicit identity semantics from producer to all consumers; no runtime adaptation branch needed.
+3. Trust/access/tool-control gates must be real enforcement logic (no mock trust, no allow-all access paths) with auditable denial behavior.
+4. Security defaults must be deny-by-default even before environment specialization.
+5. AI/control-plane boundaries must use strict typed models at all ingress/egress points.
+6. WS lifecycle must include explicit resource budgets (queue bounds/backpressure/heartbeat) with load-test evidence.
+
+## 34. Top 10 Gaps Blocking Elite Status
+1. Duplicated route/runtime authority for chat WS.
+2. Registry-declared ownership contradicted by active booted routes.
+3. Event contract drift with dict/object adaptation in hot path.
+4. Optional relay + best-effort immediate publish semantics.
+5. Mock trust scoring used in admin execution graph.
+6. Access validation node explicitly permissive.
+7. Dynamic admin invoke payload typing (`dict[str, Any]`).
+8. Permissive security defaults (`*`, dev/default secrets).
+9. No explicit WS queue bounds/backpressure controls.
+10. Overmind copy-coupling baseline confirms unresolved dual code authority.
+
+## 35. What a Truly Elite Version Would Require
+- Singular runtime authority map that matches docs, registry, compose edges, and actual route bindings.
+- End-to-end typed event and tool contracts with provable invariants, no repair branches.
+- Intrinsic trust/access/tool governance with hard policy gates and auditable denials.
+- Realtime lifecycle guarantees under stress backed by reproducible evidence.
+- Security posture where insecure defaults are impossible by configuration.
+
+## 36. Final Answer: Is This Repository Elite?
 **No.**
+- The repository is technically capable and actively engineered, but confirmed structural disqualifiers remain unresolved in runtime authority, event contracts, AI trust/control enforcement, and lifecycle hardening.
+- Classification certainty: **High**.
 
-This repository demonstrates serious intent and substantial engineering effort, but it does not meet elite long-horizon standards because multiple elite-disqualifying conditions are materially confirmed in the codebase.
+## 37. Appendix A: Evidence Index by File Path
+| File path | Evidence role |
+|---|---|
+| `app/main.py` | Kernel runtime boot authority.
+| `app/kernel.py` | Lifespan behavior; fail-open startup warnings; API-first assertions.
+| `app/api/routers/registry.py` | App router mounting includes admin/customer chat.
+| `app/api/routers/customer_chat.py` | Customer WS route, envelope shape.
+| `app/api/routers/admin.py` | Admin WS route in app runtime.
+| `app/api/routers/ws_auth.py` | WS auth fallback behavior.
+| `app/core/settings/base.py` | wildcard CORS/hosts, default admin credential.
+| `app/core/event_bus.py` | in-process queue semantics without max bounds.
+| `app/core/redis_bus.py` | bridge adaptation commentary proving contract drift.
+| `app/core/integration_kernel/runtime.py` | Any-based driver/control-plane interfaces.
+| `app/core/governance/contracts.py` | strict-governance claim baseline.
+| `microservices/api_gateway/main.py` | public WS ownership, canary routing logic.
+| `microservices/api_gateway/websockets.py` | WS proxy lifecycle behavior.
+| `microservices/orchestrator_service/src/core/config.py` | security defaults and validator gates; outbox relay default.
+| `microservices/orchestrator_service/src/core/event_bus.py` | Redis publish/subscribe shape.
+| `microservices/orchestrator_service/src/api/routes.py` | dynamic admin tool invoke surface.
+| `microservices/orchestrator_service/src/services/overmind/state.py` | outbox + publish + monitor conversion logic.
+| `microservices/orchestrator_service/src/services/overmind/graph/main.py` | AgentState typing, graph transitions, fallback nodes.
+| `microservices/orchestrator_service/src/services/overmind/graph/admin.py` | mock trust, permissive access node.
+| `microservices/orchestrator_service/src/services/overmind/graph/mcp_mock.py` | mock MCP/Kagent wrapper.
+| `microservices/user_service/settings.py` | weak default secret baseline.
+| `frontend/app/hooks/useRealtimeConnection.js` | reconnect and unbounded pending queue.
+| `config/route_ownership_registry.json` | declared route owner map.
+| `config/overmind_copy_coupling_baseline.json` | explicit overlap/coupling metric.
+| `docs/API_FIRST_SUMMARY.md` | absolute architecture claims.
+| `docs/contracts/consumer/gateway_chat_content_contracts.json` | websocket envelope expectation.
+| `docs/architecture/MICROSERVICES_CONSTITUTION.md` | elite constitutional standards baseline.
+| `docker-compose.yml` | runtime-exposed edge ownership.
 
-## 29. Appendix A: Evidence Index by File Path
-| File Path | Key Symbols Reviewed | Why It Matters |
+## 38. Appendix B: Evidence Index by Symbol
+| Symbol | Path | Claim supported |
 |---|---|---|
-| `app/main.py` | `_kernel`, `app`, `create_app` | Confirms monolith kernel runtime entrypoint still active. |
-| `app/kernel.py` | `RealityKernel`, `_handle_lifespan_events`, `_validate_contract_alignment` | Startup behavior, fail-fast vs warn-and-continue, contract checks. |
-| `app/core/app_blueprint.py` | `build_kernel_spec`, `build_middleware_stack` | Declarative kernel composition and middleware/router assembly. |
-| `app/api/routers/registry.py` | `base_router_registry` | Confirms active app router ownership including chat/admin/content. |
-| `app/api/routers/customer_chat.py` | `chat_stream_ws` | Runtime WS envelope shape and event normalization behavior. |
-| `app/api/routers/admin.py` | `chat_stream_ws` | Admin chat WS path in app runtime (overlap with gateway narrative). |
-| `app/api/routers/ws_auth.py` | `extract_websocket_auth` | Auth lifecycle and query-token fallback rules. |
-| `app/core/settings/base.py` | `AppSettings`, production validators, defaults | Security defaults vs conditional hardening. |
-| `app/core/redis_bus.py` | `RedisEventBridge._listen_loop` | Explicit event contract mismatch commentary and forwarding behavior. |
-| `app/core/event_bus.py` | `EventBus.publish/subscribe_queue` | In-memory queue semantics and unbounded queue creation.
-| `app/core/integration_kernel/runtime.py` | `register_driver`, `run_workflow`, `act` | `Any` usage at orchestration boundaries. |
-| `app/core/governance/contracts.py` | `GovernanceModel` | Stated strict contract governance baseline. |
-| `microservices/api_gateway/main.py` | `chat_ws_proxy`, `admin_chat_ws_proxy`, lifespan | Gateway edge routing and websocket proxy role. |
-| `microservices/api_gateway/websockets.py` | `websocket_proxy` | WS lifecycle controls and absence of bounds/backpressure.
-| `microservices/orchestrator_service/src/api/routes.py` | dynamic tool invoke endpoints, outbox relay endpoint | Tool-safety boundary and operational control APIs. |
-| `microservices/orchestrator_service/src/services/overmind/state.py` | `log_event`, `monitor_mission_events` | Outbox + publish semantics and dict-to-model repair path. |
-| `microservices/orchestrator_service/src/services/overmind/graph/main.py` | `AgentState`, `_load_search_nodes`, graph edges | LangGraph orchestration and `Any` in state schema. |
-| `microservices/orchestrator_service/src/services/overmind/graph/admin.py` | `MockTLM`, `ValidateAccessNode`, `ExecuteToolNode` | AI trust and admin-tool control realism. |
-| `microservices/orchestrator_service/src/services/overmind/graph/mcp_mock.py` | `kagent_tool` | MCP/Kagent wrapping reality. |
-| `microservices/orchestrator_service/src/core/config.py` | `Settings` defaults + validators | Orchestrator security and outbox-relay default posture. |
-| `microservices/orchestrator_service/src/core/event_bus.py` | `publish`, `subscribe` | Redis Pub/Sub delivery role. |
-| `microservices/user_service/settings.py` | `UserServiceSettings` | Service secret defaults and environment hardening policy. |
-| `frontend/app/hooks/useRealtimeConnection.js` | `pendingQueue`, reconnect logic | Client-side realtime resilience and memory risk. |
-| `frontend/app/hooks/useAgentSocket.js` | ws URL building + event handling | Runtime contract consumption and client event envelope assumptions. |
-| `docker-compose.yml` | service topology, gateway port ownership | Declared runtime topology and service decomposition intent. |
-| `docs/API_FIRST_SUMMARY.md` | “100% API-First” claims | Claimed certainty benchmark for docs-vs-runtime checks. |
-| `docs/ARCHITECTURE.md` | strict boundaries claims | Claimed architecture principles baseline. |
-| `docs/architecture/MICROSERVICES_CONSTITUTION.md` | laws 1..100 | Elite constitutional standard used for comparison. |
-| `config/route_ownership_registry.json` | route owners for chat/system/services | Declared ownership map for mismatch analysis. |
-| `config/overmind_copy_coupling_baseline.json` | overlap metric + ownership | Direct proof of unresolved duplicate authority during migration. |
-| `.github/workflows/ci.yml` | lint/contracts/guardrails/tests jobs | Verification rigor baseline and limits.
+| `RealityKernel` | `app/kernel.py` | app runtime plane remains active.
+| `base_router_registry` | `app/api/routers/registry.py` | app mounts chat/admin surfaces.
+| `chat_stream_ws` (customer) | `app/api/routers/customer_chat.py` | customer WS endpoint ownership and envelope.
+| `chat_stream_ws` (admin) | `app/api/routers/admin.py` | admin WS endpoint ownership in app.
+| `chat_ws_proxy` | `microservices/api_gateway/main.py` | gateway customer WS ownership.
+| `admin_chat_ws_proxy` | same | gateway admin WS ownership.
+| `websocket_proxy` | `microservices/api_gateway/websockets.py` | WS lifecycle/backpressure gaps.
+| `MissionStateManager.log_event` | `state.py` | outbox + immediate publish semantics.
+| `MissionStateManager.monitor_mission_events` | `state.py` | dict/event conversion and dedupe logic.
+| `RedisEventBridge._listen_loop` | `app/core/redis_bus.py` | explicit contract-break commentary.
+| `invoke_admin_tool` | `api/routes.py` | dynamic tool invocation and error leakage.
+| `AgentState` | `graph/main.py` | Any-based control-plane state.
+| `_load_search_nodes` | `graph/main.py` | passthrough fallback under import failure.
+| `check_quality` | `graph/main.py` | invariant weakness (`pass` only).
+| `MockTLM.get_trustworthiness_score` | `graph/admin.py` | fixed trust placeholder.
+| `ValidateAccessNode.__call__` | `graph/admin.py` | permissive access behavior.
+| `kagent_tool` | `graph/mcp_mock.py` | mock wrapper not hard capability boundary.
+| `Settings.validate_production_security` | orchestrator config | env-gated hardening only.
+| `pendingQueue` | frontend hook | unbounded client queue risk.
 
-## 30. Appendix B: Evidence Index by Symbol
-| Symbol | File Path | Architectural Relevance | Findings Supported |
-|---|---|---|---|
-| `RealityKernel` | `app/kernel.py` | Monolith kernel runtime authority | CF-1, backend consistency |
-| `base_router_registry` | `app/api/routers/registry.py` | App route ownership | CF-1, architecture mismatch |
-| `chat_stream_ws` (customer) | `app/api/routers/customer_chat.py` | Realtime payload behavior | HF-1, MF-2 |
-| `chat_stream_ws` (admin) | `app/api/routers/admin.py` | Admin realtime path in app | CF-1 |
-| `extract_websocket_auth` | `app/api/routers/ws_auth.py` | WS auth lifecycle and fallback | security forensics |
-| `RedisEventBridge._listen_loop` | `app/core/redis_bus.py` | Cross-system event adaptation | CF-2 |
-| `EventBus.subscribe_queue` | `app/core/event_bus.py` | Queue semantics | HF-1, eventing risk |
-| `IntegrationKernel.register_driver` | `app/core/integration_kernel/runtime.py` | AI/orchestration boundary typing | CF-3 |
-| `GovernanceModel` | `app/core/governance/contracts.py` | Claimed strict contracts | CF-3 contradiction |
-| `chat_ws_proxy` | `microservices/api_gateway/main.py` | Edge WS path | CF-1, HF-1 |
-| `websocket_proxy` | `microservices/api_gateway/websockets.py` | WS forwarding lifecycle | HF-1 |
-| `invoke_admin_tool` | `microservices/.../api/routes.py` | Tool invocation safety boundary | HF-3 |
-| `MissionStateManager.log_event` | `microservices/.../state.py` | Outbox + publish semantics | CF-2, MF-1 |
-| `MissionStateManager.monitor_mission_events` | `microservices/.../state.py` | Event stream reconstruction/dedupe | CF-2 |
-| `AgentState` | `microservices/.../graph/main.py` | LangGraph state schema strictness | CF-3 |
-| `_load_search_nodes` | `microservices/.../graph/main.py` | Dependency-failure fallback behavior | AI reliability risk |
-| `MockTLM.get_trustworthiness_score` | `microservices/.../graph/admin.py` | Trust gate realism | HF-3, AI forensics |
-| `ValidateAccessNode.__call__` | `microservices/.../graph/admin.py` | Access enforcement realism | security/AI risk |
-| `kagent_tool` | `microservices/.../graph/mcp_mock.py` | MCP/Kagent wrapper implementation | AI stack realism |
-| `Settings.validate_production_security` | `microservices/.../core/config.py` | Conditional hardening | HF-2 |
-| `UserServiceSettings.SECRET_KEY` | `microservices/user_service/settings.py` | Secret default posture | HF-2 |
-| `pendingQueue` | `frontend/.../useRealtimeConnection.js` | Slow-consumer/reconnect memory behavior | HF-1 |
+## 39. Appendix C: Evidence Index by Line Range
+| Line range / anchor | File path | Symbol | Claim supported | Evidence strength |
+|---|---|---|---|---|
+| 22-25 | `app/main.py` | module init | App runtime boot authority exists | direct |
+| 157-160 | `app/kernel.py` | `_construct_app` | App mounts middleware/routes in active kernel path | direct |
+| 199-224 | `app/kernel.py` | `_handle_lifespan_events` | Startup failures are warning-logged, not hard-fail | direct |
+| 24-32 | `app/api/routers/registry.py` | `base_router_registry` | app includes admin/customer routers | direct |
+| 83-90 | `app/api/routers/customer_chat.py` | `chat_stream_ws` | customer WS endpoint declared in app | direct |
+| 162-164 | same | send status envelope | outgoing schema uses `type/payload` | direct |
+| 167-174 | `app/api/routers/admin.py` | `chat_stream_ws` | admin WS endpoint declared in app | direct |
+| 251-253 | `microservices/api_gateway/main.py` | `chat_ws_proxy` | gateway also owns customer WS surface | direct |
+| 281-283 | same | `admin_chat_ws_proxy` | gateway also owns admin WS surface | direct |
+| 66-67 | `app/core/event_bus.py` | `subscribe_queue` | unbounded queue construction | direct |
+| 73-101 | `app/core/redis_bus.py` | `_listen_loop` | explicit contract-break adaptation commentary | direct |
+| 102 | same | `_listen_loop` | forwards dict payload to internal bus | direct |
+| 159-169 | `api/routes.py` | dynamic endpoint loop | dynamic tool routes generated from contract list | direct |
+| 168-169 | same | `invoke_admin_tool` | broad `dict[str, Any]` payload boundary | direct |
+| 191-192 | same | `invoke_admin_tool` | raw exception message returned | direct |
+| 53,455-470 | `state.py` | `_build_event_bus_message` / `log_event` | outbox + immediate best-effort publish semantics | direct |
+| 651-669 | `state.py` | `monitor_mission_events` | dict-to-event reconstruction fallback | direct |
+| 42-50 | `graph/main.py` | `AgentState` | Any-heavy graph state contract | direct |
+| 27-39 | `graph/main.py` | `_load_search_nodes` | passthrough fallback on import failure | direct |
+| 225-226 | `graph/main.py` | `check_quality` | validator always pass | direct |
+| 47-50 | `graph/admin.py` | `MockTLM` | fixed trust score placeholder | direct |
+| 60-63 | `graph/admin.py` | `ValidateAccessNode` | permissive access policy | direct |
+| 1-9 | `graph/mcp_mock.py` | `kagent_tool` | mock metadata wrapper for tooling | direct |
+| 31,39 | orchestrator config | `Settings` fields | dev secret and wildcard CORS defaults | direct |
+| 53 | orchestrator config | `OUTBOX_RELAY_ENABLED` | relay disabled by default | direct |
+| 30 | `microservices/user_service/settings.py` | `BaseServiceSettings.SECRET_KEY` | weak default secret baseline | direct |
+| 18,123 | `useRealtimeConnection.js` | `pendingQueue` | unbounded queued outbound messages | direct |
+| 105-130 | `config/route_ownership_registry.json` | route entries | owner declared orchestrator for chat paths | direct |
+| 3-8 | `config/overmind_copy_coupling_baseline.json` | overlap metrics | unresolved dual-code ownership/coupling | direct |
+| 3 | `docs/API_FIRST_SUMMARY.md` | absolute claim | 100% API-first certainty assertion | direct |
+| 62-65 | `gateway_chat_content_contracts.json` | websocket envelope | docs expect `status,response` | direct |
 
-## 31. Appendix C: Claims Requiring More Proof
-| Claim | Status | Why |
+## 40. Appendix D: Claims Requiring More Proof
+| Claim | Status | Reasoning |
 |---|---|---|
-| “Supabase RLS is enforced for all sensitive retrieval paths” | **absent evidence** | Supabase vector-store usage is visible, but enforced policy artifacts and runtime checks are not fully proven here. |
-| “System has chaos-tested websocket resilience” | **absent evidence** | No definitive active chaos/load workflow evidence found in reviewed CI/workflows. |
-| “Zero-trust mTLS is active service-to-service in deployed runtime” | **partially proven** | Infra manifests mention mesh/otel/k8s patterns, but activation and enforcement in real runtime are not proven from this audit scope. |
-| “TLM trust scoring is operationally meaningful” | **contradicted by code** | `MockTLM` fixed-score placeholder demonstrates non-production trust gate. |
-| “Single canonical architecture currently in production” | **contradicted by code** | Coexistence of app kernel runtime and gateway microservices runtime is explicit in repository entrypoints/config. |
+| Runtime has duplicated chat WS authority | DIRECTLY PROVEN | Dual decorators and active route bindings in app and gateway are explicit.
+| Event contract is drifting across producer/consumer boundaries | DIRECTLY PROVEN | Producer/bridge/consumer code contains explicit adaptation and mismatch comments.
+| Security defaults are permissive pre-validation | DIRECTLY PROVEN | Default values are in settings models.
+| AI trust gate is operationally meaningful | CONTRADICTED BY CODE | `MockTLM` fixed score and permissive access node invalidate claim.
+| System can be operated safely short-term with strict process controls | PARTIALLY PROVEN | Feasible by ops discipline, but code-level guarantees are incomplete.
+| mTLS and zero-trust are active in deployed runtime | NOT PROVEN | No definitive enforcement artifact in audited runtime code path.
+| Retrieval quality is measured and gate-enforced | NOT PROVEN | Graph structure exists; quality measurement governance evidence absent.
+| Single authoritative architecture currently governs runtime | CONTRADICTED BY CODE | App and gateway both own overlapping runtime surfaces.
