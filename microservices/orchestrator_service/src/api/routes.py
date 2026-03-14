@@ -1,6 +1,6 @@
 import logging
 import uuid
-from typing import Any, TypedDict
+from typing import TypedDict
 
 import jwt
 from fastapi import (
@@ -45,6 +45,8 @@ from microservices.orchestrator_service.src.services.overmind.utils.tools import
 from microservices.orchestrator_service.src.services.tools.registry import get_registry
 
 logger = logging.getLogger(__name__)
+
+type JsonObject = dict[str, object]
 
 class ChatRunContext(TypedDict, total=False):
     """غلاف سياقي محدود لمسار تشغيل الدردشة لتجنّب القواميس المفتوحة في الحدود الحرجة."""
@@ -219,8 +221,8 @@ for tool_name in ADMIN_TOOL_CONTRACT:
         dependencies=[Depends(require_internal_admin_access)],
     )
     async def invoke_admin_tool(
-        payload: dict[str, Any] | None = None, name=tool_name
-    ) -> dict[str, Any]:
+        payload: JsonObject | None = None, name=tool_name
+    ) -> JsonObject:
         if payload is None:
             payload = {}
         tool_fn = get_registry().get(name)
@@ -242,15 +244,24 @@ for tool_name in ADMIN_TOOL_CONTRACT:
                 result = tool_fn(**payload)
 
             return {"status": "success", "result": result}
-        except Exception as e:
-            return {"status": "error", "message": str(e)}
+        except Exception:
+            request_id = str(uuid.uuid4())
+            logger.error(
+                "Admin tool invocation failed",
+                exc_info=True,
+                extra={"request_id": request_id, "tool_name": name},
+            )
+            return {
+                "status": "error",
+                "message": f"Tool execution failed. request_id={request_id}",
+            }
 
     @router.get(
         f"/api/v1/tools/{tool_name}/schema",
         tags=["Admin MCP Tools"],
         dependencies=[Depends(require_internal_admin_access)],
     )
-    async def get_admin_tool_schema(name=tool_name) -> dict[str, Any]:
+    async def get_admin_tool_schema(name=tool_name) -> JsonObject:
         return {"name": name, "description": ADMIN_TOOL_CONTRACT.get(name), "parameters": {}}
 
     @router.get(
@@ -258,7 +269,7 @@ for tool_name in ADMIN_TOOL_CONTRACT:
         tags=["Admin MCP Tools"],
         dependencies=[Depends(require_internal_admin_access)],
     )
-    async def get_admin_tool_health(name=tool_name) -> dict[str, Any]:
+    async def get_admin_tool_health(name=tool_name) -> JsonObject:
         tool_fn = get_registry().get(name)
         return {"name": name, "status": "healthy" if tool_fn else "unavailable"}
 
@@ -913,9 +924,17 @@ async def create_mission_endpoint(
 
         return _serialize_mission(mission)
 
-    except Exception as e:
-        logger.error(f"Failed to create mission: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e)) from e
+    except Exception:
+        request_id = str(uuid.uuid4())
+        logger.error(
+            "Failed to create mission",
+            exc_info=True,
+            extra={"request_id": request_id},
+        )
+        raise HTTPException(
+            status_code=500,
+            detail=f"Mission creation failed. request_id={request_id}",
+        )
 
 
 @router.get("/missions/{mission_id}", response_model=MissionResponse, summary="Get Mission")
