@@ -102,8 +102,6 @@ def _resolve_chat_target_base(route_id: str, identity: str, rollout_percent: int
     return target_base
 
 
-
-
 def _conversation_ws_base_url() -> str:
     """يحدد عنوان WS لخدمة Conversation مع fallback آمن نحو تحويل عنوان HTTP."""
 
@@ -112,6 +110,7 @@ def _conversation_ws_base_url() -> str:
         return configured_ws_url.rstrip("/")
 
     return _to_ws_base_url(settings.CONVERSATION_SERVICE_URL.rstrip("/"))
+
 
 def _resolve_chat_ws_target(route_id: str, upstream_path: str) -> str:
     """يحدد هدف WS الحديث باستخدام نفس محرك القرار الخاص بمسار HTTP."""

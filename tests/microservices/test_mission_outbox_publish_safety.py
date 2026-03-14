@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 import json
+from dataclasses import dataclass
 
 import pytest
 
@@ -181,7 +181,9 @@ async def test_relay_outbox_events_marks_serialization_error_without_publish_cal
     assert result == {"processed": 1, "published": 0, "failed": 1, "skipped": 0}
     assert broken.status == "failed"
     assert bus.published_messages == []
-    relay_meta = broken.payload_json.get("__relay") if isinstance(broken.payload_json, dict) else None
+    relay_meta = (
+        broken.payload_json.get("__relay") if isinstance(broken.payload_json, dict) else None
+    )
     assert isinstance(relay_meta, dict)
     assert relay_meta.get("last_error_kind") == "serialization_error"
 

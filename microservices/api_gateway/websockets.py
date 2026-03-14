@@ -16,7 +16,9 @@ async def websocket_proxy(client_ws: WebSocket, target_url: str):
     # Accept with the requested subprotocol if present so the proxy connection matches
     requested_protocols = client_ws.headers.get("sec-websocket-protocol", "").split(",")
     parsed_protocols = [p.strip() for p in requested_protocols if p.strip()]
-    selected_protocol = "jwt" if "jwt" in parsed_protocols else (parsed_protocols[0] if parsed_protocols else None)
+    selected_protocol = (
+        "jwt" if "jwt" in parsed_protocols else (parsed_protocols[0] if parsed_protocols else None)
+    )
 
     await client_ws.accept(subprotocol=selected_protocol)
 

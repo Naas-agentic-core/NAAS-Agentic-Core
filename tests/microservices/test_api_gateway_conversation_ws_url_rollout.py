@@ -6,7 +6,9 @@ from microservices.api_gateway import main
 from microservices.api_gateway.config import settings
 
 
-def test_resolve_chat_ws_target_uses_conversation_ws_url_when_conversation_selected(monkeypatch) -> None:
+def test_resolve_chat_ws_target_uses_conversation_ws_url_when_conversation_selected(
+    monkeypatch,
+) -> None:
     """عند اختيار conversation فعليًا يجب احترام CONVERSATION_WS_URL حرفيًا."""
 
     monkeypatch.setattr(settings, "ROUTE_CHAT_WS_CONVERSATION_ROLLOUT_PERCENT", 100)
@@ -36,7 +38,9 @@ def test_resolve_chat_ws_target_falls_back_to_conversation_http_url_when_ws_url_
     assert target == "wss://conversation-service:8010/api/chat/ws"
 
 
-def test_resolve_chat_ws_target_keeps_orchestrator_when_conversation_not_selected(monkeypatch) -> None:
+def test_resolve_chat_ws_target_keeps_orchestrator_when_conversation_not_selected(
+    monkeypatch,
+) -> None:
     """لا يغير السلوك الافتراضي: عند عدم اختيار conversation يبقى الهدف orchestrator."""
 
     monkeypatch.setattr(settings, "ROUTE_CHAT_WS_CONVERSATION_ROLLOUT_PERCENT", 0)

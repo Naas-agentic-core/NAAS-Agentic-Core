@@ -44,4 +44,8 @@ async def test_run_outbox_relay_once_uses_settings_limits(monkeypatch) -> None:
     summary = await main._run_outbox_relay_once()
 
     assert summary == {"processed": 0, "published": 0, "failed": 0, "skipped": 0}
-    assert captured == {"batch_size": 17, "max_failed_attempts": 5, "processing_timeout_seconds": 123}
+    assert captured == {
+        "batch_size": 17,
+        "max_failed_attempts": 5,
+        "processing_timeout_seconds": 123,
+    }

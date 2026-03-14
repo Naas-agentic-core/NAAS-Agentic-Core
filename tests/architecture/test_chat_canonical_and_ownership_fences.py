@@ -11,9 +11,12 @@ def test_chat_routers_keep_compatibility_facade_and_canonical_authority() -> Non
     admin_router = Path("app/api/routers/admin.py").read_text(encoding="utf-8")
     customer_router = Path("app/api/routers/customer_chat.py").read_text(encoding="utf-8")
 
-    assert 'COMPATIBILITY_FACADE_MODE = True' in admin_router
-    assert 'COMPATIBILITY_FACADE_MODE = True' in customer_router
-    assert 'CANONICAL_EXECUTION_AUTHORITY = "app.services.chat.orchestrator.ChatOrchestrator"' in admin_router
+    assert "COMPATIBILITY_FACADE_MODE = True" in admin_router
+    assert "COMPATIBILITY_FACADE_MODE = True" in customer_router
+    assert (
+        'CANONICAL_EXECUTION_AUTHORITY = "app.services.chat.orchestrator.ChatOrchestrator"'
+        in admin_router
+    )
     assert (
         'CANONICAL_EXECUTION_AUTHORITY = "app.services.chat.orchestrator.ChatOrchestrator"'
         in customer_router
@@ -27,7 +30,7 @@ def test_gateway_remains_canonical_runtime_entry_for_chat_paths() -> None:
 
     assert '@app.websocket("/api/chat/ws")' in gateway_main
     assert '@app.websocket("/admin/api/chat/ws")' in gateway_main
-    assert '@app.api_route(' in gateway_main
+    assert "@app.api_route(" in gateway_main
     assert '"/api/chat/{path:path}"' in gateway_main
 
 

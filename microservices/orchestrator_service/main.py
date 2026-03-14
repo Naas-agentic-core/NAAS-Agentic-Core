@@ -1,6 +1,6 @@
 import asyncio
 import logging
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, suppress
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -16,8 +16,6 @@ from microservices.orchestrator_service.src.services.tools.registry import regis
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("orchestrator_service")
-
-
 
 
 async def _run_outbox_relay_once() -> dict[str, int]:
@@ -48,6 +46,7 @@ async def _outbox_relay_loop(stop_event: asyncio.Event) -> None:
             await asyncio.wait_for(stop_event.wait(), timeout=interval_seconds)
         except TimeoutError:
             continue
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -119,10 +118,8 @@ async def lifespan(app: FastAPI):
     if relay_task is not None:
         app.state.outbox_relay_stop_event.set()
         relay_task.cancel()
-        try:
+        with suppress(asyncio.CancelledError):
             await relay_task
-        except asyncio.CancelledError:
-            pass
 
     await event_bus.close()
     tool_registry.clear()

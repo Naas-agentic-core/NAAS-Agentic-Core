@@ -4,10 +4,10 @@
 # Version: 11.2.0-pacelc-gapless
 # =================================================================================================
 
+import json
 import logging
 from collections.abc import AsyncGenerator
 from datetime import UTC, datetime, timedelta
-import json
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -49,7 +49,6 @@ class MissionStateManager:
     def __init__(self, session: AsyncSession, event_bus: EventBusProtocol | None = None) -> None:
         self.session = session
         self.event_bus = event_bus or get_event_bus()
-
 
     def _build_event_bus_message(
         self,
@@ -258,13 +257,11 @@ class MissionStateManager:
             "skipped": skipped,
         }
 
-
     async def get_outbox_operational_snapshot(self) -> dict[str, int | str | None]:
         """يعيد ملخصًا تشغيليًا لحالة outbox لدعم المراقبة واتخاذ القرار."""
 
-        status_stmt = (
-            select(MissionOutbox.status, func.count(MissionOutbox.id))
-            .group_by(MissionOutbox.status)
+        status_stmt = select(MissionOutbox.status, func.count(MissionOutbox.id)).group_by(
+            MissionOutbox.status
         )
         status_result = await self.session.execute(status_stmt)
         rows = status_result.all()
@@ -471,7 +468,6 @@ class MissionStateManager:
         except Exception as e:
             await self._set_outbox_status(outbox, status="failed")
             logger.warning(f"Failed to publish event to Redis: {e}. Outbox record ID: {outbox.id}")
-
 
     async def _set_outbox_status(
         self,

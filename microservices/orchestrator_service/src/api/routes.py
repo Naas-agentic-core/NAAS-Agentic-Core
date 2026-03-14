@@ -51,8 +51,6 @@ router = APIRouter(
 )
 
 
-
-
 class OutboxRelayResponse(BaseModel):
     """استجابة تشغيل relay اليدوي لسجلات outbox."""
 
@@ -60,7 +58,6 @@ class OutboxRelayResponse(BaseModel):
     published: int
     failed: int
     skipped: int
-
 
 
 class OutboxStatusResponse(BaseModel):
@@ -72,6 +69,7 @@ class OutboxStatusResponse(BaseModel):
     published: int
     oldest_pending_age_seconds: int | None
     generated_at: str
+
 
 def _is_admin_payload(payload: dict[str, object]) -> bool:
     """يتحقق من صلاحيات الإدارة داخل حمولة JWT وفق مبدأ أقل صلاحية وfail-closed."""
@@ -117,10 +115,6 @@ def _safe_assistant_error(request_id: str) -> str:
     return f"تعذر معالجة طلب الدردشة حالياً. رقم المتابعة: {request_id}"
 
 
-
-
-
-
 @router.get(
     "/api/v1/system/outbox/status",
     response_model=OutboxStatusResponse,
@@ -133,6 +127,7 @@ async def outbox_status(db: AsyncSession = Depends(get_db)) -> OutboxStatusRespo
     manager = MissionStateManager(session=db)
     snapshot = await manager.get_outbox_operational_snapshot()
     return OutboxStatusResponse(**snapshot)
+
 
 @router.post(
     "/api/v1/system/outbox/relay",
@@ -159,6 +154,7 @@ async def trigger_outbox_relay(
         processing_timeout_seconds=normalized_processing_timeout,
     )
     return OutboxRelayResponse(**summary)
+
 
 # MCP Admin Tool Endpoints dynamically generated from contract
 for tool_name in ADMIN_TOOL_CONTRACT:

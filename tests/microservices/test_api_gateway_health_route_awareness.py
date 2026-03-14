@@ -11,7 +11,7 @@ from microservices.api_gateway.config import settings
 def test_gateway_health_defaults_to_orchestrator_chat_mode(monkeypatch) -> None:
     """يثبت السلوك الآمن الافتراضي: chat mode = orchestrator بدون rollout."""
 
-    async def fake_get(url: str, timeout: float = 2.0):  # noqa: ARG001
+    async def fake_get(url: str, timeout: float = 2.0):
         class _Response:
             status_code = 200
 
@@ -33,7 +33,7 @@ def test_gateway_health_defaults_to_orchestrator_chat_mode(monkeypatch) -> None:
 def test_gateway_health_includes_conversation_when_chat_rollout_enabled(monkeypatch) -> None:
     """يثبت أن readiness أصبح route-aware عند تفعيل rollout."""
 
-    async def fake_get(url: str, timeout: float = 2.0):  # noqa: ARG001
+    async def fake_get(url: str, timeout: float = 2.0):
         class _Response:
             status_code = 200
 
