@@ -51,6 +51,28 @@ router = APIRouter(
 )
 
 
+
+
+class OutboxRelayResponse(BaseModel):
+    """استجابة تشغيل relay اليدوي لسجلات outbox."""
+
+    processed: int
+    published: int
+    failed: int
+    skipped: int
+
+
+
+class OutboxStatusResponse(BaseModel):
+    """استجابة تلخص الحالة التشغيلية لطابور outbox."""
+
+    pending: int
+    processing: int
+    failed: int
+    published: int
+    oldest_pending_age_seconds: int | None
+    generated_at: str
+
 def _is_admin_payload(payload: dict[str, object]) -> bool:
     """يتحقق من صلاحيات الإدارة داخل حمولة JWT وفق مبدأ أقل صلاحية وfail-closed."""
     role = str(payload.get("role", "")).lower().strip()
@@ -94,6 +116,49 @@ def _safe_assistant_error(request_id: str) -> str:
     """يبني رسالة خطأ آمنة للمستخدم دون أي تسريب تشخيصي داخلي."""
     return f"تعذر معالجة طلب الدردشة حالياً. رقم المتابعة: {request_id}"
 
+
+
+
+
+
+@router.get(
+    "/api/v1/system/outbox/status",
+    response_model=OutboxStatusResponse,
+    tags=["System"],
+    dependencies=[Depends(require_internal_admin_access)],
+)
+async def outbox_status(db: AsyncSession = Depends(get_db)) -> OutboxStatusResponse:
+    """يعرض لقطة تشغيلية آمنة عن outbox دون تعديل أي بيانات."""
+
+    manager = MissionStateManager(session=db)
+    snapshot = await manager.get_outbox_operational_snapshot()
+    return OutboxStatusResponse(**snapshot)
+
+@router.post(
+    "/api/v1/system/outbox/relay",
+    response_model=OutboxRelayResponse,
+    tags=["System"],
+    dependencies=[Depends(require_internal_admin_access)],
+)
+async def trigger_outbox_relay(
+    batch_size: int = 50,
+    max_failed_attempts: int = 3,
+    processing_timeout_seconds: int = 300,
+    db: AsyncSession = Depends(get_db),
+) -> OutboxRelayResponse:
+    """يشغل relay يدويًا بشكل آمن مع حدود واضحة للدفعة والمحاولات."""
+
+    normalized_batch_size = max(1, min(batch_size, 200))
+    normalized_attempts = max(1, min(max_failed_attempts, 10))
+    normalized_processing_timeout = max(5, min(processing_timeout_seconds, 3600))
+
+    manager = MissionStateManager(session=db)
+    summary = await manager.relay_outbox_events(
+        batch_size=normalized_batch_size,
+        max_failed_attempts=normalized_attempts,
+        processing_timeout_seconds=normalized_processing_timeout,
+    )
+    return OutboxRelayResponse(**summary)
 
 # MCP Admin Tool Endpoints dynamically generated from contract
 for tool_name in ADMIN_TOOL_CONTRACT:

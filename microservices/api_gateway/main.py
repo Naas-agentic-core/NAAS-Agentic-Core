@@ -102,6 +102,17 @@ def _resolve_chat_target_base(route_id: str, identity: str, rollout_percent: int
     return target_base
 
 
+
+
+def _conversation_ws_base_url() -> str:
+    """يحدد عنوان WS لخدمة Conversation مع fallback آمن نحو تحويل عنوان HTTP."""
+
+    configured_ws_url = str(settings.CONVERSATION_WS_URL).strip()
+    if configured_ws_url:
+        return configured_ws_url.rstrip("/")
+
+    return _to_ws_base_url(settings.CONVERSATION_SERVICE_URL.rstrip("/"))
+
 def _resolve_chat_ws_target(route_id: str, upstream_path: str) -> str:
     """يحدد هدف WS الحديث باستخدام نفس محرك القرار الخاص بمسار HTTP."""
     identity = f"{route_id}:{upstream_path}"
@@ -110,8 +121,40 @@ def _resolve_chat_ws_target(route_id: str, upstream_path: str) -> str:
         identity=identity,
         rollout_percent=settings.ROUTE_CHAT_WS_CONVERSATION_ROLLOUT_PERCENT,
     )
-    ws_base = _to_ws_base_url(target_base)
+    normalized_conversation_base = settings.CONVERSATION_SERVICE_URL.rstrip("/")
+    if target_base.rstrip("/") == normalized_conversation_base:
+        ws_base = _conversation_ws_base_url()
+    else:
+        ws_base = _to_ws_base_url(target_base)
     return f"{ws_base}/{upstream_path}"
+
+
+def _chat_route_uses_conversation() -> bool:
+    """يحدد ما إذا كانت مسارات chat الإنتاجية قد تُوجَّه فعليًا نحو conversation-service."""
+
+    return (
+        settings.ROUTE_CHAT_HTTP_CONVERSATION_ROLLOUT_PERCENT > 0
+        or settings.ROUTE_CHAT_WS_CONVERSATION_ROLLOUT_PERCENT > 0
+    )
+
+
+def _health_dependency_targets() -> dict[str, str]:
+    """يبني قائمة التبعيات الصحية مع مراعاة الخدمة الفعلية لمسارات chat."""
+
+    services = {
+        "planning_agent": settings.PLANNING_AGENT_URL,
+        "memory_agent": settings.MEMORY_AGENT_URL,
+        "user_service": settings.USER_SERVICE_URL,
+        "observability_service": settings.OBSERVABILITY_SERVICE_URL,
+        "research_agent": settings.RESEARCH_AGENT_URL,
+        "reasoning_agent": settings.REASONING_AGENT_URL,
+        "orchestrator_service": settings.ORCHESTRATOR_SERVICE_URL,
+    }
+
+    if _chat_route_uses_conversation():
+        services["conversation_service"] = settings.CONVERSATION_SERVICE_URL
+
+    return services
 
 
 import uuid
@@ -275,15 +318,7 @@ async def health_check():
     Health check endpoint that verifies connectivity to downstream services.
     Returns a detailed status report.
     """
-    services = {
-        "planning_agent": settings.PLANNING_AGENT_URL,
-        "memory_agent": settings.MEMORY_AGENT_URL,
-        "user_service": settings.USER_SERVICE_URL,
-        "observability_service": settings.OBSERVABILITY_SERVICE_URL,
-        "research_agent": settings.RESEARCH_AGENT_URL,
-        "reasoning_agent": settings.REASONING_AGENT_URL,
-        "orchestrator_service": settings.ORCHESTRATOR_SERVICE_URL,
-    }
+    services = _health_dependency_targets()
 
     async def check_service(name: str, url: str):
         try:
@@ -307,6 +342,7 @@ async def health_check():
         "status": overall_status,
         "service": "api-gateway",
         "dependencies": dependencies,
+        "chat_route_mode": "conversation" if _chat_route_uses_conversation() else "orchestrator",
     }
 
 

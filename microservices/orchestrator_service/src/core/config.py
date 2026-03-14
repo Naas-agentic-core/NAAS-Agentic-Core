@@ -49,6 +49,13 @@ class Settings(BaseSettings):
     # Redis
     REDIS_URL: str = "redis://localhost:6379"
 
+    # Outbox Relay (disabled by default for safe incremental rollout)
+    OUTBOX_RELAY_ENABLED: bool = False
+    OUTBOX_RELAY_INTERVAL_SECONDS: int = 15
+    OUTBOX_RELAY_BATCH_SIZE: int = 50
+    OUTBOX_RELAY_MAX_FAILED_ATTEMPTS: int = 3
+    OUTBOX_RELAY_PROCESSING_TIMEOUT_SECONDS: int = 300
+
     # AI Config
     OPENAI_API_KEY: str | None = Field(None, description="OpenAI API Key")
     OPENROUTER_API_KEY: str | None = Field(None, description="OpenRouter API Key")
@@ -127,6 +134,19 @@ class Settings(BaseSettings):
                 raise ValueError(
                     "ADMIN_TOOL_API_KEY must be configured and strong in production/staging"
                 )
+
+        if self.OUTBOX_RELAY_INTERVAL_SECONDS < 1:
+            raise ValueError("OUTBOX_RELAY_INTERVAL_SECONDS must be >= 1")
+
+        if self.OUTBOX_RELAY_BATCH_SIZE < 1 or self.OUTBOX_RELAY_BATCH_SIZE > 500:
+            raise ValueError("OUTBOX_RELAY_BATCH_SIZE must be between 1 and 500")
+
+        if self.OUTBOX_RELAY_MAX_FAILED_ATTEMPTS < 1 or self.OUTBOX_RELAY_MAX_FAILED_ATTEMPTS > 20:
+            raise ValueError("OUTBOX_RELAY_MAX_FAILED_ATTEMPTS must be between 1 and 20")
+
+        if self.OUTBOX_RELAY_PROCESSING_TIMEOUT_SECONDS < 5:
+            raise ValueError("OUTBOX_RELAY_PROCESSING_TIMEOUT_SECONDS must be >= 5")
+
         return self
 
 

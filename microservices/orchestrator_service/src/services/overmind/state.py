@@ -6,7 +6,8 @@
 
 import logging
 from collections.abc import AsyncGenerator
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
+import json
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -48,6 +49,256 @@ class MissionStateManager:
     def __init__(self, session: AsyncSession, event_bus: EventBusProtocol | None = None) -> None:
         self.session = session
         self.event_bus = event_bus or get_event_bus()
+
+
+    def _build_event_bus_message(
+        self,
+        *,
+        mission_id: int,
+        event_type: MissionEventType,
+        payload: dict[str, JsonValue],
+        created_at: datetime,
+    ) -> dict[str, object]:
+        """يبني رسالة حدث قابلة للتسلسل وتوافق عقود البث الحالية."""
+
+        message: dict[str, object] = {
+            "mission_id": mission_id,
+            "event_type": str(event_type.value),
+            "payload_json": payload,
+            "created_at": created_at.isoformat(),
+        }
+        json.dumps(message)
+        return message
+
+    async def _load_relay_candidates(self, *, batch_size: int) -> list[MissionOutbox]:
+        """يحمّل دفعة سجلات Outbox المرشحة لإعادة النشر."""
+
+        stmt = (
+            select(MissionOutbox)
+            .where(MissionOutbox.status.in_(["pending", "failed", "processing"]))
+            .order_by(MissionOutbox.id.asc())
+            .limit(batch_size)
+        )
+        result = await self.session.execute(stmt)
+        return list(result.scalars().all())
+
+    def _relay_attempt(self, outbox: MissionOutbox) -> int:
+        """يستخرج عداد محاولات relay من الحمولة الداخلية دون كسر البيانات الأصلية."""
+
+        payload = outbox.payload_json
+        if not isinstance(payload, dict):
+            return 0
+        relay_meta = payload.get("__relay")
+        if not isinstance(relay_meta, dict):
+            return 0
+        attempt = relay_meta.get("attempt")
+        if isinstance(attempt, int) and attempt >= 0:
+            return attempt
+        return 0
+
+    def _business_payload(self, outbox: MissionOutbox) -> dict[str, JsonValue]:
+        """يعيد حمولة الحدث الأصلية مع حذف مفاتيح relay الداخلية عند الحاجة."""
+
+        payload = outbox.payload_json
+        if not isinstance(payload, dict):
+            return {}
+        clean_payload = dict(payload)
+        clean_payload.pop("__relay", None)
+        return clean_payload
+
+    def _processing_reference_time(self, outbox: MissionOutbox) -> datetime:
+        """يستخرج مرجع الزمن لمعالجة processing مع تفضيل آخر محاولة relay."""
+
+        payload = outbox.payload_json
+        if isinstance(payload, dict):
+            relay_meta = payload.get("__relay")
+            if isinstance(relay_meta, dict):
+                raw_last_attempt = relay_meta.get("last_attempt_at")
+                if isinstance(raw_last_attempt, str) and raw_last_attempt.strip():
+                    try:
+                        parsed = datetime.fromisoformat(raw_last_attempt)
+                        if parsed.tzinfo is None:
+                            return parsed.replace(tzinfo=UTC)
+                        return parsed
+                    except ValueError:
+                        pass
+
+        created_at = outbox.created_at
+        if created_at.tzinfo is None:
+            return created_at.replace(tzinfo=UTC)
+        return created_at
+
+    def _is_processing_stale(
+        self,
+        outbox: MissionOutbox,
+        *,
+        processing_timeout_seconds: int,
+        now: datetime,
+    ) -> bool:
+        """يحدد ما إذا كان سجل processing قديمًا بما يكفي لإعادة المعالجة بأمان."""
+
+        if outbox.status != "processing":
+            return True
+        timeout = max(1, int(processing_timeout_seconds))
+        reference_time = self._processing_reference_time(outbox)
+        return reference_time <= (now - timedelta(seconds=timeout))
+
+    async def relay_outbox_events(
+        self,
+        *,
+        batch_size: int = 50,
+        max_failed_attempts: int = 3,
+        processing_timeout_seconds: int = 300,
+    ) -> dict[str, int]:
+        """يعيد نشر سجلات outbox المتعثرة/المعلقة مع حالات معالجة واضحة."""
+
+        now = utc_now()
+        candidates = await self._load_relay_candidates(batch_size=batch_size)
+        processed = 0
+        published = 0
+        failed = 0
+        skipped = 0
+
+        for outbox in candidates:
+            current_attempt = self._relay_attempt(outbox)
+            if outbox.status == "failed" and current_attempt >= max_failed_attempts:
+                skipped += 1
+                logger.info(
+                    "outbox_relay_skipped id=%s mission_id=%s attempt=%s reason=max_failed_attempts",
+                    outbox.id,
+                    outbox.mission_id,
+                    current_attempt,
+                )
+                continue
+
+            if not self._is_processing_stale(
+                outbox,
+                processing_timeout_seconds=processing_timeout_seconds,
+                now=now,
+            ):
+                skipped += 1
+                logger.info(
+                    "outbox_relay_skipped id=%s mission_id=%s attempt=%s reason=processing_inflight",
+                    outbox.id,
+                    outbox.mission_id,
+                    current_attempt,
+                )
+                continue
+
+            outbox.status = "processing"
+            await self.session.commit()
+
+            next_attempt = current_attempt + 1
+            payload = self._business_payload(outbox)
+            message = {
+                "mission_id": outbox.mission_id,
+                "event_type": outbox.event_type,
+                "payload_json": payload,
+                "created_at": outbox.created_at.isoformat(),
+            }
+
+            error_kind = "publish_error"
+            try:
+                json.dumps(message)
+            except TypeError as exc:
+                error_kind = "serialization_error"
+                payload_with_meta = dict(payload)
+                payload_with_meta["__relay"] = {
+                    "attempt": next_attempt,
+                    "last_error": str(exc),
+                    "last_error_kind": error_kind,
+                    "last_attempt_at": utc_now().isoformat(),
+                }
+                outbox.payload_json = payload_with_meta
+                await self._set_outbox_status(outbox, status="failed")
+                failed += 1
+                processed += 1
+                logger.warning(
+                    "outbox_relay_failed id=%s mission_id=%s reason=%s",
+                    outbox.id,
+                    outbox.mission_id,
+                    error_kind,
+                )
+                continue
+
+            try:
+                await self.event_bus.publish(f"mission:{outbox.mission_id}", message)
+                await self._set_outbox_status(outbox, status="published", published_at=utc_now())
+                published += 1
+                logger.info(
+                    "outbox_relay_published id=%s mission_id=%s attempt=%s",
+                    outbox.id,
+                    outbox.mission_id,
+                    next_attempt,
+                )
+            except Exception as exc:
+                payload_with_meta = dict(payload)
+                payload_with_meta["__relay"] = {
+                    "attempt": next_attempt,
+                    "last_error": str(exc),
+                    "last_error_kind": error_kind,
+                    "last_attempt_at": utc_now().isoformat(),
+                }
+                outbox.payload_json = payload_with_meta
+                await self._set_outbox_status(outbox, status="failed")
+                failed += 1
+                logger.warning(
+                    "outbox_relay_failed id=%s mission_id=%s reason=%s",
+                    outbox.id,
+                    outbox.mission_id,
+                    error_kind,
+                )
+
+            processed += 1
+
+        return {
+            "processed": processed,
+            "published": published,
+            "failed": failed,
+            "skipped": skipped,
+        }
+
+
+    async def get_outbox_operational_snapshot(self) -> dict[str, int | str | None]:
+        """يعيد ملخصًا تشغيليًا لحالة outbox لدعم المراقبة واتخاذ القرار."""
+
+        status_stmt = (
+            select(MissionOutbox.status, func.count(MissionOutbox.id))
+            .group_by(MissionOutbox.status)
+        )
+        status_result = await self.session.execute(status_stmt)
+        rows = status_result.all()
+
+        counts: dict[str, int] = {
+            "pending": 0,
+            "processing": 0,
+            "failed": 0,
+            "published": 0,
+        }
+        for status, total in rows:
+            key = str(status)
+            if key in counts:
+                counts[key] = int(total)
+
+        oldest_pending_stmt = select(func.min(MissionOutbox.created_at)).where(
+            MissionOutbox.status == "pending"
+        )
+        oldest_pending_result = await self.session.execute(oldest_pending_stmt)
+        oldest_pending = oldest_pending_result.scalar_one_or_none()
+
+        oldest_pending_age_seconds: int | None = None
+        if isinstance(oldest_pending, datetime):
+            delta = utc_now() - oldest_pending
+            oldest_pending_age_seconds = max(0, int(delta.total_seconds()))
+
+        return {
+            "pending": counts["pending"],
+            "processing": counts["processing"],
+            "failed": counts["failed"],
+            "published": counts["published"],
+            "oldest_pending_age_seconds": oldest_pending_age_seconds,
+            "generated_at": utc_now().isoformat(),
+        }
 
     async def create_mission(
         self,
@@ -208,10 +459,32 @@ class MissionStateManager:
         # Ideally, a background worker polls 'mission_outbox' where status='pending'.
         # For simplicity and latency, we try direct publish.
         # If this fails, the 'monitor_mission_events' (catch-up) mechanism still works via DB polling.
+        message = self._build_event_bus_message(
+            mission_id=mission_id,
+            event_type=event_type,
+            payload=payload,
+            created_at=event.created_at,
+        )
         try:
-            await self.event_bus.publish(f"mission:{mission_id}", event)
+            await self.event_bus.publish(f"mission:{mission_id}", message)
+            await self._set_outbox_status(outbox, status="published", published_at=utc_now())
         except Exception as e:
+            await self._set_outbox_status(outbox, status="failed")
             logger.warning(f"Failed to publish event to Redis: {e}. Outbox record ID: {outbox.id}")
+
+
+    async def _set_outbox_status(
+        self,
+        outbox: MissionOutbox,
+        *,
+        status: str,
+        published_at: datetime | None = None,
+    ) -> None:
+        """يحدّث حالة سجل الـ Outbox بشكل صريح لضمان تتبع موثوق للنشر."""
+
+        outbox.status = status
+        outbox.published_at = published_at
+        await self.session.commit()
 
     async def get_mission_events(self, mission_id: int) -> list[MissionEvent]:
         """Fetch all historical events for a mission."""
