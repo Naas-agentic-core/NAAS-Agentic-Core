@@ -13,6 +13,7 @@
 """
 
 import asyncio
+import contextlib
 from collections.abc import AsyncGenerator
 
 from app.core.di import get_logger
@@ -51,10 +52,8 @@ class EventBus(EventBusProtocol):
         for queue in list(queues):
             try:
                 if queue.full():
-                    try:
+                    with contextlib.suppress(asyncio.QueueEmpty):
                         queue.get_nowait()
-                    except asyncio.QueueEmpty:
-                        pass
                 queue.put_nowait(event)
             except Exception as exc:
                 logger.error(f"Failed to push to queue in channel {channel}: {exc}")

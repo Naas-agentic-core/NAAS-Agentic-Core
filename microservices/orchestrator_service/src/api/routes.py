@@ -48,6 +48,7 @@ logger = logging.getLogger(__name__)
 
 type JsonObject = dict[str, object]
 
+
 class ChatRunContext(TypedDict, total=False):
     """غلاف سياقي محدود لمسار تشغيل الدردشة لتجنّب القواميس المفتوحة في الحدود الحرجة."""
 
@@ -129,7 +130,9 @@ def _coerce_admin_state(payload: dict[str, object] | None = None) -> dict[str, o
     }
 
 
-def _merge_admin_inputs(base_inputs: dict[str, object], admin_payload: dict[str, object] | None) -> dict[str, object]:
+def _merge_admin_inputs(
+    base_inputs: dict[str, object], admin_payload: dict[str, object] | None
+) -> dict[str, object]:
     """يحقن غلاف الإدارة الموحد فقط عند الحاجة، مع إبقاء المسارات الأخرى دون تغيير."""
 
     if admin_payload is None:
@@ -220,9 +223,7 @@ for tool_name in ADMIN_TOOL_CONTRACT:
         tags=["Admin MCP Tools"],
         dependencies=[Depends(require_internal_admin_access)],
     )
-    async def invoke_admin_tool(
-        payload: JsonObject | None = None, name=tool_name
-    ) -> JsonObject:
+    async def invoke_admin_tool(payload: JsonObject | None = None, name=tool_name) -> JsonObject:
         if payload is None:
             payload = {}
         tool_fn = get_registry().get(name)
@@ -426,7 +427,10 @@ async def _stream_chat_langgraph(
             if not app_graph:
                 app_graph = create_unified_graph()
             config = {"configurable": {"thread_id": str(conversation_id)}}
-            inputs: dict[str, object] = {"query": objective, "messages": [HumanMessage(content=objective)]}
+            inputs: dict[str, object] = {
+                "query": objective,
+                "messages": [HumanMessage(content=objective)],
+            }
             inputs = _merge_admin_inputs(inputs, admin_payload if chat_scope == "admin" else None)
 
             res = await app_graph.ainvoke(inputs, config=config)
@@ -924,7 +928,7 @@ async def create_mission_endpoint(
 
         return _serialize_mission(mission)
 
-    except Exception:
+    except Exception as e:
         request_id = str(uuid.uuid4())
         logger.error(
             "Failed to create mission",
@@ -934,7 +938,7 @@ async def create_mission_endpoint(
         raise HTTPException(
             status_code=500,
             detail=f"Mission creation failed. request_id={request_id}",
-        )
+        ) from e
 
 
 @router.get("/missions/{mission_id}", response_model=MissionResponse, summary="Get Mission")
@@ -1035,9 +1039,7 @@ async def stream_mission_ws(
             if canonical_event is None:
                 continue
 
-            await websocket.send_json(
-                {"type": "mission_event", "payload": canonical_event}
-            )
+            await websocket.send_json({"type": "mission_event", "payload": canonical_event})
 
             if canonical_event["event_type"] in ("mission_completed", "mission_failed"):
                 # Fetch final status

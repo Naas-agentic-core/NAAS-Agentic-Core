@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from types import SimpleNamespace
 from pathlib import Path
+from types import SimpleNamespace
 
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
@@ -193,8 +193,6 @@ def test_outbox_status_returns_operational_snapshot(monkeypatch) -> None:
     }
 
 
-
-
 def test_admin_graph_access_node_is_fail_closed() -> None:
     """يتأكد أن عقدة الوصول الإدارية لم تعد تعمل بمنطق السماح العام."""
 
@@ -224,7 +222,7 @@ def test_admin_tool_invoke_count_python_files_success(monkeypatch) -> None:
         "get_settings",
         lambda: SimpleNamespace(ADMIN_TOOL_API_KEY="internal-key-1234567890", SECRET_KEY="x" * 40),
     )
-    monkeypatch.setattr(routes, "get_registry", lambda: _Registry())
+    monkeypatch.setattr(routes, "get_registry", _Registry)
 
     app = _build_test_app()
 
@@ -262,7 +260,7 @@ def test_admin_tool_invoke_sanitizes_tool_errors(monkeypatch) -> None:
         "get_settings",
         lambda: SimpleNamespace(ADMIN_TOOL_API_KEY="internal-key-1234567890", SECRET_KEY="x" * 40),
     )
-    monkeypatch.setattr(routes, "get_registry", lambda: _Registry())
+    monkeypatch.setattr(routes, "get_registry", _Registry)
 
     app = _build_test_app()
 

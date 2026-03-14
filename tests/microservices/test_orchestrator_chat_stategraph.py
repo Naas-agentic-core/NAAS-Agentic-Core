@@ -167,13 +167,15 @@ def test_chat_ws_admin_uses_stategraph(monkeypatch) -> None:
 def test_chat_ws_admin_rejects_non_admin_token() -> None:
     """يتأكد أن مسار WS الإداري يرفض الرموز غير الإدارية بشكل fail-closed."""
 
-    token = jwt.encode({"sub": "2", "user_id": 2, "role": "user"}, get_settings().SECRET_KEY, algorithm="HS256")
+    token = jwt.encode(
+        {"sub": "2", "user_id": 2, "role": "user"}, get_settings().SECRET_KEY, algorithm="HS256"
+    )
 
     try:
         with TestClient(app).websocket_connect(f"/admin/api/chat/ws?token={token}"):
             raise AssertionError("Expected admin websocket rejection for non-admin token")
     except Exception as exc:
-        assert "4403" in str(exc)
+        assert getattr(exc, "code", None) == 4403 or "4403" in str(exc)
 
 
 def test_chat_ws_admin_sanitizes_streaming_errors(monkeypatch) -> None:
@@ -183,7 +185,7 @@ def test_chat_ws_admin_sanitizes_streaming_errors(monkeypatch) -> None:
         async def ainvoke(self, *args, **kwargs):
             raise RuntimeError("sensitive-internal-stack")
 
-    monkeypatch.setattr(routes, "create_unified_graph", lambda: ExplodingGraph())
+    monkeypatch.setattr(routes, "create_unified_graph", ExplodingGraph)
 
     async def fake_ensure_conversation(**kwargs):
         return 999

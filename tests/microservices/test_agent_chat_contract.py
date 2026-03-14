@@ -70,7 +70,12 @@ def test_agent_chat_admin_path_forwards_aligned_admin_state(monkeypatch) -> None
         json={
             "question": "count python files",
             "user_id": 11,
-            "context": {"chat_scope": "admin", "is_admin": True, "role": "admin", "scope": "admin:tool"},
+            "context": {
+                "chat_scope": "admin",
+                "is_admin": True,
+                "role": "admin",
+                "scope": "admin:tool",
+            },
         },
     ) as response:
         assert response.status_code == 200

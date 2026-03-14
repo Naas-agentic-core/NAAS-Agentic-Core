@@ -120,11 +120,12 @@ def test_create_mission_endpoint():
         loop.run_until_complete(test_engine.dispose())
 
 
-
 def test_canonicalize_mission_event_accepts_legacy_shapes() -> None:
     from microservices.orchestrator_service.src.api.routes import _canonicalize_mission_event
 
-    payload_shape = _canonicalize_mission_event({"event_type": "mission_started", "payload_json": {"a": 1}})
+    payload_shape = _canonicalize_mission_event(
+        {"event_type": "mission_started", "payload_json": {"a": 1}}
+    )
     data_shape = _canonicalize_mission_event({"event_type": "mission_started", "data": {"b": 2}})
 
     assert payload_shape == {"event_type": "mission_started", "data": {"a": 1}}
@@ -150,7 +151,9 @@ def test_create_mission_endpoint_sanitizes_internal_errors() -> None:
 
     app.dependency_overrides[get_db] = _fake_get_db
 
-    with patch("microservices.orchestrator_service.src.api.routes.start_mission", _broken_start_mission):
+    with patch(
+        "microservices.orchestrator_service.src.api.routes.start_mission", _broken_start_mission
+    ):
         client = TestClient(app)
         response = client.post(
             "/missions",
