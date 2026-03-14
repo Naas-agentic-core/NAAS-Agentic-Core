@@ -1,6 +1,6 @@
 import logging
 import uuid
-from typing import Any
+from typing import Any, TypedDict
 
 import jwt
 from fastapi import (
@@ -45,6 +45,38 @@ from microservices.orchestrator_service.src.services.overmind.utils.tools import
 from microservices.orchestrator_service.src.services.tools.registry import get_registry
 
 logger = logging.getLogger(__name__)
+
+class ChatRunContext(TypedDict, total=False):
+    """غلاف سياقي محدود لمسار تشغيل الدردشة لتجنّب القواميس المفتوحة في الحدود الحرجة."""
+
+    mission_type: str
+
+
+class MissionEventEnvelope(TypedDict):
+    """العقد الداخلي القياسي لبث أحداث المهمات عبر WebSocket."""
+
+    event_type: str
+    data: dict[str, object]
+
+
+def _canonicalize_mission_event(event: object) -> MissionEventEnvelope | None:
+    """يوحّد أشكال الحدث التاريخية إلى غلاف داخلي ثابت مع توافق رجعي عند الحافة."""
+
+    if not isinstance(event, dict):
+        return None
+
+    raw_event_type = event.get("event_type")
+    if not isinstance(raw_event_type, str) or not raw_event_type.strip():
+        return None
+
+    payload_candidate = event.get("payload_json")
+    if not isinstance(payload_candidate, dict):
+        payload_candidate = event.get("data")
+    if not isinstance(payload_candidate, dict):
+        payload_candidate = {}
+
+    return {"event_type": raw_event_type, "data": payload_candidate}
+
 
 router = APIRouter(
     tags=["Overmind (Super Agent)"],
@@ -346,13 +378,13 @@ import asyncio
 async def _stream_chat_langgraph(
     websocket: WebSocket,
     objective: str,
-    context: dict[str, Any],
+    context: ChatRunContext,
     chat_scope: str,
     conversation_id: int,
-    app_graph: Any = None,
+    app_graph: object = None,
 ) -> None:
     """يشغّل LangGraph الموحد لمسارات البحث والإدارة ويبث الأحداث."""
-    queue: asyncio.Queue[dict[str, object]] = asyncio.Queue()
+    queue: asyncio.Queue[dict[str, object]] = asyncio.Queue(maxsize=64)
 
     async def _runner():
         try:
@@ -364,8 +396,12 @@ async def _stream_chat_langgraph(
 
             res = await app_graph.ainvoke(inputs, config=config)
 
+            if queue.full():
+                await queue.get()
             await queue.put({"type": "__DONE__", "result": res})
         except Exception as e:
+            if queue.full():
+                await queue.get()
             await queue.put({"type": "__ERROR__", "error": str(e)})
 
     task = asyncio.create_task(_runner())
@@ -498,8 +534,8 @@ async def _stream_chat_langgraph(
 
 async def _run_chat_langgraph(
     objective: str,
-    context: dict[str, Any],
-    app_graph: Any = None,
+    context: ChatRunContext,
+    app_graph: object = None,
 ) -> dict[str, object]:
     """يشغّل LangGraph كعمود فقري لرحلة chat ويعيد حمولة موحدة قابلة للبث (HTTP legacy fallback)."""
     if not app_graph:
@@ -936,22 +972,15 @@ async def stream_mission_ws(
 
     try:
         async for event in subscription:
-            payload = {}
-            evt_type = ""
-
-            if isinstance(event, dict):
-                # Check structure from Redis (published by log_event or entrypoint)
-                # entrypoint might publish raw dicts?
-                # MissionStateManager.log_event publishes to Redis.
-                # Let's assume it matches what we expect
-                payload = event.get("payload_json", {}) or event.get("data", {})
-                evt_type = event.get("event_type", "")
+            canonical_event = _canonicalize_mission_event(event)
+            if canonical_event is None:
+                continue
 
             await websocket.send_json(
-                {"type": "mission_event", "payload": {"event_type": evt_type, "data": payload}}
+                {"type": "mission_event", "payload": canonical_event}
             )
 
-            if evt_type in ("mission_completed", "mission_failed"):
+            if canonical_event["event_type"] in ("mission_completed", "mission_failed"):
                 # Fetch final status
                 async with async_session_factory() as final_session:
                     sm = MissionStateManager(final_session)

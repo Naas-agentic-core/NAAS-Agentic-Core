@@ -122,8 +122,8 @@ class AppSettings(BaseServiceSettings):
     API_STRICT_MODE: bool = Field(True, description="Strict API Security")
 
     # CORS & Hosts
-    BACKEND_CORS_ORIGINS: list[str] = Field(default=["*"])
-    ALLOWED_HOSTS: list[str] = Field(default=["*"])
+    BACKEND_CORS_ORIGINS: list[str] = Field(default=["http://localhost:3000"])
+    ALLOWED_HOSTS: list[str] = Field(default=["localhost", "127.0.0.1"])
 
     # Infra
     REDIS_URL: str | None = None

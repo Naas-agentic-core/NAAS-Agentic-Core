@@ -1,6 +1,6 @@
 import re
 from datetime import datetime
-from typing import Any
+from typing import TypedDict
 
 from langgraph.graph import END, StateGraph
 
@@ -44,10 +44,21 @@ def assert_admin_prompt_only(prompt_fn_name: str):
     )
 
 
-class MockTLM:
-    def get_trustworthiness_score(self, prompt: str, response: str) -> float:
-        # Mocking TLM until real implementation is provided in the future
-        return 0.95
+class AdminExecutionState(TypedDict, total=False):
+    """حالة تنفيذ إدارية مقيّدة الحقول لتقليل الغموض عند حدود التحكم."""
+
+    query: str
+    user_role: str
+    is_admin: bool
+    scope: str
+
+
+def _is_admin_state(state: AdminExecutionState) -> bool:
+    """يفرض تحقق وصول حتمي بدلاً من منطق السماح العام."""
+
+    role = str(state.get("user_role", "")).strip().lower()
+    scope = str(state.get("scope", "")).strip().lower()
+    return bool(state.get("is_admin") is True or role in {"admin", "super_admin", "superadmin"} or ("admin" in scope and "tool" in scope))
 
 
 # Deterministic Graph Nodes
@@ -58,8 +69,9 @@ class DetectIntentNode:
 
 
 class ValidateAccessNode:
-    async def __call__(self, state):
-        # Allow all for now, in a real system we'd check JWT scope or user_id
+    async def __call__(self, state: AdminExecutionState) -> AdminExecutionState | dict[str, str]:
+        if not _is_admin_state(state):
+            return {"error": "ADMIN_ACCESS_DENIED", "access": "denied"}
         return {**state, "access": "granted"}
 
 
@@ -90,7 +102,7 @@ class ResolveToolNode:
 
 class ExecuteToolNode:
     def __init__(self):
-        self.tlm = MockTLM()
+        pass
 
     async def __call__(self, state):
         import time
@@ -114,7 +126,6 @@ class ExecuteToolNode:
             )
             return {"error": "ADMIN_TOOL_UNAVAILABLE", "tool_name": tool_name}
 
-        # Execute with TLM trust scoring
         try:
             import asyncio
 
@@ -141,9 +152,7 @@ class ExecuteToolNode:
             }
 
         logger.info(f"TOOL EXECUTED → {tool_name} → {str(result)[:50]}")
-        trust = self.tlm.get_trustworthiness_score(
-            prompt=state.get("query", ""), response=str(result)
-        )
+        trust = 1.0
 
         emit_telemetry(
             node_name="ExecuteToolNode",
@@ -203,7 +212,7 @@ class AdminAgentNode:
     def __init__(self, admin_app=None):
         self.admin_app = admin_app
 
-    async def __call__(self, state: AgentState) -> dict[str, Any]:
+    async def __call__(self, state: AgentState) -> dict[str, object]:
         if not self.admin_app:
             raise RuntimeError("AdminAgentNode missing compiled admin_app")
         config = {"configurable": {"thread_id": "admin_run"}}

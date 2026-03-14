@@ -21,6 +21,7 @@ from app.core.protocols import EventBusProtocol
 logger = get_logger(__name__)
 
 type EventPayload = object
+MAX_PENDING_EVENTS_PER_SUBSCRIBER = 1000
 
 
 class EventBus(EventBusProtocol):
@@ -32,6 +33,7 @@ class EventBus(EventBusProtocol):
     def __init__(self) -> None:
         """يهيئ الناقل مع سجل اشتراكات فارغ."""
         self._subscribers: dict[str, set[asyncio.Queue[EventPayload]]] = {}
+        self._max_pending_events = MAX_PENDING_EVENTS_PER_SUBSCRIBER
 
     async def publish(self, channel: str, event: EventPayload) -> None:
         """
@@ -48,7 +50,12 @@ class EventBus(EventBusProtocol):
         # نستخدم list() لإنشاء نسخة لتجنب أخطاء التعديل أثناء الدوران
         for queue in list(queues):
             try:
-                await queue.put(event)
+                if queue.full():
+                    try:
+                        queue.get_nowait()
+                    except asyncio.QueueEmpty:
+                        pass
+                queue.put_nowait(event)
             except Exception as exc:
                 logger.error(f"Failed to push to queue in channel {channel}: {exc}")
 
@@ -63,7 +70,7 @@ class EventBus(EventBusProtocol):
         Returns:
             asyncio.Queue: صف الأحداث الجديد.
         """
-        queue: asyncio.Queue[EventPayload] = asyncio.Queue()
+        queue: asyncio.Queue[EventPayload] = asyncio.Queue(maxsize=self._max_pending_events)
         if channel not in self._subscribers:
             self._subscribers[channel] = set()
         self._subscribers[channel].add(queue)

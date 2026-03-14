@@ -118,3 +118,14 @@ def test_create_mission_endpoint():
     finally:
         fastapi_app.dependency_overrides.pop(get_db, None)
         loop.run_until_complete(test_engine.dispose())
+
+
+
+def test_canonicalize_mission_event_accepts_legacy_shapes() -> None:
+    from microservices.orchestrator_service.src.api.routes import _canonicalize_mission_event
+
+    payload_shape = _canonicalize_mission_event({"event_type": "mission_started", "payload_json": {"a": 1}})
+    data_shape = _canonicalize_mission_event({"event_type": "mission_started", "data": {"b": 2}})
+
+    assert payload_shape == {"event_type": "mission_started", "data": {"a": 1}}
+    assert data_shape == {"event_type": "mission_started", "data": {"b": 2}}

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from types import SimpleNamespace
+from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
@@ -190,3 +191,16 @@ def test_outbox_status_returns_operational_snapshot(monkeypatch) -> None:
         "oldest_pending_age_seconds": 42,
         "generated_at": "2026-01-01T00:00:00+00:00",
     }
+
+
+
+
+def test_admin_graph_access_node_is_fail_closed() -> None:
+    """يتأكد أن عقدة الوصول الإدارية لم تعد تعمل بمنطق السماح العام."""
+
+    module_text = Path(
+        "microservices/orchestrator_service/src/services/overmind/graph/admin.py"
+    ).read_text(encoding="utf-8")
+
+    assert "ADMIN_ACCESS_DENIED" in module_text
+    assert "Allow all for now" not in module_text

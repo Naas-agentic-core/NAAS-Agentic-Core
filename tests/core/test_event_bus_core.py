@@ -56,3 +56,15 @@ async def test_async_generator_subscription(bus):
 
     await task
     assert received == [1, 2]
+
+
+@pytest.mark.asyncio
+async def test_subscriber_queue_is_bounded_and_drops_oldest(bus):
+    queue = bus.subscribe_queue("bounded")
+
+    for i in range(bus._max_pending_events + 5):
+        await bus.publish("bounded", i)
+
+    assert queue.qsize() == bus._max_pending_events
+    first = await queue.get()
+    assert first == 5
