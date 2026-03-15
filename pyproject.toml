@@ -35,3 +35,7 @@ ignore = [
 [tool.ruff.lint.isort]
 known-first-party = ["app", "microservices"]
 section-order = ["future", "standard-library", "third-party", "first-party", "local-folder"]
+
+[tool.ruff.lint.per-file-ignores]
+"cryptography/fernet.py" = ["N818"]
+"redis/asyncio.py" = ["N801"]

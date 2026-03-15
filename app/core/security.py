@@ -13,6 +13,7 @@
 from datetime import UTC, datetime, timedelta
 
 import jwt
+
 from app.core.config import get_settings
 from app.security.passwords import pwd_context
 

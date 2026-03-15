@@ -2,7 +2,6 @@ import os
 from unittest.mock import patch
 
 import pytest
-from cryptography.fernet import Fernet
 
 from app.services.api_config_secrets.infrastructure.vault_adapters import (
     AWSSecretsManagerBackend,
@@ -10,6 +9,7 @@ from app.services.api_config_secrets.infrastructure.vault_adapters import (
     LocalVaultBackend,
     SecretEncryption,
 )
+from cryptography.fernet import Fernet
 
 
 def test_secret_encryption_with_key():

@@ -7,9 +7,9 @@ Ensures Single Control Plane and Source of Truth.
 import asyncio
 import logging
 
-import redis.asyncio as redis
 from sqlalchemy.ext.asyncio import AsyncSession
 
+import redis.asyncio as redis
 from microservices.orchestrator_service.src.core.config import get_settings
 from microservices.orchestrator_service.src.models.mission import (
     Mission,

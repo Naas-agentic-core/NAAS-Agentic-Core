@@ -37,7 +37,7 @@ class Fernet:
     def decrypt(self, token: bytes) -> bytes:
         try:
             payload = base64.urlsafe_b64decode(token)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             raise InvalidToken("Invalid token encoding") from exc
         if len(payload) < 32:
             raise InvalidToken("Token too short")

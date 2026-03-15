@@ -1,9 +1,8 @@
 import os
 import threading
 
-from cryptography.fernet import Fernet
-
 from app.services.api_config_secrets.domain.ports import VaultBackend
+from cryptography.fernet import Fernet
 
 
 class SecretEncryption:

@@ -10,7 +10,6 @@ import json
 import logging
 
 import redis.asyncio as redis
-
 from app.core.event_bus import get_event_bus
 
 logger = logging.getLogger(__name__)
