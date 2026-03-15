@@ -8,8 +8,11 @@ import hmac
 import secrets
 
 
-class InvalidToken(ValueError):
+class InvalidTokenError(ValueError):
     """يمثل خطأ في صحة الرمز المشفر."""
+
+
+InvalidToken = InvalidTokenError
 
 
 class Fernet:
@@ -38,12 +41,12 @@ class Fernet:
         try:
             payload = base64.urlsafe_b64decode(token)
         except Exception as exc:
-            raise InvalidToken("Invalid token encoding") from exc
+            raise InvalidTokenError("Invalid token encoding") from exc
         if len(payload) < 32:
-            raise InvalidToken("Token too short")
+            raise InvalidTokenError("Token too short")
         cipher, sig = payload[:-32], payload[-32:]
         expected = hmac.new(self._sig_key, cipher, hashlib.sha256).digest()
         if not hmac.compare_digest(sig, expected):
-            raise InvalidToken("Invalid token signature")
+            raise InvalidTokenError("Invalid token signature")
         keystream = hashlib.sha256(self._enc_key).digest()
         return bytes(b ^ keystream[i % len(keystream)] for i, b in enumerate(cipher))

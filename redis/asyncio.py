@@ -66,8 +66,13 @@ class Redis:
         self._store.clear()
 
 
-class client:
+class ClientNamespace:
+    """مساحة أسماء للتوافق مع redis.asyncio.client.PubSub."""
+
     PubSub = PubSub
+
+
+client = ClientNamespace
 
 
 def from_url(*_args, **_kwargs) -> Redis:
