@@ -52,6 +52,14 @@ class AdminExecutionState(TypedDict, total=False):
     is_admin: bool
     is_admin_user: bool
     scope: str
+    access: str
+    resolved_tool: str
+    tool_result: str
+    tool_name: str
+    trust_score: float
+    executed_at: str
+    error: str
+    final_response: dict
 
 
 def _is_admin_state(state: AdminExecutionState) -> bool:
@@ -200,7 +208,7 @@ class RenderAnswerNode:
         }
 
 
-admin_graph = StateGraph(dict)
+admin_graph = StateGraph(AdminExecutionState)
 admin_graph.add_node("detect", DetectIntentNode())
 admin_graph.add_node("validate", ValidateAccessNode())
 admin_graph.add_node("resolve", ResolveToolNode())
