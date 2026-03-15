@@ -50,6 +50,7 @@ class AdminExecutionState(TypedDict, total=False):
     query: str
     user_role: str
     is_admin: bool
+    is_admin_user: bool
     scope: str
 
 
@@ -60,7 +61,12 @@ def _is_admin_state(state: AdminExecutionState) -> bool:
     scope = str(state.get("scope", "")).strip().lower()
     has_admin_role = role in {"admin", "super_admin", "superadmin"}
     has_admin_scope = "admin" in scope and "tool" in scope
-    return bool(state.get("is_admin") is True or has_admin_role or has_admin_scope)
+    return bool(
+        state.get("is_admin") is True
+        or state.get("is_admin_user") is True
+        or has_admin_role
+        or has_admin_scope
+    )
 
 
 # Deterministic Graph Nodes
