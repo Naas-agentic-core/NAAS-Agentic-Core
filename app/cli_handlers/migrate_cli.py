@@ -3,8 +3,6 @@
 from __future__ import annotations
 
 import click
-from alembic import command
-from alembic.config import Config
 
 from app.cli_handlers.context import CLIContext, get_cli_context
 
@@ -19,14 +17,18 @@ def register_migrate_commands(root: click.Group) -> None:
         """يشغّل ترقية Alembic حتى النسخة المحددة."""
 
         context = get_cli_context(ctx)
+        from alembic import command
+
         cfg = _build_config(context, rev)
         context.logger.info("alembic upgrade %s", rev)
         command.upgrade(cfg, rev)
         context.logger.info("انتهى تنفيذ ترقية Alembic.")
 
 
-def _build_config(context: CLIContext, rev: str) -> Config:
+def _build_config(context: CLIContext, rev: str):
     """يبني ضبط Alembic بناءً على الإعدادات الحالية."""
+
+    from alembic.config import Config
 
     cfg = Config()
     cfg.set_main_option("sqlalchemy.url", context.settings.DATABASE_URL)

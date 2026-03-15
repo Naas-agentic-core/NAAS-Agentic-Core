@@ -17,6 +17,7 @@ os.environ.setdefault("LLM_MOCK_MODE", "1")
 os.environ.setdefault("LOG_LEVEL", "DEBUG")
 os.environ.setdefault("PROJECT_NAME", "CogniForgeTest")
 os.environ.setdefault("REDIS_URL", "redis://localhost:6379/0")
+os.environ.setdefault("PASSLIB_BUILTIN_BCRYPT", "enabled")
 # Set a consistent SECRET_KEY for all tests and microservices
 os.environ["SECRET_KEY"] = "test-secret-key-for-ci-pipeline-secure-length"
 os.environ["DATABASE_URL"] = "sqlite+aiosqlite:///:memory:"

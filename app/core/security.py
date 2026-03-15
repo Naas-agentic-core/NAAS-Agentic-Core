@@ -12,14 +12,7 @@
 
 from datetime import UTC, datetime, timedelta
 
-import bcrypt
 import jwt
-
-if not hasattr(bcrypt, "__about__"):
-    import contextlib
-
-    with contextlib.suppress(Exception):
-        bcrypt.__about__ = type("about", (object,), {"__version__": bcrypt.__version__})
 from app.core.config import get_settings
 from app.security.passwords import pwd_context
 
