@@ -4,14 +4,14 @@ from __future__ import annotations
 
 import pytest
 
-from app.api.routers import customer_chat
+from app.services.chat import event_protocol
 
 
 def test_normalize_streaming_event_legacy_protocol_for_string(monkeypatch: pytest.MonkeyPatch) -> None:
     """يتحقق من بقاء السلوك التاريخي عند تعطيل راية البروتوكول الموحّد."""
     monkeypatch.setenv("CHAT_USE_UNIFIED_EVENT_ENVELOPE", "0")
 
-    event = customer_chat._normalize_streaming_event("hello")
+    event = event_protocol.normalize_streaming_event("hello")
 
     assert event == {"type": "delta", "payload": {"content": "hello"}}
 
@@ -20,7 +20,7 @@ def test_normalize_streaming_event_unified_maps_legacy_delta(monkeypatch: pytest
     """يتحقق من تحويل حدث delta القديم إلى assistant_delta ضمن ChatEventEnvelope."""
     monkeypatch.setenv("CHAT_USE_UNIFIED_EVENT_ENVELOPE", "1")
 
-    event = customer_chat._normalize_streaming_event(
+    event = event_protocol.normalize_streaming_event(
         {"type": "delta", "payload": {"content": "chunk"}}
     )
 
@@ -33,7 +33,7 @@ def test_normalize_streaming_event_unified_maps_error(monkeypatch: pytest.Monkey
     """يتحقق من تحويل حدث الخطأ إلى assistant_error مع الحفاظ على التفاصيل."""
     monkeypatch.setenv("CHAT_USE_UNIFIED_EVENT_ENVELOPE", "1")
 
-    event = customer_chat._normalize_streaming_event(
+    event = event_protocol.normalize_streaming_event(
         {"type": "error", "payload": {"details": "boom", "status_code": 500}}
     )
 
@@ -47,7 +47,7 @@ def test_normalize_streaming_event_unified_maps_status(monkeypatch: pytest.Monke
     """يتحقق من تحويل حدث الحالة إلى نوع status ضمن العقد الموحّد."""
     monkeypatch.setenv("CHAT_USE_UNIFIED_EVENT_ENVELOPE", "1")
 
-    event = customer_chat._normalize_streaming_event(
+    event = event_protocol.normalize_streaming_event(
         {"type": "status", "payload": {"status_code": 202}}
     )
 

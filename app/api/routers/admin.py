@@ -14,7 +14,6 @@
 
 import inspect
 from collections.abc import Callable
-import os
 
 from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect
 from pydantic import BaseModel
@@ -22,7 +21,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.routers.ws_auth import extract_websocket_auth
 from app.api.schemas.admin import ConversationDetailsResponse, ConversationSummaryResponse
-from app.contracts.chat_events import ChatEventEnvelope, ChatEventPayload, ChatEventType
 from app.core.ai_gateway import AIClient, get_ai_client
 from app.core.config import get_settings
 from app.core.database import async_session_factory, get_db
@@ -34,6 +32,7 @@ from app.services.auth.token_decoder import decode_user_id
 from app.services.boundaries.admin_chat_boundary_service import AdminChatBoundaryService
 from app.services.chat.contracts import ChatDispatchRequest
 from app.services.chat.dispatcher import ChatRoleDispatcher, build_chat_dispatcher
+from app.services.chat.event_protocol import normalize_streaming_event
 from app.services.chat.orchestrator import ChatOrchestrator
 from app.services.rbac import ADMIN_ROLE
 
@@ -48,85 +47,11 @@ router = APIRouter(
 )
 
 
-def _is_unified_chat_event_protocol_enabled() -> bool:
-    """يتحقق من تفعيل البروتوكول الموحّد للأحداث عبر راية تشغيل تدريجية."""
-    return os.getenv("CHAT_USE_UNIFIED_EVENT_ENVELOPE", "0") == "1"
-
-
-def _build_chat_event_envelope(
-    *,
-    event_type: ChatEventType,
-    content: str | None = None,
-    details: str | None = None,
-    status_code: int | None = None,
-) -> dict[str, object]:
-    """ينشئ مغلف حدث موحّد ومتوافق مع العقد الرسمي دون حقول فارغة."""
-    envelope = ChatEventEnvelope(
-        type=event_type,
-        payload=ChatEventPayload(
-            content=content,
-            details=details,
-            status_code=status_code,
-        ),
-    )
-    return envelope.model_dump(exclude_none=True)
-
-
-def _normalize_streaming_event(event: object) -> dict[str, object]:
-    """يوحّد حدث البث إلى ChatEventEnvelope عند تفعيل الراية مع إبقاء التوافق الخلفي."""
-    if not _is_unified_chat_event_protocol_enabled():
-        if isinstance(event, dict):
-            return event
-        return {"type": "delta", "payload": {"content": str(event)}}
-
-    if not isinstance(event, dict):
-        return _build_chat_event_envelope(
-            event_type=ChatEventType.ASSISTANT_DELTA,
-            content=str(event),
-        )
-
-    raw_type = str(event.get("type", "assistant_delta"))
-    payload_value = event.get("payload")
-    payload = payload_value if isinstance(payload_value, dict) else {}
-
-    if raw_type in ("status", ChatEventType.STATUS.value):
-        status_value = payload.get("status_code")
-        status_code = status_value if isinstance(status_value, int) else None
-        return _build_chat_event_envelope(event_type=ChatEventType.STATUS, status_code=status_code)
-
-    if raw_type in ("error", "assistant_error"):
-        details = str(payload.get("details", "")) or str(payload.get("content", ""))
-        status_value = payload.get("status_code")
-        status_code = status_value if isinstance(status_value, int) else None
-        return _build_chat_event_envelope(
-            event_type=ChatEventType.ASSISTANT_ERROR,
-            details=details,
-            status_code=status_code,
-        )
-
-    if raw_type == ChatEventType.ASSISTANT_FINAL.value:
-        return _build_chat_event_envelope(
-            event_type=ChatEventType.ASSISTANT_FINAL,
-            content=str(payload.get("content", "")),
-        )
-
-    content = str(payload.get("content", "")) if payload else str(event)
-    return _build_chat_event_envelope(
-        event_type=ChatEventType.ASSISTANT_DELTA,
-        content=content,
-    )
-
-
 # -----------------------------------------------------------------------------
 # DTOs
 # -----------------------------------------------------------------------------
 class AdminUserCountResponse(BaseModel):
     count: int
-
-
-# -----------------------------------------------------------------------------
-# Dependencies
-# -----------------------------------------------------------------------------
 
 
 def get_session_factory() -> Callable[[], AsyncSession]:
@@ -266,7 +191,7 @@ async def chat_stream_ws(
 
     if not actor.is_admin:
         await websocket.send_json(
-            _normalize_streaming_event(
+            normalize_streaming_event(
                 {
                     "type": "error",
                     "payload": {
@@ -285,7 +210,7 @@ async def chat_stream_ws(
             question = str(payload.get("question", "")).strip()
             if not question:
                 await websocket.send_json(
-                    _normalize_streaming_event(
+                    normalize_streaming_event(
                         {"type": "error", "payload": {"details": "Question is required."}}
                     )
                 )
@@ -312,7 +237,7 @@ async def chat_stream_ws(
                 )
             except HTTPException as exc:
                 await websocket.send_json(
-                    _normalize_streaming_event(
+                    normalize_streaming_event(
                         {
                             "type": "error",
                             "payload": {"details": exc.detail, "status_code": exc.status_code},
@@ -322,13 +247,13 @@ async def chat_stream_ws(
                 continue
 
             await websocket.send_json(
-                _normalize_streaming_event(
+                normalize_streaming_event(
                     {"type": "status", "payload": {"status_code": dispatch_result.status_code}}
                 )
             )
 
             async for event in dispatch_result.stream:
-                await websocket.send_json(_normalize_streaming_event(event))
+                await websocket.send_json(normalize_streaming_event(event))
 
     except WebSocketDisconnect:
         logger.info("Admin WebSocket disconnected")
