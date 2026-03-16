@@ -2,25 +2,36 @@ name: Knowledge Ingestion
 
 on:
   push:
+    branches: [main, master]
     paths:
       - 'knowledge_base/**'
-    branches:
-      - main
-      - master
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: knowledge-ingestion-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   ingest:
+    name: Ingest Changed Knowledge Assets
     runs-on: ubuntu-latest
+    timeout-minutes: 20
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # Required to detect changed files
+          fetch-depth: 0
 
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+          cache: pip
+          cache-dependency-path: requirements.txt
 
       - name: Install system dependencies (OCR)
         run: |
@@ -29,8 +40,8 @@ jobs:
 
       - name: Install Python dependencies
         run: |
+          python -m pip install --upgrade pip
           pip install -r requirements.txt
-          # Ensure ingestion script specific deps are present if not in requirements.txt (safeguard)
           pip install pypdf python-docx openpyxl pandas pillow pytesseract httpx
 
       - name: Get changed files
@@ -41,24 +52,22 @@ jobs:
           escape_json: false
           json: true
 
-      - name: Ingest Knowledge
+      - name: Ingest knowledge files
         if: steps.changed-files.outputs.any_changed == 'true'
         env:
           MEMORY_API_URL: ${{ secrets.MEMORY_AGENT_API_URL }}
           CHANGED_FILES: ${{ steps.changed-files.outputs.all_changed_files }}
         run: |
           if [ -z "$MEMORY_API_URL" ]; then
-            echo "::warning::MEMORY_AGENT_API_URL secret is not set. Skipping upload."
-            echo "To enable auto-ingestion, set the MEMORY_AGENT_API_URL secret in repository settings."
+            echo "::warning::MEMORY_AGENT_API_URL secret is not set. Running in dry-run mode."
             DRY_RUN_FLAG="--dry-run"
           else
             DRY_RUN_FLAG=""
           fi
 
-          # Use Python to handle the JSON array of files safely (handles spaces/special chars)
           python3 -c "
-          import os
           import json
+          import os
           import subprocess
           import sys
 
@@ -67,20 +76,26 @@ jobs:
           dry_run = '$DRY_RUN_FLAG'
 
           for file_path in files:
-              print(f'---------------------------------------------------')
+              print('---------------------------------------------------')
               print(f'🚀 Processing: {file_path}')
-              if os.path.exists(file_path):
-                  cmd = ['python', 'scripts/ingest_knowledge.py', file_path]
-                  if api_url:
-                      cmd.extend(['--url', api_url])
-                  if dry_run:
-                      cmd.append(dry_run)
 
-                  try:
-                      subprocess.run(cmd, check=True)
-                  except subprocess.CalledProcessError:
-                      print(f'❌ Failed to ingest {file_path}')
-                      sys.exit(1)
-              else:
+              if not os.path.exists(file_path):
                   print(f'⚠️ File {file_path} was deleted or does not exist.')
+                  continue
+
+              cmd = ['python', 'scripts/ingest_knowledge.py', file_path]
+              if api_url:
+                  cmd.extend(['--url', api_url])
+              if dry_run:
+                  cmd.append(dry_run)
+
+              try:
+                  subprocess.run(cmd, check=True)
+              except subprocess.CalledProcessError:
+                  print(f'❌ Failed to ingest {file_path}')
+                  sys.exit(1)
           "
+
+      - name: No changes summary
+        if: steps.changed-files.outputs.any_changed != 'true'
+        run: echo "ℹ️ No changes detected under knowledge_base/."

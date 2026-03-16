@@ -1,333 +1,110 @@
-# =============================================================================
-# Comprehensive Testing CI/CD Pipeline
-# =============================================================================
-# Enforces 100% coverage and runs all test types
-# Blocks merge if coverage drops below 100%
-# DISABLED: Only runs manually to save GitHub Actions minutes
-
 name: 🧪 Comprehensive Testing
 
 on:
-  # Disabled automatic triggers to save GitHub Actions minutes
-  # push:
-  #   branches: ["main", "develop", "feature/*"]
-  # pull_request:
-  #   branches: ["main", "develop"]
   workflow_dispatch:
 
 permissions:
   contents: read
-  checks: write
-  pull-requests: write
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: comprehensive-testing-${{ github.ref }}
   cancel-in-progress: true
 
 env:
-  PYTHON_VERSION: "3.12"
-  COVERAGE_THRESHOLD: "100"
+  PYTHON_VERSION: '3.12'
+  DATABASE_URL: "sqlite+aiosqlite:///:memory:"
+  SECRET_KEY: "test-secret-key-for-ci"
+  ENVIRONMENT: "testing"
+  LLM_MOCK_MODE: '1'
+  SUPABASE_URL: "https://dummy.supabase.co"
+  SUPABASE_SERVICE_ROLE_KEY: "dummy-key-for-ci"
 
 jobs:
-  # ===========================================================================
-  # Unit Tests with 100% Coverage Requirement
-  # ===========================================================================
-  unit-tests:
-    name: 🧪 Unit Tests (100% Coverage)
+  quality-gate:
+    name: Enterprise Quality Gate
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
+
+    strategy:
+      fail-fast: false
+      matrix:
+        suite:
+          - name: unit
+            path: tests
+            marker: 'not fuzz and not security'
+            extra_args: '--cov=app --cov-report=xml:coverage.xml --cov-report=term-missing --junit-xml=unit-junit.xml'
+          - name: property
+            path: tests/property_based
+            marker: ''
+            extra_args: '--hypothesis-show-statistics --hypothesis-seed=0 --junit-xml=property-junit.xml'
+          - name: fuzzing
+            path: tests/fuzzing
+            marker: 'fuzz'
+            extra_args: '--timeout=300 --junit-xml=fuzzing-junit.xml'
+          - name: integration
+            path: tests/integration
+            marker: ''
+            extra_args: '--junit-xml=integration-junit.xml'
+          - name: security
+            path: tests/security
+            marker: 'security'
+            extra_args: '--junit-xml=security-junit.xml'
 
     steps:
-      - name: 📥 Checkout
+      - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: 🐍 Setup Python
+      - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
-          cache: "pip"
+          cache: pip
+          cache-dependency-path: requirements-test.txt
 
-      - name: 📦 Install Dependencies
+      - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          pip install -r requirements-test.txt
 
-      - name: 🧪 Run Unit Tests
-        env:
-          DATABASE_URL: "sqlite+aiosqlite:///:memory:"
-          SECRET_KEY: "test-secret-key"
-          ENVIRONMENT: "testing"
-          LLM_MOCK_MODE: "1"
-          SUPABASE_URL: "https://dummy.supabase.co"
-          SUPABASE_SERVICE_ROLE_KEY: "dummy-key-for-ci"
+      - name: Execute ${{ matrix.suite.name }} suite
+        shell: bash
         run: |
-          python -m pytest tests/ \
-            -v \
-            --cov=app \
-            --cov-report=term-missing \
-            --cov-report=xml:coverage.xml \
-            --cov-report=html:htmlcov \
-            --cov-fail-under=${{ env.COVERAGE_THRESHOLD }} \
-            --junit-xml=junit.xml \
-            -m "not fuzz" \
-            || true
+          if [ ! -d "${{ matrix.suite.path }}" ]; then
+            echo "ℹ️ Directory ${{ matrix.suite.path }} not found. Skipping suite=${{ matrix.suite.name }}."
+            exit 0
+          fi
 
-      - name: 📊 Upload Coverage Report
-        uses: actions/upload-artifact@v4
+          MARKER_ARGS=""
+          if [ -n "${{ matrix.suite.marker }}" ]; then
+            MARKER_ARGS="-m \"${{ matrix.suite.marker }}\""
+          fi
+
+          # shellcheck disable=SC2086
+          eval "python -m pytest ${{ matrix.suite.path }} -v ${MARKER_ARGS} ${{ matrix.suite.extra_args }}"
+
+      - name: Upload suite artifacts
         if: always()
+        uses: actions/upload-artifact@v4
         with:
-          name: coverage-report
+          name: test-artifacts-${{ matrix.suite.name }}
           path: |
+            *-junit.xml
             coverage.xml
-            htmlcov/
-          retention-days: 30
+          if-no-files-found: ignore
+          retention-days: 14
 
-      - name: 📈 Coverage Comment
-        if: github.event_name == 'pull_request'
-        uses: py-cov-action/python-coverage-comment-action@v3
-        with:
-          GITHUB_TOKEN: ${{ github.token }}
-          MINIMUM_GREEN: 100
-          MINIMUM_ORANGE: 90
-
-  # ===========================================================================
-  # Property-Based Tests
-  # ===========================================================================
-  property-tests:
-    name: 🔬 Property-Based Tests
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-
-    steps:
-      - name: 📥 Checkout
-        uses: actions/checkout@v4
-
-      - name: 🐍 Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-          cache: "pip"
-
-      - name: 📦 Install Dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-
-      - name: 🔬 Run Property-Based Tests
-        env:
-          DATABASE_URL: "sqlite+aiosqlite:///:memory:"
-          SECRET_KEY: "test-secret-key"
-          ENVIRONMENT: "testing"
-          SUPABASE_URL: "https://dummy.supabase.co"
-          SUPABASE_SERVICE_ROLE_KEY: "dummy-key-for-ci"
-        run: |
-          python -m pytest tests/property_based/ \
-            -v \
-            --hypothesis-show-statistics \
-            --hypothesis-seed=0 \
-            || true
-
-  # ===========================================================================
-  # Fuzzing Tests
-  # ===========================================================================
-  fuzzing-tests:
-    name: 💥 Fuzzing Tests
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-
-    steps:
-      - name: 📥 Checkout
-        uses: actions/checkout@v4
-
-      - name: 🐍 Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-          cache: "pip"
-
-      - name: 📦 Install Dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-
-      - name: 💥 Run Fuzzing Tests
-        env:
-          DATABASE_URL: "sqlite+aiosqlite:///:memory:"
-          SECRET_KEY: "test-secret-key"
-          ENVIRONMENT: "testing"
-          SUPABASE_URL: "https://dummy.supabase.co"
-          SUPABASE_SERVICE_ROLE_KEY: "dummy-key-for-ci"
-        run: |
-          python -m pytest tests/fuzzing/ \
-            -v \
-            -m fuzz \
-            --timeout=300 \
-            || true
-
-  # ===========================================================================
-  # Integration Tests
-  # ===========================================================================
-  integration-tests:
-    name: 🔗 Integration Tests
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-
-    steps:
-      - name: 📥 Checkout
-        uses: actions/checkout@v4
-
-      - name: 🐍 Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-          cache: "pip"
-
-      - name: 📦 Install Dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-
-      - name: 🔗 Run Integration Tests
-        env:
-          DATABASE_URL: "sqlite+aiosqlite:///:memory:"
-          SECRET_KEY: "test-secret-key"
-          ENVIRONMENT: "testing"
-          SUPABASE_URL: "https://dummy.supabase.co"
-          SUPABASE_SERVICE_ROLE_KEY: "dummy-key-for-ci"
-        run: |
-          python -m pytest tests/integration/ \
-            -v \
-            --junit-xml=integration-junit.xml \
-            || true
-
-      - name: 📊 Upload Integration Results
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: integration-results
-          path: integration-junit.xml
-
-  # ===========================================================================
-  # Security Tests
-  # ===========================================================================
-  security-tests:
-    name: 🔒 Security Tests
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-
-    steps:
-      - name: 📥 Checkout
-        uses: actions/checkout@v4
-
-      - name: 🐍 Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-          cache: "pip"
-
-      - name: 📦 Install Dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-
-      - name: 🔒 Run Security Tests
-        env:
-          DATABASE_URL: "sqlite+aiosqlite:///:memory:"
-          SECRET_KEY: "test-secret-key"
-          ENVIRONMENT: "testing"
-          SUPABASE_URL: "https://dummy.supabase.co"
-          SUPABASE_SERVICE_ROLE_KEY: "dummy-key-for-ci"
-        run: |
-          python -m pytest tests/security/ \
-            -v \
-            -m security \
-            --junit-xml=security-junit.xml \
-            || true
-
-      - name: 📊 Upload Security Results
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: security-results
-          path: security-junit.xml
-
-  # ===========================================================================
-  # Mutation Testing
-  # ===========================================================================
-  mutation-tests:
-    name: 🧬 Mutation Testing
-    runs-on: ubuntu-latest
-    timeout-minutes: 60
-    continue-on-error: true  # Don't fail build on mutation issues initially
-
-    steps:
-      - name: 📥 Checkout
-        uses: actions/checkout@v4
-
-      - name: 🐍 Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-          cache: "pip"
-
-      - name: 📦 Install Dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-
-      - name: 🧬 Run Mutation Tests
-        env:
-          DATABASE_URL: "sqlite+aiosqlite:///:memory:"
-          SECRET_KEY: "test-secret-key"
-          ENVIRONMENT: "testing"
-          SUPABASE_URL: "https://dummy.supabase.co"
-          SUPABASE_SERVICE_ROLE_KEY: "dummy-key-for-ci"
-        run: |
-          # Run mutation testing on critical modules
-          echo "⏭️ Skipping mutation tests in CI (too time-consuming)"
-          echo "Run locally with: mutmut run --paths-to-mutate=app/validators/"
-
-      - name: 📊 Upload Mutation Results
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: mutation-results
-          path: |
-            mutation-results.txt
-            mutation-html/
-
-  # ===========================================================================
-  # Final Verification
-  # ===========================================================================
-  verify:
+  final-verification:
     name: ✅ Final Verification
     runs-on: ubuntu-latest
-    needs: [unit-tests, property-tests, fuzzing-tests, integration-tests, security-tests]
-    if: always()
+    needs: [quality-gate]
+    if: always() && !cancelled()
 
     steps:
-      - name: 🎯 Check All Jobs
+      - name: Evaluate matrix outcome
         run: |
-          echo "🔍 Unit Tests: ${{ needs.unit-tests.result }}"
-          echo "🔬 Property Tests: ${{ needs.property-tests.result }}"
-          echo "💥 Fuzzing Tests: ${{ needs.fuzzing-tests.result }}"
-          echo "🔗 Integration Tests: ${{ needs.integration-tests.result }}"
-          echo "🔒 Security Tests: ${{ needs.security-tests.result }}"
-
-          # Allow tests to fail gracefully - focus on code quality
-          echo "✅ Test suite completed!"
-          echo "🚀 Ready for merge!"
-
-      - name: 📝 Summary
-        run: |
-          echo "## 🎉 Test Summary" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "| Test Type | Status |" >> $GITHUB_STEP_SUMMARY
-          echo "|-----------|--------|" >> $GITHUB_STEP_SUMMARY
-          echo "| Unit Tests | ✅ |" >> $GITHUB_STEP_SUMMARY
-          echo "| Property Tests | ✅ |" >> $GITHUB_STEP_SUMMARY
-          echo "| Fuzzing Tests | ✅ |" >> $GITHUB_STEP_SUMMARY
-          echo "| Integration Tests | ✅ |" >> $GITHUB_STEP_SUMMARY
-          echo "| Security Tests | ✅ |" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "✅ All workflows completed successfully!" >> $GITHUB_STEP_SUMMARY
+          echo "quality-gate=${{ needs.quality-gate.result }}"
+          if [ "${{ needs.quality-gate.result }}" != "success" ]; then
+            echo "❌ Comprehensive quality gate failed"
+            exit 1
+          fi
+          echo "✅ Comprehensive quality gate passed"
