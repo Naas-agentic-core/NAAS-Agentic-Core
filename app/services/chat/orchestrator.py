@@ -40,6 +40,7 @@ from app.services.chat.handlers.strategy_handlers import (
 from app.services.chat.intent_detector import ChatIntent, IntentDetector
 from app.services.chat.ports import IntentDetectorPort
 from app.services.chat.orchestration_rollout import (
+    build_rollout_trace_payload,
     get_orchestration_rollout_decision,
     get_rollout_runtime_snapshot,
 )
@@ -248,12 +249,10 @@ class ChatOrchestrator:
             context = {
                 "intent": intent_result.intent,
                 "system_context": system_context,
-                "rollout": {
-                    "reason": rollout_decision.reason,
-                    "canary_percent": rollout_decision.canary_percent,
-                    "bucket": rollout_decision.bucket,
-                    "stage": runtime_snapshot.stage,
-                },
+                "rollout": build_rollout_trace_payload(
+                    decision=rollout_decision,
+                    snapshot=runtime_snapshot,
+                ),
             }
 
             full_response_buffer = []

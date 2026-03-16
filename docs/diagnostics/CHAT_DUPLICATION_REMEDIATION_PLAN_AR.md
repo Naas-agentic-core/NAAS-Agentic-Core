@@ -120,3 +120,6 @@
 - تم اعتماد Snapshot تشغيلي (`get_rollout_runtime_snapshot`) لعرض حالة البوابات/المرحلة/النسبة وقت التنفيذ.
 - أولوية الحسم: `CHAT_ORCHESTRATOR_CANARY_STAGE` يتقدم على `CHAT_ORCHESTRATOR_CANARY_PERCENT`، وعند مرحلة غير صالحة يتم الرجوع للنسبة الرقمية.
 - تم تمرير بيانات قرار الـrollout داخل context المفوض إلى `orchestrator_service` لدعم التتبع الطرفي End-to-End.
+
+- تم توحيد بناء حمولة التتبع عبر تابع مخصص `build_rollout_trace_payload` لتقليل التكرار وضمان ثبات contract الداخلي.
+- تمت إضافة اختبار تكاملي للوحدة يثبت فعليًا وصول `rollout` context إلى `orchestrator_client.chat_with_agent` أثناء التفويض.

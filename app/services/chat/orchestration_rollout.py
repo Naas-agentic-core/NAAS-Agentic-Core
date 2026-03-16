@@ -71,8 +71,6 @@ def _rollout_bucket(identity: str) -> int:
     return int(digest[:8], 16) % 100
 
 
-
-
 def _resolve_stage() -> RolloutStage | None:
     """يُعيد مرحلة الـ canary المعلنة إذا كانت صالحة، وإلا None."""
     stage_raw = os.getenv("CHAT_ORCHESTRATOR_CANARY_STAGE", "").strip().lower()
@@ -89,6 +87,7 @@ def _resolve_stage() -> RolloutStage | None:
     if stage_raw == "full":
         return "full"
     return None
+
 
 def _resolve_canary_percent() -> int:
     """يحدد نسبة التفعيل من المرحلة المعلنة أو من النسبة الرقمية المباشرة."""
@@ -129,6 +128,20 @@ def get_rollout_runtime_snapshot() -> RolloutRuntimeSnapshot:
         stage=stage,
         canary_percent=_resolve_canary_percent(),
     )
+
+
+def build_rollout_trace_payload(
+    *,
+    decision: RolloutDecision,
+    snapshot: RolloutRuntimeSnapshot,
+) -> dict[str, str | int | None]:
+    """يبني حمولة تتبع موحّدة لتمرير قرار الـrollout بين حدود الخدمات."""
+    return {
+        "reason": decision.reason,
+        "canary_percent": decision.canary_percent,
+        "bucket": decision.bucket,
+        "stage": snapshot.stage,
+    }
 
 
 def get_orchestration_rollout_decision(*, user_id: int, is_agent_intent: bool) -> RolloutDecision:
