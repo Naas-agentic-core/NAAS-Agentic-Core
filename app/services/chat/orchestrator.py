@@ -39,6 +39,7 @@ from app.services.chat.handlers.strategy_handlers import (
 )
 from app.services.chat.intent_detector import ChatIntent, IntentDetector
 from app.services.chat.ports import IntentDetectorPort
+from app.services.chat.orchestration_rollout import should_delegate_to_orchestrator
 from app.services.chat.tools import ToolRegistry
 from app.services.overmind.identity import OvermindIdentity
 
@@ -214,7 +215,12 @@ class ChatOrchestrator:
             ChatIntent.CONTENT_RETRIEVAL,
         )
 
-        if is_agent_intent:
+        should_delegate = should_delegate_to_orchestrator(
+            user_id=user_id,
+            is_agent_intent=is_agent_intent,
+        )
+
+        if should_delegate:
             logger.info(
                 f"Delegating intent {intent_result.intent} to OrchestratorAgent (Microservice)",
                 extra={"user_id": user_id},
@@ -300,6 +306,12 @@ class ChatOrchestrator:
                 yield "عذرًا، حدث خطأ أثناء الاتصال بالوكيل الذكي."
 
             return
+
+        if is_agent_intent and not should_delegate:
+            logger.info(
+                "Canary kept request on monolith path for compatibility",
+                extra={"user_id": user_id},
+            )
 
         # 2. التحقق من الذاكرة الدلالية (Semantic Cache) - للنوايا العادية
         # Mission Complex MUST bypass cache to ensure deterministic execution
