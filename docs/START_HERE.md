@@ -16,6 +16,8 @@
    - `docs/quality/testing.md`
 3. استعرض خريطة المستودع الحالية:
    - `docs/REPOSITORY_MAP.md`
+4. اقرأ دليل التوجيه العملي للمستودع:
+   - `docs/guides/NEWCOMER_CODEBASE_MAP.md`
 
 ## 3) تشغيل المشروع محليًا
 
