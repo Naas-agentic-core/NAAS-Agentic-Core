@@ -104,3 +104,9 @@
   - قيمة وسطية: Canary حتمي حسب `user_id`.
 - تم ربط القرار فعليًا داخل `ChatOrchestrator.process` بحيث يصبح التحويل قابلًا للإرجاع فورًا بدون كسر الواجهات.
 - تمت إضافة اختبارات وحدة لتثبيت سلوك canary والتحقق من الحتمية.
+
+- تم تحصين التفعيل التدريجي ببوابات صريحة قبل أي تحويل:
+  - `CHAT_ORCHESTRATOR_ROLLOUT_ENABLED=1`
+  - `CHAT_ORCHESTRATOR_PARITY_VERIFIED=1`
+  - `CHAT_ORCHESTRATOR_CAPABILITY_LEVEL` ضمن `{parity_ready, production_eligible}`
+- السلوك الافتراضي أصبح **Legacy-Safe** (النسبة الافتراضية `0%`) لمنع cutover عرضي في بيئات غير مهيأة.
