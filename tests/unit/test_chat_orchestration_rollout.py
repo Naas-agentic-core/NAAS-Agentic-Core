@@ -12,6 +12,18 @@ def _enable_rollout_guards(monkeypatch) -> None:
     monkeypatch.setenv("CHAT_ORCHESTRATOR_CAPABILITY_LEVEL", "parity_ready")
 
 
+def test_runtime_snapshot_reflects_environment(monkeypatch) -> None:
+    """يعرض Snapshot قيم البيئة الفعلية لتسهيل المراقبة التشغيلية."""
+    _enable_rollout_guards(monkeypatch)
+    monkeypatch.setenv("CHAT_ORCHESTRATOR_CANARY_STAGE", "canary_5")
+    snapshot = orchestration_rollout.get_rollout_runtime_snapshot()
+    assert snapshot.rollout_enabled is True
+    assert snapshot.parity_verified is True
+    assert snapshot.capability_level == "parity_ready"
+    assert snapshot.stage == "canary_5"
+    assert snapshot.canary_percent == 5
+
+
 def test_delegate_disabled_for_non_agent_intent(monkeypatch) -> None:
     """يمنع التفويض عندما لا تكون النية ضمن فئة مهام الوكلاء."""
     _enable_rollout_guards(monkeypatch)
@@ -115,6 +127,30 @@ def test_delegate_supports_stage_based_rollout(monkeypatch) -> None:
     monkeypatch.delenv("CHAT_ORCHESTRATOR_CANARY_PERCENT", raising=False)
     decision = orchestration_rollout.get_orchestration_rollout_decision(
         user_id=7,
+        is_agent_intent=True,
+    )
+    assert decision.canary_percent == 25
+
+
+def test_stage_has_priority_over_percent(monkeypatch) -> None:
+    """يقدّم المرحلة المعلنة على النسبة الرقمية عند تعارض القيم."""
+    _enable_rollout_guards(monkeypatch)
+    monkeypatch.setenv("CHAT_ORCHESTRATOR_CANARY_STAGE", "canary_1")
+    monkeypatch.setenv("CHAT_ORCHESTRATOR_CANARY_PERCENT", "100")
+    decision = orchestration_rollout.get_orchestration_rollout_decision(
+        user_id=1,
+        is_agent_intent=True,
+    )
+    assert decision.canary_percent == 1
+
+
+def test_invalid_stage_falls_back_to_percent(monkeypatch) -> None:
+    """يرجع للنسبة الرقمية إذا كانت المرحلة غير صالحة."""
+    _enable_rollout_guards(monkeypatch)
+    monkeypatch.setenv("CHAT_ORCHESTRATOR_CANARY_STAGE", "unknown")
+    monkeypatch.setenv("CHAT_ORCHESTRATOR_CANARY_PERCENT", "25")
+    decision = orchestration_rollout.get_orchestration_rollout_decision(
+        user_id=99,
         is_agent_intent=True,
     )
     assert decision.canary_percent == 25

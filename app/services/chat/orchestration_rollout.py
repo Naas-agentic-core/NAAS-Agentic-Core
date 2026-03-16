@@ -5,9 +5,30 @@ from __future__ import annotations
 import hashlib
 import os
 from dataclasses import dataclass
+from typing import Literal, TypeAlias
 
-_ALLOWED_CAPABILITY_LEVELS = {"parity_ready", "production_eligible"}
-_STAGE_TO_PERCENT: dict[str, int] = {
+AllowedCapabilityLevel: TypeAlias = Literal["parity_ready", "production_eligible"]
+RolloutReason: TypeAlias = Literal[
+    "non_agent_intent",
+    "rollout_disabled",
+    "parity_not_verified",
+    "capability_not_ready",
+    "canary_off",
+    "canary_full",
+    "canary_selected",
+    "canary_not_selected",
+]
+RolloutStage: TypeAlias = Literal[
+    "off",
+    "canary_1",
+    "canary_5",
+    "canary_25",
+    "canary_50",
+    "full",
+]
+
+_ALLOWED_CAPABILITY_LEVELS: set[AllowedCapabilityLevel] = {"parity_ready", "production_eligible"}
+_STAGE_TO_PERCENT: dict[RolloutStage, int] = {
     "off": 0,
     "canary_1": 1,
     "canary_5": 5,
@@ -22,9 +43,20 @@ class RolloutDecision:
     """يمثل قرار التوجيه مع سبب صريح لدعم المراقبة والتحليل."""
 
     should_delegate: bool
-    reason: str
+    reason: RolloutReason
     canary_percent: int
     bucket: int | None
+
+
+@dataclass(frozen=True, slots=True)
+class RolloutRuntimeSnapshot:
+    """يعرض حالة إعدادات التفعيل الحالية لتسهيل التشخيص والقياس التشغيلي."""
+
+    rollout_enabled: bool
+    parity_verified: bool
+    capability_level: str
+    stage: str
+    canary_percent: int
 
 
 def _read_env_flag(name: str, *, default: bool = False) -> bool:
@@ -39,11 +71,30 @@ def _rollout_bucket(identity: str) -> int:
     return int(digest[:8], 16) % 100
 
 
+
+
+def _resolve_stage() -> RolloutStage | None:
+    """يُعيد مرحلة الـ canary المعلنة إذا كانت صالحة، وإلا None."""
+    stage_raw = os.getenv("CHAT_ORCHESTRATOR_CANARY_STAGE", "").strip().lower()
+    if stage_raw == "off":
+        return "off"
+    if stage_raw == "canary_1":
+        return "canary_1"
+    if stage_raw == "canary_5":
+        return "canary_5"
+    if stage_raw == "canary_25":
+        return "canary_25"
+    if stage_raw == "canary_50":
+        return "canary_50"
+    if stage_raw == "full":
+        return "full"
+    return None
+
 def _resolve_canary_percent() -> int:
     """يحدد نسبة التفعيل من المرحلة المعلنة أو من النسبة الرقمية المباشرة."""
-    stage = os.getenv("CHAT_ORCHESTRATOR_CANARY_STAGE", "").strip().lower()
-    if stage:
-        return _STAGE_TO_PERCENT.get(stage, 0)
+    stage = _resolve_stage()
+    if stage is not None:
+        return _STAGE_TO_PERCENT[stage]
 
     raw = os.getenv("CHAT_ORCHESTRATOR_CANARY_PERCENT", "0")
     try:
@@ -53,7 +104,7 @@ def _resolve_canary_percent() -> int:
     return max(0, min(100, numeric))
 
 
-def _guard_failure_reason() -> str | None:
+def _guard_failure_reason() -> RolloutReason | None:
     """يعيد سبب إغلاق بوابات الجاهزية، أو None عند الجاهزية الكاملة."""
     if not _read_env_flag("CHAT_ORCHESTRATOR_ROLLOUT_ENABLED", default=False):
         return "rollout_disabled"
@@ -66,6 +117,18 @@ def _guard_failure_reason() -> str | None:
         return "capability_not_ready"
 
     return None
+
+
+def get_rollout_runtime_snapshot() -> RolloutRuntimeSnapshot:
+    """يبني Snapshot لحالة إعدادات التفعيل الحالية لمراقبة الـ rollout."""
+    stage = _resolve_stage() or ""
+    return RolloutRuntimeSnapshot(
+        rollout_enabled=_read_env_flag("CHAT_ORCHESTRATOR_ROLLOUT_ENABLED", default=False),
+        parity_verified=_read_env_flag("CHAT_ORCHESTRATOR_PARITY_VERIFIED", default=False),
+        capability_level=os.getenv("CHAT_ORCHESTRATOR_CAPABILITY_LEVEL", "stub").strip().lower(),
+        stage=stage,
+        canary_percent=_resolve_canary_percent(),
+    )
 
 
 def get_orchestration_rollout_decision(*, user_id: int, is_agent_intent: bool) -> RolloutDecision:

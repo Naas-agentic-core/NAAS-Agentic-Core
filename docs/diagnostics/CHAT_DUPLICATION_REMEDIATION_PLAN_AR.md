@@ -117,3 +117,6 @@
   - bucket المستخدم عند التفعيل الجزئي `bucket`.
 - تمت إضافة دعم مراحل تشغيل معيارية عبر `CHAT_ORCHESTRATOR_CANARY_STAGE` بالقيم:
   `off`, `canary_1`, `canary_5`, `canary_25`, `canary_50`, `full`.
+- تم اعتماد Snapshot تشغيلي (`get_rollout_runtime_snapshot`) لعرض حالة البوابات/المرحلة/النسبة وقت التنفيذ.
+- أولوية الحسم: `CHAT_ORCHESTRATOR_CANARY_STAGE` يتقدم على `CHAT_ORCHESTRATOR_CANARY_PERCENT`، وعند مرحلة غير صالحة يتم الرجوع للنسبة الرقمية.
+- تم تمرير بيانات قرار الـrollout داخل context المفوض إلى `orchestrator_service` لدعم التتبع الطرفي End-to-End.
