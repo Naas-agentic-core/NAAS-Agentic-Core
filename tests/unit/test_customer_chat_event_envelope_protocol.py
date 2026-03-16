@@ -7,7 +7,9 @@ import pytest
 from app.services.chat import event_protocol
 
 
-def test_normalize_streaming_event_legacy_protocol_for_string(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_normalize_streaming_event_legacy_protocol_for_string(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """يتحقق من بقاء السلوك التاريخي عند تعطيل راية البروتوكول الموحّد."""
     monkeypatch.setenv("CHAT_USE_UNIFIED_EVENT_ENVELOPE", "0")
 
@@ -16,7 +18,9 @@ def test_normalize_streaming_event_legacy_protocol_for_string(monkeypatch: pytes
     assert event == {"type": "delta", "payload": {"content": "hello"}}
 
 
-def test_normalize_streaming_event_unified_maps_legacy_delta(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_normalize_streaming_event_unified_maps_legacy_delta(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """يتحقق من تحويل حدث delta القديم إلى assistant_delta ضمن ChatEventEnvelope."""
     monkeypatch.setenv("CHAT_USE_UNIFIED_EVENT_ENVELOPE", "1")
 
