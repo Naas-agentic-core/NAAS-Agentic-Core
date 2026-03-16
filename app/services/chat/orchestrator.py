@@ -39,7 +39,10 @@ from app.services.chat.handlers.strategy_handlers import (
 )
 from app.services.chat.intent_detector import ChatIntent, IntentDetector
 from app.services.chat.ports import IntentDetectorPort
-from app.services.chat.orchestration_rollout import get_orchestration_rollout_decision
+from app.services.chat.orchestration_rollout import (
+    get_orchestration_rollout_decision,
+    get_rollout_runtime_snapshot,
+)
 from app.services.chat.tools import ToolRegistry
 from app.services.overmind.identity import OvermindIdentity
 
@@ -241,10 +244,16 @@ class ChatOrchestrator:
             system_context = self._build_overmind_system_context()
 
             # DELEGATION: Call Microservice
+            runtime_snapshot = get_rollout_runtime_snapshot()
             context = {
                 "intent": intent_result.intent,
                 "system_context": system_context,
-                # We can pass more context if needed
+                "rollout": {
+                    "reason": rollout_decision.reason,
+                    "canary_percent": rollout_decision.canary_percent,
+                    "bucket": rollout_decision.bucket,
+                    "stage": runtime_snapshot.stage,
+                },
             }
 
             full_response_buffer = []
