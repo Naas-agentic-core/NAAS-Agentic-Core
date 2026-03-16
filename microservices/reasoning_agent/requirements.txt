@@ -9,7 +9,7 @@ aiosqlite>=0.17.0
 openai==1.55.0
 langgraph
 dspy
-litellm==1.50.0
+litellm==1.61.15
 llama-index-core>=0.10.0
 llama-index-llms-openai>=0.1.0
 tenacity>=8.0.0
