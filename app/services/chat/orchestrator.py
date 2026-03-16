@@ -39,7 +39,7 @@ from app.services.chat.handlers.strategy_handlers import (
 )
 from app.services.chat.intent_detector import ChatIntent, IntentDetector
 from app.services.chat.ports import IntentDetectorPort
-from app.services.chat.orchestration_rollout import should_delegate_to_orchestrator
+from app.services.chat.orchestration_rollout import get_orchestration_rollout_decision
 from app.services.chat.tools import ToolRegistry
 from app.services.overmind.identity import OvermindIdentity
 
@@ -215,9 +215,20 @@ class ChatOrchestrator:
             ChatIntent.CONTENT_RETRIEVAL,
         )
 
-        should_delegate = should_delegate_to_orchestrator(
+        rollout_decision = get_orchestration_rollout_decision(
             user_id=user_id,
             is_agent_intent=is_agent_intent,
+        )
+        should_delegate = rollout_decision.should_delegate
+
+        logger.info(
+            "chat_orchestration_rollout_decision intent=%s user_id=%s delegate=%s reason=%s canary=%s bucket=%s",
+            intent_result.intent,
+            user_id,
+            should_delegate,
+            rollout_decision.reason,
+            rollout_decision.canary_percent,
+            rollout_decision.bucket,
         )
 
         if should_delegate:
@@ -309,7 +320,10 @@ class ChatOrchestrator:
 
         if is_agent_intent and not should_delegate:
             logger.info(
-                "Canary kept request on monolith path for compatibility",
+                "Canary kept request on monolith path for compatibility: reason=%s canary=%s bucket=%s",
+                rollout_decision.reason,
+                rollout_decision.canary_percent,
+                rollout_decision.bucket,
                 extra={"user_id": user_id},
             )
 

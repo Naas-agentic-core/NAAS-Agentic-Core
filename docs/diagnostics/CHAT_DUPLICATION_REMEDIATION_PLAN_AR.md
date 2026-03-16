@@ -110,3 +110,10 @@
   - `CHAT_ORCHESTRATOR_PARITY_VERIFIED=1`
   - `CHAT_ORCHESTRATOR_CAPABILITY_LEVEL` ضمن `{parity_ready, production_eligible}`
 - السلوك الافتراضي أصبح **Legacy-Safe** (النسبة الافتراضية `0%`) لمنع cutover عرضي في بيئات غير مهيأة.
+- تم ترقية آلية القرار إلى نموذج احترافي مهيكل (`RolloutDecision`) يتضمن:
+  - قرار التحويل `should_delegate`.
+  - سبب معياري `reason` (مثل: `parity_not_verified`, `canary_not_selected`).
+  - نسبة canary الفعلية `canary_percent`.
+  - bucket المستخدم عند التفعيل الجزئي `bucket`.
+- تمت إضافة دعم مراحل تشغيل معيارية عبر `CHAT_ORCHESTRATOR_CANARY_STAGE` بالقيم:
+  `off`, `canary_1`, `canary_5`, `canary_25`, `canary_50`, `full`.
