@@ -1,42 +1,53 @@
 name: 🔍 Structure Validation (Critical)
 
 on:
-  push:
-    branches: [ main, develop, 'copilot/**' ]
   pull_request:
-    branches: [ main, develop ]
+    branches: [main, develop]
+  push:
+    branches: [main, develop, 'copilot/**']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: structure-validation-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYTHON_VERSION: '3.12'
 
 jobs:
   validate-structure:
     name: Validate Service Structure
     runs-on: ubuntu-latest
-    
+    timeout-minutes: 15
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-      
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.12'
-      
-      - name: Run Structure Validation
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: requirements-test.txt
+
+      - name: Install minimal tooling
         run: |
-          python scripts/validate_structure.py || echo "⚠️ Structure validation completed - check warnings above"
-      
-      - name: Report Status
-        if: failure()
-        run: |
-          echo "❌ CRITICAL: Structure validation failed!"
-          echo "This indicates methods may be defined outside their classes."
-          echo "Please review the errors above and fix class indentation."
-          exit 1
+          python -m pip install --upgrade pip
+          pip install -r requirements-test.txt
+
+      - name: Run structure validation
+        run: python scripts/validate_structure.py
 
   validate-integration:
     name: Integration Tests (E2E Chat)
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     needs: validate-structure
-    
+
     services:
       postgres:
         image: postgres:16
@@ -51,41 +62,34 @@ jobs:
           --health-retries 5
         ports:
           - 5432:5432
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-      
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.12'
-      
-      - name: Install dependencies
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: requirements-test.txt
+
+      - name: Install integration test dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install pytest pytest-asyncio pytest-cov
-      
-      - name: Set up test database
+          pip install -r requirements-test.txt
+
+      - name: Run integration tests
         env:
           DATABASE_URL: postgresql://test_user:test_pass@localhost:5432/test_db
-          SECRET_KEY: "test-secret-key"
-          ENVIRONMENT: "testing"
-          LLM_MOCK_MODE: "1"
-          SUPABASE_URL: "https://dummy.supabase.co"
-          SUPABASE_SERVICE_ROLE_KEY: "dummy-key-for-ci"
+          SECRET_KEY: test-secret-key-for-ci
+          ENVIRONMENT: testing
+          LLM_MOCK_MODE: '1'
+          SUPABASE_URL: https://dummy.supabase.co
+          SUPABASE_SERVICE_ROLE_KEY: dummy-key-for-ci
         run: |
           if [ -f "tests/integration/test_chat_e2e.py" ]; then
-            python -m pytest tests/integration/test_chat_e2e.py -v --tb=short || echo "⚠️ Integration tests completed with warnings"
+            python -m pytest tests/integration/test_chat_e2e.py -v --tb=short
           else
-            echo "⚠️ Integration test file not found - skipping"
+            echo "ℹ️ tests/integration/test_chat_e2e.py not found, skipping targeted E2E suite."
           fi
-      
-      - name: Report Status
-        if: failure()
-        run: |
-          echo "❌ CRITICAL: Integration tests failed!"
-          echo "The chat functionality is not working end-to-end."
-          echo "This could indicate AttributeError or missing methods."
-          exit 1
