@@ -117,7 +117,8 @@ class SupervisorNode:
     def __init__(self):
         self.dspy_classifier = dspy.ChainOfThought(AdminIntentClassifier)
 
-    def __call__(self, state: AgentState) -> dict:
+    async def __call__(self, state: AgentState) -> dict:
+        """يوجّه النية بشكل غير حاجب للحلقة الحدثية مع أولوية للحراس الحتمية."""
         import time
 
         from .telemetry import emit_telemetry
@@ -136,7 +137,7 @@ class SupervisorNode:
                 return {"intent": "admin"}
 
         try:
-            result = self.dspy_classifier(query=query)
+            result = await asyncio.to_thread(self.dspy_classifier, query=query)
             if hasattr(result, "is_admin") and str(result.is_admin).lower() == "true":
                 try:
                     conf = float(result.confidence)
