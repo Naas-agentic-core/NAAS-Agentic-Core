@@ -14,7 +14,7 @@ class _StubSignature:
 class _StubField:
     """حقل وهمي يحاكي InputField/OutputField بدون سلوك إضافي."""
 
-    def __call__(self, *args, **kwargs):  # noqa: ANN002, ANN003
+    def __call__(self, *args, **kwargs):
         return None
 
 
@@ -24,7 +24,7 @@ class _StubChainOfThought:
     def __init__(self, _signature: object) -> None:
         self._result = SimpleNamespace(is_admin="false", confidence="0.0")
 
-    def __call__(self, **kwargs):  # noqa: ANN003
+    def __call__(self, **kwargs):
         return self._result
 
 
@@ -49,7 +49,12 @@ async def test_supervisor_node_uses_to_thread_for_dspy(monkeypatch: pytest.Monke
     main = _load_graph_main_with_stubbed_dspy(monkeypatch)
 
     node = main.SupervisorNode()
-    node.dspy_classifier = lambda **kwargs: SimpleNamespace(is_admin="true", confidence="0.9")
+
+    def classifier_stub(**kwargs):
+        _ = kwargs
+        return SimpleNamespace(is_admin="true", confidence="0.9")
+
+    node.dspy_classifier = classifier_stub
 
     called: dict[str, bool] = {"to_thread": False}
 
@@ -71,7 +76,12 @@ async def test_supervisor_node_short_circuits_admin_guard(monkeypatch: pytest.Mo
     main = _load_graph_main_with_stubbed_dspy(monkeypatch)
 
     node = main.SupervisorNode()
-    node.dspy_classifier = lambda **kwargs: (_ for _ in ()).throw(RuntimeError("must not run"))
+
+    def forbidden_classifier(**kwargs):
+        _ = kwargs
+        raise RuntimeError("must not run")
+
+    node.dspy_classifier = forbidden_classifier
 
     result = await node({"query": "كم عدد ملفات بايثون", "messages": []})
 
