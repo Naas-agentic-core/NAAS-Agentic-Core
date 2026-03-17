@@ -5,41 +5,38 @@
 مع فرض سياسات الأمان والملكية.
 """
 
-from collections.abc import Callable
-
 from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.routers.ws_auth import extract_websocket_auth
-from app.api.schemas.customer_chat import CustomerConversationDetails, CustomerConversationSummary
-from app.core.ai_gateway import AIClient, get_ai_client
+from app.api.schemas.customer_chat import (
+    CustomerConversationDetails,
+    CustomerConversationSummary,
+)
 from app.core.config import get_settings
-from app.core.database import async_session_factory, get_db
+from app.core.database import get_db
 from app.core.di import get_logger
 from app.core.domain.user import User
 from app.deps.auth import CurrentUser, require_permissions
 from app.services.auth.token_decoder import decode_user_id
-from app.services.boundaries.customer_chat_boundary_service import CustomerChatBoundaryService
-from app.services.chat.contracts import ChatDispatchRequest
-from app.services.chat.dispatcher import ChatRoleDispatcher, build_chat_dispatcher
+from app.services.boundaries.customer_chat_boundary_service import (
+    CustomerChatBoundaryService,
+)
 from app.services.chat.event_protocol import normalize_streaming_event
-from app.services.chat.orchestrator import ChatOrchestrator
+from app.infrastructure.clients.orchestrator_client import orchestrator_client
 from app.services.rbac import QA_SUBMIT
 
 logger = get_logger(__name__)
 
 COMPATIBILITY_FACADE_MODE = True
-CANONICAL_EXECUTION_AUTHORITY = "app.services.chat.orchestrator.ChatOrchestrator"
+# تنبيه معماري: هذا المسار واجهة توافقية فقط ويُمنع فيه أي تنفيذ محلي لمنطق الدردشة.
+CANONICAL_EXECUTION_AUTHORITY = "orchestrator-service:/agent/chat"
+LEGACY_LOCAL_EXECUTION_BLOCKED = True
 
 router = APIRouter(
     prefix="/api/chat",
     tags=["Customer Chat"],
 )
-
-
-def get_session_factory() -> Callable[[], AsyncSession]:
-    """تبعية لاسترجاع مصنع الجلسات."""
-    return async_session_factory
 
 
 def get_chat_actor(
@@ -71,22 +68,16 @@ async def get_actor_user(
     return user
 
 
-def get_customer_service(db: AsyncSession = Depends(get_db)) -> CustomerChatBoundaryService:
+def get_customer_service(
+    db: AsyncSession = Depends(get_db),
+) -> CustomerChatBoundaryService:
     """تبعية للحصول على خدمة حدود محادثة العملاء."""
     return CustomerChatBoundaryService(db)
-
-
-def get_chat_dispatcher(db: AsyncSession = Depends(get_db)) -> ChatRoleDispatcher:
-    """تبعية للحصول على موزّع الدردشة حسب الدور."""
-    return build_chat_dispatcher(db)
 
 
 @router.websocket("/ws")
 async def chat_stream_ws(
     websocket: WebSocket,
-    ai_client: AIClient = Depends(get_ai_client),
-    dispatcher: ChatRoleDispatcher = Depends(get_chat_dispatcher),
-    session_factory: Callable[[], AsyncSession] = Depends(get_session_factory),
     db: AsyncSession = Depends(get_db),
 ) -> None:
     """
@@ -132,7 +123,10 @@ async def chat_stream_ws(
             if not question:
                 await websocket.send_json(
                     normalize_streaming_event(
-                        {"type": "error", "payload": {"details": "Question is required."}}
+                        {
+                            "type": "error",
+                            "payload": {"details": "Question is required."},
+                        }
                     )
                 )
                 continue
@@ -143,41 +137,22 @@ async def chat_stream_ws(
                 metadata["mission_type"] = mission_type
 
             try:
-                dispatch_request = ChatDispatchRequest(
+                async for event in orchestrator_client.chat_with_agent(
                     question=question,
+                    user_id=actor.id,
                     conversation_id=payload.get("conversation_id"),
-                    ai_client=ai_client,
-                    session_factory=session_factory,
-                    metadata=metadata,
-                )
-                dispatch_result = await ChatOrchestrator.dispatch(
-                    user=actor,
-                    request=dispatch_request,
-                    dispatcher=dispatcher,
-                )
-            except HTTPException as exc:
-                await websocket.send_json(
-                    normalize_streaming_event(
-                        {
-                            "type": "error",
-                            "payload": {"details": exc.detail, "status_code": exc.status_code},
-                        }
-                    )
-                )
-                continue
-
-            await websocket.send_json(
-                normalize_streaming_event(
-                    {"type": "status", "payload": {"status_code": dispatch_result.status_code}}
-                )
-            )
-
-            try:
-                async for event in dispatch_result.stream:
+                    context={
+                        "chat_scope": "customer",
+                        "metadata": metadata,
+                        "compatibility_facade": True,
+                    },
+                ):
                     normalized_event = normalize_streaming_event(event)
                     await websocket.send_json(normalized_event)
             except Exception as exc:
-                logger.error(f"Error in chat stream: {exc}", exc_info=True)
+                logger.error(
+                    f"Error in compatibility facade stream: {exc}", exc_info=True
+                )
                 await websocket.send_json(
                     normalize_streaming_event(
                         {

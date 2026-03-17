@@ -24,14 +24,17 @@ class RequestIdMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
         # Generate a new Request ID if not present in headers (or always generate new one)
         # Prioritizing generating a new one to ensure uniqueness within our system
-        request_id = str(uuid.uuid4())
+        incoming_correlation_id = request.headers.get("X-Correlation-ID")
+        request_id = incoming_correlation_id or str(uuid.uuid4())
         request.state.request_id = request_id
+        request.state.correlation_id = request_id
 
         # Process the request
         response = await call_next(request)
 
         # Attach to response
         response.headers["X-Request-ID"] = request_id
+        response.headers["X-Correlation-ID"] = request_id
         return response
 
 
