@@ -3,6 +3,10 @@ document.addEventListener("DOMContentLoaded", function() {
     const chatInput = document.getElementById("chat-input");
     const sendBtn = document.getElementById("send-btn");
 
+    if (!chatBox || !chatInput || !sendBtn) {
+        return;
+    }
+
     const protocol = window.location.protocol === "https:" ? "wss" : "ws";
     const token = localStorage.getItem("token");
     const wsUrl = `${protocol}://${window.location.host}/admin/api/chat/ws`;
@@ -17,14 +21,17 @@ document.addEventListener("DOMContentLoaded", function() {
     socket.onmessage = function(event) {
         try {
             const data = JSON.parse(event.data);
-            const deltaContent = data?.payload?.content || data?.delta || "";
+            const payload = data && typeof data === "object" ? data.payload : null;
+            const payloadContent = payload && typeof payload === "object" ? payload.content : "";
+            const deltaContent = payloadContent || data.delta || "";
+
             if (deltaContent) {
                 chatBox.innerHTML += `<span>${deltaContent}</span>`;
-            } else if (data?.type === "error") {
-                const details = data?.payload?.details || "Unexpected error";
+            } else if (data && data.type === "error") {
+                const details = payload && payload.details ? payload.details : "Unexpected error";
                 chatBox.innerHTML += `<p style=\"color: red;\">${details}</p>`;
             }
-        } catch (e) {
+        } catch (_error) {
             if (String(event.data || "").includes("Error:")) {
                 chatBox.innerHTML += `<p style=\"color: red;\">${event.data}</p>`;
             }
@@ -38,7 +45,8 @@ document.addEventListener("DOMContentLoaded", function() {
     };
 
     socket.onerror = function(error) {
-        chatBox.innerHTML += `<p><em>An error occurred: ${error.message || "WebSocket error"}</em></p>`;
+        const message = error && error.message ? error.message : "WebSocket error";
+        chatBox.innerHTML += `<p><em>An error occurred: ${message}</em></p>`;
     };
 
     function sendMessage() {
@@ -47,7 +55,7 @@ document.addEventListener("DOMContentLoaded", function() {
             chatBox.innerHTML += `<p><b>You:</b> ${message}</p>`;
             socket.send(JSON.stringify({ question: message }));
             chatInput.value = "";
-            chatBox.innerHTML += `<p><b>AI:</b> </p>`;
+            chatBox.innerHTML += "<p><b>AI:</b> </p>";
         }
     }
 
