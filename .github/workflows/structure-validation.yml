@@ -59,7 +59,6 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     needs: validate-structure
-    continue-on-error: true
 
     services:
       postgres:
@@ -102,12 +101,19 @@ jobs:
           SUPABASE_SERVICE_ROLE_KEY: dummy-key-for-ci
         run: |
           if [ -f "tests/integration/test_chat_e2e.py" ]; then
-            python -m pytest tests/integration/test_chat_e2e.py -v --tb=short
+            if python -m pytest tests/integration/test_chat_e2e.py -v --tb=short; then
+              echo "INTEGRATION_STATUS=passed" >> "$GITHUB_ENV"
+            else
+              echo "::warning::E2E integration tests failed but are non-blocking in this workflow."
+              echo "INTEGRATION_STATUS=failed" >> "$GITHUB_ENV"
+            fi
           else
             echo "ℹ️ tests/integration/test_chat_e2e.py not found, skipping targeted E2E suite."
+            echo "INTEGRATION_STATUS=skipped" >> "$GITHUB_ENV"
           fi
 
       - name: Integration suite summary
         if: always()
         run: |
-          echo "ℹ️ Integration job is configured as best-effort to prevent flaky infrastructure from blocking merges." >> "$GITHUB_STEP_SUMMARY"
+          echo "### Integration smoke status: ${INTEGRATION_STATUS:-unknown}" >> "$GITHUB_STEP_SUMMARY"
+          echo "ℹ️ Integration smoke is best-effort and does not block merge in this workflow." >> "$GITHUB_STEP_SUMMARY"
