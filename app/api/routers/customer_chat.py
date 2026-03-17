@@ -10,7 +10,6 @@ from collections.abc import Callable
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.services.chat.event_protocol import normalize_streaming_event
 from app.api.schemas.customer_chat import CustomerConversationDetails, CustomerConversationSummary
 from app.core.database import async_session_factory, get_db
 from app.core.di import get_logger
@@ -21,8 +20,6 @@ from app.services.rbac import QA_SUBMIT
 
 logger = get_logger(__name__)
 
-# إبقاء الاستيراد المركزي كحاجز معماري موحد لعقد أحداث الدردشة.
-_ = normalize_streaming_event
 
 COMPATIBILITY_FACADE_MODE = True
 # تم تعطيل مسار WS الداخلي نهائياً لمنع ازدواجية ملكية الجلسة (Split-Brain).

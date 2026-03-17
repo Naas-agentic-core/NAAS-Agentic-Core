@@ -18,7 +18,6 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.services.chat.event_protocol import normalize_streaming_event
 from app.api.schemas.admin import ConversationDetailsResponse, ConversationSummaryResponse
 from app.core.database import async_session_factory, get_db
 from app.core.di import get_logger
@@ -31,8 +30,6 @@ from app.services.rbac import ADMIN_ROLE
 
 logger = get_logger(__name__)
 
-# إبقاء الاستيراد المركزي كحاجز معماري موحد لعقد أحداث الدردشة.
-_ = normalize_streaming_event
 
 COMPATIBILITY_FACADE_MODE = True
 # تم تعطيل مسار WS الإداري الداخلي نهائياً لمنع Split-Brain وفرض المرور عبر API Gateway.
