@@ -1,23 +1,11 @@
-import pytest
+"""Regression: إزالة مسار WS المونوليثي تمنع stub المحلي نهائيًا."""
+
 from fastapi.testclient import TestClient
-from starlette.websockets import WebSocketDisconnect
-
-from app.main import app
-
-client = TestClient(app)
 
 
-def test_chat_stream_is_real_implementation():
-    """
-    Verifies that the WebSocket chat endpoint enforces authentication.
+def test_chat_stream_is_not_served_by_monolith_anymore(test_app) -> None:
+    """يتحقق من أن المسار المحلي للدردشة أُزيل لتجنّب split-brain."""
 
-    If a stub existed, it would accept unauthenticated connections.
-    """
-    with pytest.raises(WebSocketDisconnect) as exc:
-        with client.websocket_connect("/admin/api/chat/ws"):
-            pass
-
-    assert exc.value.code == 4401, (
-        f"Expected 4401 Unauthorized, but got {exc.value.code}. "
-        "The stub implementation might still be active."
-    )
+    with TestClient(test_app) as client:
+        response = client.get("/admin/api/chat/ws")
+    assert response.status_code == 404

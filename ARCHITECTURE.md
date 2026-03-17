@@ -24,3 +24,9 @@ All mission executions must follow the **Command Pattern**:
 ## Strict Boundaries
 - **No Direct Execution**: `run_mission()` must never be called directly from UI/API handlers without going through the Command Entrypoint.
 - **No Dual Writes**: State changes must occur within a transaction that also logs the corresponding event.
+
+## Chat Runtime Ownership (Split-Brain Resolution)
+- **Canonical runtime entry for chat is API Gateway only**: `microservices/api_gateway` exposes `/api/chat/ws` and `/admin/api/chat/ws` and forwards to `orchestrator_service`.
+- **Monolith chat WebSocket endpoints are decommissioned**: `app/api/routers/admin.py` and `app/api/routers/customer_chat.py` no longer expose WS routes to prevent dual session ownership.
+- **Parity cutover is hard-enforced**: `CONVERSATION_PARITY_VERIFIED` is enforced as `true` inside gateway settings validation to avoid accidental legacy fallback behavior.
+

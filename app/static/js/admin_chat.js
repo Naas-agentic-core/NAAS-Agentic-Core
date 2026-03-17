@@ -3,8 +3,15 @@ document.addEventListener("DOMContentLoaded", function() {
     const chatInput = document.getElementById("chat-input");
     const sendBtn = document.getElementById("send-btn");
 
-    // Establish WebSocket connection
-    const socket = new WebSocket("ws://" + window.location.host + "/ws/chat");
+    // Legacy direct WS path was removed to prevent split-brain ownership.
+    // Unified runtime path is /admin/api/chat/ws via API Gateway-aware clients.
+    const socket = null;
+    chatBox.innerHTML += "<p><em>Legacy admin_chat.js is disabled. Use the unified chat UI.</em></p>";
+
+
+    if (!socket) {
+        return;
+    }
 
     socket.onopen = function(event) {
         chatBox.innerHTML += "<p><em>Connected to AI...</em></p>";

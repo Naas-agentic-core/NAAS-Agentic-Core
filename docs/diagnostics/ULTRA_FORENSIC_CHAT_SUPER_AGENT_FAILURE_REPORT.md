@@ -1,4 +1,6 @@
 # 1. Executive Summary
+> **Update (Split-Brain Remediation Applied):** Monolith chat WebSocket endpoints in `app/api/routers/admin.py` and `app/api/routers/customer_chat.py` were decommissioned, and gateway parity cutover is now enforced as true. Runtime ownership for chat WS is unified through `api_gateway -> orchestrator_service`.
+
 The repository currently runs in **three materially different runtime modes** (default microservices compose, legacy/emergency compose, and local/dev monolith boot scripts), and the three chat journeys (admin normal chat, customer normal chat, super-agent mission) do **not** share a single authoritative control-plane in all modes.
 
 Most critical forensic conclusion:

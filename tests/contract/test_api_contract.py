@@ -48,6 +48,8 @@ MIGRATED_PATHS = {
     "/auth/refresh",
     "/auth/register",
     "/qa/question",
+    "/admin/api/chat/ws",
+    "/api/chat/ws",
     "/users/me",
     "/users/me/change-password",
 }
