@@ -5,7 +5,8 @@ const isBrowser = typeof window !== 'undefined';
 const API_ORIGIN = process.env.NEXT_PUBLIC_API_URL ?? '';
 const WS_ORIGIN = process.env.NEXT_PUBLIC_WS_URL ?? '';
 
-const resolveWebSocketProtocol = (protocol) => {
+const resolveWebSocketProtocol = (protocol, forceSecure) => {
+    if (forceSecure) return 'wss:';
     if (protocol === 'https:') return 'wss:';
     if (protocol === 'http:') return 'ws:';
     if (protocol === 'wss:' || protocol === 'ws:') return protocol;
@@ -14,11 +15,12 @@ const resolveWebSocketProtocol = (protocol) => {
 
 const getWsBase = () => {
     if (!isBrowser) return '';
+    const forceSecure = window.location.protocol === 'https:';
     const configuredOrigin = WS_ORIGIN || API_ORIGIN;
     if (configuredOrigin) {
         try {
             const parsed = new URL(configuredOrigin);
-            const wsProtocol = resolveWebSocketProtocol(parsed.protocol);
+            const wsProtocol = resolveWebSocketProtocol(parsed.protocol, forceSecure);
             return `${wsProtocol}//${parsed.host}`;
         } catch (error) {
             console.error('Invalid WebSocket base configuration:', error);
