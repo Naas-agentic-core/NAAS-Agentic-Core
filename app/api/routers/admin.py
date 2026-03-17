@@ -18,12 +18,8 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.routers.ws_auth import extract_websocket_auth
-from app.core.config import get_settings
-from app.services.auth.token_decoder import decode_user_id
 from app.services.chat.event_protocol import normalize_streaming_event
 from app.api.schemas.admin import ConversationDetailsResponse, ConversationSummaryResponse
-from app.core.ai_gateway import AIClient, get_ai_client
 from app.core.database import async_session_factory, get_db
 from app.core.di import get_logger
 from app.core.domain.user import User
@@ -34,6 +30,9 @@ from app.services.chat.dispatcher import ChatRoleDispatcher, build_chat_dispatch
 from app.services.rbac import ADMIN_ROLE
 
 logger = get_logger(__name__)
+
+# إبقاء الاستيراد المركزي كحاجز معماري موحد لعقد أحداث الدردشة.
+_ = normalize_streaming_event
 
 COMPATIBILITY_FACADE_MODE = True
 # تم تعطيل مسار WS الإداري الداخلي نهائياً لمنع Split-Brain وفرض المرور عبر API Gateway.
