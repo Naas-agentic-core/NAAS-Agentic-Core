@@ -5,10 +5,10 @@ from __future__ import annotations
 import hashlib
 import os
 from dataclasses import dataclass
-from typing import Literal, TypeAlias
+from typing import Literal
 
-AllowedCapabilityLevel: TypeAlias = Literal["parity_ready", "production_eligible"]
-RolloutReason: TypeAlias = Literal[
+type AllowedCapabilityLevel = Literal["parity_ready", "production_eligible"]
+type RolloutReason = Literal[
     "non_agent_intent",
     "rollout_disabled",
     "parity_not_verified",
@@ -18,7 +18,7 @@ RolloutReason: TypeAlias = Literal[
     "canary_selected",
     "canary_not_selected",
 ]
-RolloutStage: TypeAlias = Literal[
+type RolloutStage = Literal[
     "off",
     "canary_1",
     "canary_5",
