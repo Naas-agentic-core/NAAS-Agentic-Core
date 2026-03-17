@@ -1,11 +1,11 @@
 # Architecture Report: Split-Brain Resolution
 
 **Date:** 2025-05-20
-**Status:** RESOLVED
+**Status:** RESOLVED (Single Control Plane Enforced)
 
 ## 1. The Problem: Split-Brain Architecture
 The system previously suffered from a "Split-Brain" condition where the orchestration logic existed in two places:
-1.  **In-Process (Monolith):** `app.services.overmind.orchestrator` contained logic to run missions and write to the DB.
+1.  **In-Process (Monolith):** مسارات الدردشة/المهام في المونوليث خُفّضت إلى Facades توافقية بلا تنفيذ محلي.
 2.  **Microservice:** `microservices/orchestrator_service` existed but was either bypassed or duplicated the logic.
 
 This resulted in:
@@ -37,3 +37,9 @@ We have refactored the system to enforce the **Microservices Constitution**.
 ## 4. Future Work
 *   Implement `tools/ci/check_import_boundaries.py` to prevent regression.
 *   Add distributed tracing (OpenTelemetry) for deeper observability.
+
+
+## 5. Compatibility Facade Guard
+- `COMPATIBILITY_FACADE_MODE=True` remains enabled in legacy routers.
+- Canonical authority is now `orchestrator-service:/agent/chat`.
+- Local execution is explicitly blocked with `LEGACY_LOCAL_EXECUTION_BLOCKED=True`.

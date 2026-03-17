@@ -1,26 +1,17 @@
-# Architecture: Unified Control Plane & Source of Truth
+# Architecture: Single Control Plane (Orchestrator Service)
 
-## Core Principle: Single Control Plane
-This system enforces a **Single Control Plane** architecture to prevent "Split-Brain" orchestration.
-The **`app/services/overmind`** module (The Brain) is the designated Control Plane.
-The `microservices/orchestrator_service` is deprecated for execution logic and acts only as a worker/stub or data-plane component if needed.
+## Core Principle
+نقطة التحكم الواحدة للتشغيل (Control Plane) هي خدمة **`microservices/orchestrator_service`** عبر بوابة API Gateway فقط.
 
-## Single Source of Truth
-The **`cogniforge.db`** (application database) accessed via `app/core/domain/mission.py` models is the **Single Source of Truth** for:
-- Mission State (Status, Context)
-- Mission Events (Log)
-- Execution Plans
+- Gateway (`microservices/api_gateway`) هو نقطة الدخول العامة الوحيدة.
+- `orchestrator-service` هو المالك القانوني لتدفقات chat/missions.
+- مسارات المونوليث في `app/api/routers/customer_chat.py` و`app/api/routers/admin.py` تعمل كـ **Compatibility Facades** فقط.
 
-Any external service attempting to manage mission state independently is a violation of this architecture.
+## Operational Rules
+1. يمنع تنفيذ منطق الدردشة أو المهام محلياً داخل المونوليث.
+2. أي تكامل بين الخدمات يتم عبر HTTP/WebSocket/Event Bus فقط.
+3. `X-Correlation-ID` يجب أن ينتقل من Gateway إلى orchestrator-service عبر كل الطلبات.
 
-## Execution Flow: Command -> Event -> State
-All mission executions must follow the **Command Pattern**:
-1.  Client (API/Chat) sends a `StartMission` command via `app/services/overmind/entrypoint.py`.
-2.  Command Handler enforces **Idempotency** and **Locking**.
-3.  Command Handler persists `MissionStarted` event to DB.
-4.  Command Handler triggers execution (background task or worker).
-5.  Execution Logic (`OvermindOrchestrator`) updates state and logs events.
-
-## Strict Boundaries
-- **No Direct Execution**: `run_mission()` must never be called directly from UI/API handlers without going through the Command Entrypoint.
-- **No Dual Writes**: State changes must occur within a transaction that also logs the corresponding event.
+## Rollback Strategy
+- الإرجاع السريع يتم عبر revert commit الخاص بالقطع أو عبر feature flags للـ rollout.
+- واجهات التوافق تبقى مفعلة حتى اكتمال parity وtelemetry.

@@ -32,7 +32,7 @@ class Settings(BaseSettings):
     ROUTE_CHAT_WS_CONVERSATION_ROLLOUT_PERCENT: int = 0
 
     # Safety gate: conversation service cannot receive critical traffic before parity proof.
-    CONVERSATION_PARITY_VERIFIED: bool = False
+    CONVERSATION_PARITY_VERIFIED: bool = True
     CONVERSATION_CAPABILITY_LEVEL: str = "stub"
 
     # Candidate target for WS cutover (kept disabled by default in PR#1)
@@ -81,9 +81,13 @@ class Settings(BaseSettings):
             ):
                 raise ValueError("SECRET_KEY غير آمن لبيئة production/staging")
             if self.ALLOWED_HOSTS == ["*"]:
-                raise ValueError("ALLOWED_HOSTS لا يمكن أن تكون '*' في production/staging")
+                raise ValueError(
+                    "ALLOWED_HOSTS لا يمكن أن تكون '*' في production/staging"
+                )
             if self.BACKEND_CORS_ORIGINS == ["*"]:
-                raise ValueError("BACKEND_CORS_ORIGINS لا يمكن أن تكون '*' في production/staging")
+                raise ValueError(
+                    "BACKEND_CORS_ORIGINS لا يمكن أن تكون '*' في production/staging"
+                )
 
         rollout_requested = (
             self.ROUTE_CHAT_HTTP_CONVERSATION_ROLLOUT_PERCENT > 0

@@ -167,3 +167,9 @@ The North African AI Safety Lab (NAAS Lab) operates with academic and operationa
 **Repository:** https://github.com/HOUSSAM16ai/NAAS-Agentic-Core
 
 > This repository is maintained by the project team. References to third-party organisations, platforms, or products do not imply endorsement or affiliation.
+
+
+### Chat & Mission Control Plane
+- جميع مسارات الدردشة (`/api/chat/*`, `/api/chat/ws`, `/admin/api/chat/ws`) تُدار عبر `orchestrator-service` من خلال API Gateway.
+- ملفات `app/api/routers/customer_chat.py` و`app/api/routers/admin.py` موجودة للتوافق المرحلي فقط (Compatibility Facades).
+- لا يجب إضافة منطق تشغيل محلي جديد داخل هذه الواجهات.

@@ -69,7 +69,9 @@ class CircuitBreaker:
             if self.state == CircuitState.HALF_OPEN:
                 self.state = CircuitState.CLOSED
                 self.failures = 0
-                logger.info(f"Circuit '{self.name}' recovered. State changed to CLOSED.")
+                logger.info(
+                    f"Circuit '{self.name}' recovered. State changed to CLOSED."
+                )
 
             return result
         except HTTPException:
@@ -79,11 +81,18 @@ class CircuitBreaker:
             # Count failure for network/system errors
             self.failures += 1
             self.last_failure_time = time.time()
-            logger.error(f"Circuit '{self.name}' recorded failure #{self.failures}: {e!s}")
+            logger.error(
+                f"Circuit '{self.name}' recorded failure #{self.failures}: {e!s}"
+            )
 
-            if self.state == CircuitState.HALF_OPEN or self.failures >= self.failure_threshold:
+            if (
+                self.state == CircuitState.HALF_OPEN
+                or self.failures >= self.failure_threshold
+            ):
                 self.state = CircuitState.OPEN
-                logger.error(f"Circuit '{self.name}' threshold reached. State changed to OPEN.")
+                logger.error(
+                    f"Circuit '{self.name}' threshold reached. State changed to OPEN."
+                )
 
             raise e
 
@@ -141,6 +150,11 @@ class GatewayProxy:
 
             if service_token:
                 headers["X-Service-Token"] = service_token
+            correlation_id = headers.get("X-Correlation-ID") or getattr(
+                request.state, "correlation_id", None
+            )
+            if correlation_id:
+                headers["X-Correlation-ID"] = str(correlation_id)
             if extra_headers:
                 headers.update(extra_headers)
 
@@ -167,7 +181,11 @@ class GatewayProxy:
                     # Send request with stream=True to get headers back immediately
                     return await self.client.send(req, stream=True)
 
-                except (httpx.ConnectError, httpx.ConnectTimeout, httpx.ReadTimeout) as exc:
+                except (
+                    httpx.ConnectError,
+                    httpx.ConnectTimeout,
+                    httpx.ReadTimeout,
+                ) as exc:
                     if can_retry and attempt < retries:
                         sleep_time = settings.RETRY_BACKOFF_FACTOR * (2**attempt)
                         logger.warning(

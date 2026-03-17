@@ -6,12 +6,12 @@
 
 1. `app/api/routers/admin.py`
    - الحالة: Compatibility façade.
-   - السلطة التنفيذية القانونية: `app.services.chat.orchestrator.ChatOrchestrator`.
+   - السلطة التنفيذية القانونية: `orchestrator-service:/agent/chat`.
    - ملاحظة: يبقى ingress نشطًا للتوافق مع الواجهات الحالية.
 
 2. `app/api/routers/customer_chat.py`
    - الحالة: Compatibility façade.
-   - السلطة التنفيذية القانونية: `app.services.chat.orchestrator.ChatOrchestrator`.
+   - السلطة التنفيذية القانونية: `orchestrator-service:/agent/chat`.
    - ملاحظة: يحافظ على عقود WS/HTTP الحالية مع التفويض.
 
 3. `app/api/routers/content.py`
