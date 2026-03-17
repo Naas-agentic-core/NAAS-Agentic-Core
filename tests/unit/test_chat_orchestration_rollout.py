@@ -168,8 +168,6 @@ def test_delegate_defaults_to_safe_legacy_when_percent_invalid(monkeypatch) -> N
     assert decision.reason == "canary_off"
 
 
-
-
 def test_build_rollout_trace_payload_includes_decision_and_stage(monkeypatch) -> None:
     """يبني حمولة تتبع موحّدة تضم سبب القرار ومعلومات المرحلة الحالية."""
     _enable_rollout_guards(monkeypatch)
@@ -189,6 +187,7 @@ def test_build_rollout_trace_payload_includes_decision_and_stage(monkeypatch) ->
     assert payload["canary_percent"] == decision.canary_percent
     assert payload["bucket"] == decision.bucket
     assert payload["stage"] == "canary_5"
+
 
 def test_legacy_wrapper_matches_decision(monkeypatch) -> None:
     """يحافظ على التوافق الخلفي لدالة should_delegate_to_orchestrator القديمة."""

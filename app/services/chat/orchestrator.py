@@ -38,12 +38,12 @@ from app.services.chat.handlers.strategy_handlers import (
     ProjectIndexHandler,
 )
 from app.services.chat.intent_detector import ChatIntent, IntentDetector
-from app.services.chat.ports import IntentDetectorPort
 from app.services.chat.orchestration_rollout import (
     build_rollout_trace_payload,
     get_orchestration_rollout_decision,
     get_rollout_runtime_snapshot,
 )
+from app.services.chat.ports import IntentDetectorPort
 from app.services.chat.tools import ToolRegistry
 from app.services.overmind.identity import OvermindIdentity
 
