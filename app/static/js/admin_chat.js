@@ -3,48 +3,59 @@ document.addEventListener("DOMContentLoaded", function() {
     const chatInput = document.getElementById("chat-input");
     const sendBtn = document.getElementById("send-btn");
 
-    // Establish WebSocket connection
-    const socket = new WebSocket("ws://" + window.location.host + "/ws/chat");
+    if (!chatBox || !chatInput || !sendBtn) {
+        return;
+    }
 
-    socket.onopen = function(event) {
+    const protocol = window.location.protocol === "https:" ? "wss" : "ws";
+    const token = localStorage.getItem("token");
+    const wsUrl = `${protocol}://${window.location.host}/admin/api/chat/ws`;
+
+    // Unified WS path through Gateway-compatible endpoint.
+    const socket = token ? new WebSocket(wsUrl, ["jwt", token]) : new WebSocket(wsUrl);
+
+    socket.onopen = function() {
         chatBox.innerHTML += "<p><em>Connected to AI...</em></p>";
     };
 
     socket.onmessage = function(event) {
-        // Since the backend streams raw lines, we need to parse the JSON content.
-        // The AI service nests the actual content inside a 'delta' key.
         try {
             const data = JSON.parse(event.data);
-            if (data && data.delta) { // Check for the 'delta' key
-                chatBox.innerHTML += `<span>${data.delta}</span>`;
-            } else if (event.data.includes("Error:")) { // Handle plain error messages
-                chatBox.innerHTML += `<p style="color: red;">${event.data}</p>`;
+            const payload = data && typeof data === "object" ? data.payload : null;
+            const payloadContent = payload && typeof payload === "object" ? payload.content : "";
+            const deltaContent = payloadContent || data.delta || "";
+
+            if (deltaContent) {
+                chatBox.innerHTML += `<span>${deltaContent}</span>`;
+            } else if (data && data.type === "error") {
+                const details = payload && payload.details ? payload.details : "Unexpected error";
+                chatBox.innerHTML += `<p style=\"color: red;\">${details}</p>`;
             }
-        } catch (e) {
-            // If it's not valid JSON, it might be a plain text message or an error
-            // This also handles the final full response from invoke_chat_stream
-            // which is not a delta chunk. We can ignore it for a cleaner UI.
+        } catch (_error) {
+            if (String(event.data || "").includes("Error:")) {
+                chatBox.innerHTML += `<p style=\"color: red;\">${event.data}</p>`;
+            }
         }
 
-        // Auto-scroll to the bottom
         chatBox.scrollTop = chatBox.scrollHeight;
     };
 
-    socket.onclose = function(event) {
+    socket.onclose = function() {
         chatBox.innerHTML += "<p><em>Connection closed.</em></p>";
     };
 
     socket.onerror = function(error) {
-        chatBox.innerHTML += `<p><em>An error occurred: ${error.message}</em></p>`;
+        const message = error && error.message ? error.message : "WebSocket error";
+        chatBox.innerHTML += `<p><em>An error occurred: ${message}</em></p>`;
     };
 
     function sendMessage() {
         const message = chatInput.value;
-        if (message.trim() !== "") {
+        if (message.trim() !== "" && socket.readyState === WebSocket.OPEN) {
             chatBox.innerHTML += `<p><b>You:</b> ${message}</p>`;
-            socket.send(message);
+            socket.send(JSON.stringify({ question: message }));
             chatInput.value = "";
-            chatBox.innerHTML += `<p><b>AI:</b> </p>`; // Prepare a new line for the AI's response
+            chatBox.innerHTML += "<p><b>AI:</b> </p>";
         }
     }
 

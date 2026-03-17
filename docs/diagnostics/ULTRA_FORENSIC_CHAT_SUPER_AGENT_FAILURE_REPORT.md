@@ -1,7 +1,12 @@
 # 1. Executive Summary
+> **Update (Split-Brain Remediation Applied):** Monolith chat WebSocket endpoints in `app/api/routers/admin.py` and `app/api/routers/customer_chat.py` were decommissioned, and gateway parity cutover is now enforced as true. Runtime ownership for chat WS is unified through `api_gateway -> orchestrator_service`.
+
 The repository currently runs in **three materially different runtime modes** (default microservices compose, legacy/emergency compose, and local/dev monolith boot scripts), and the three chat journeys (admin normal chat, customer normal chat, super-agent mission) do **not** share a single authoritative control-plane in all modes.
 
 Most critical forensic conclusion:
+> Historical context note: The bullets below describe the **pre-remediation** runtime state at the time of forensics collection.
+> After remediation, monolith WS chat endpoints were decommissioned and chat WS ownership is unified via gateway -> orchestrator_service.
+
 - In local/dev runtime (`uvicorn app.main:app`), **admin normal chat succeeds** because it stays inside monolith chat orchestration/boundaries/streamers.
 - In the same runtime, **customer normal chat fails more often** because the customer WS handler bypasses the local boundary streamer and directly calls `orchestrator_client.chat_with_agent()` (remote dependency).
 - **Super Agent / المهمة الخارقة fails for both roles** when executed through monolith mission handler path, because mission dispatch depends on `start_mission()` -> `orchestrator_client.create_mission()` and returns the explicit UI-facing message `Dispatch Failed` on exception.

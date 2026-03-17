@@ -15,4 +15,4 @@ def test_legacy_routers_are_explicitly_marked_as_compatibility_facades() -> None
 def test_chat_facades_delegate_to_single_canonical_authority() -> None:
     """يثبت أن مسارات chat legacy تعلن نفس السلطة التنفيذية القانونية."""
     assert admin.CANONICAL_EXECUTION_AUTHORITY == customer_chat.CANONICAL_EXECUTION_AUTHORITY
-    assert admin.CANONICAL_EXECUTION_AUTHORITY.endswith("ChatOrchestrator")
+    assert "orchestrator_service" in admin.CANONICAL_EXECUTION_AUTHORITY

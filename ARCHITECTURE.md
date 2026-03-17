@@ -2,8 +2,8 @@
 
 ## Core Principle: Single Control Plane
 This system enforces a **Single Control Plane** architecture to prevent "Split-Brain" orchestration.
-The **`app/services/overmind`** module (The Brain) is the designated Control Plane.
-The `microservices/orchestrator_service` is deprecated for execution logic and acts only as a worker/stub or data-plane component if needed.
+The **API Gateway + `microservices/orchestrator_service`** path is the designated runtime control plane for chat execution.
+The monolith (`app`) keeps compatibility read/query surfaces only and must not own WebSocket execution state.
 
 ## Single Source of Truth
 The **`cogniforge.db`** (application database) accessed via `app/core/domain/mission.py` models is the **Single Source of Truth** for:
@@ -24,3 +24,9 @@ All mission executions must follow the **Command Pattern**:
 ## Strict Boundaries
 - **No Direct Execution**: `run_mission()` must never be called directly from UI/API handlers without going through the Command Entrypoint.
 - **No Dual Writes**: State changes must occur within a transaction that also logs the corresponding event.
+
+## Chat Runtime Ownership (Split-Brain Resolution)
+- **Canonical runtime entry for chat is API Gateway only**: `microservices/api_gateway` exposes `/api/chat/ws` and `/admin/api/chat/ws` and forwards to `orchestrator_service`.
+- **Monolith chat WebSocket endpoints are decommissioned**: `app/api/routers/admin.py` and `app/api/routers/customer_chat.py` no longer expose WS routes to prevent dual session ownership.
+- **Parity cutover is hard-enforced**: `CONVERSATION_PARITY_VERIFIED` is enforced as `true` inside gateway settings validation to avoid accidental legacy fallback behavior.
+
