@@ -14,11 +14,11 @@ def test_chat_routers_keep_compatibility_facade_and_canonical_authority() -> Non
     assert "COMPATIBILITY_FACADE_MODE = True" in admin_router
     assert "COMPATIBILITY_FACADE_MODE = True" in customer_router
     assert (
-        'CANONICAL_EXECUTION_AUTHORITY = "app.services.chat.orchestrator.ChatOrchestrator"'
+        'CANONICAL_EXECUTION_AUTHORITY = "microservices.api_gateway -> orchestrator_service"'
         in admin_router
     )
     assert (
-        'CANONICAL_EXECUTION_AUTHORITY = "app.services.chat.orchestrator.ChatOrchestrator"'
+        'CANONICAL_EXECUTION_AUTHORITY = "microservices.api_gateway -> orchestrator_service"'
         in customer_router
     )
 

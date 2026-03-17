@@ -200,7 +200,10 @@ const DashboardLayout = ({ user, onLogout }) => {
         switch (st) {
             case 'connected': return 'متصل';
             case 'connecting': return 'جاري الاتصال...';
+            case 'offline':
             case 'disconnected': return 'غير متصل';
+            case 'degraded': return 'اتصال غير مستقر';
+            case 'auth_error': return 'انتهت الجلسة';
             case 'error': return 'خطأ في الاتصال';
             default: return st;
         }

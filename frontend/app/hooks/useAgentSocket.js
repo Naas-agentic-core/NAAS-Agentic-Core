@@ -5,20 +5,40 @@ const isBrowser = typeof window !== 'undefined';
 const API_ORIGIN = process.env.NEXT_PUBLIC_API_URL ?? '';
 const WS_ORIGIN = process.env.NEXT_PUBLIC_WS_URL ?? '';
 
-const resolveWebSocketProtocol = (protocol) => {
+const resolveWebSocketProtocol = (protocol, forceSecure) => {
+    if (forceSecure) return 'wss:';
     if (protocol === 'https:') return 'wss:';
     if (protocol === 'http:') return 'ws:';
     if (protocol === 'wss:' || protocol === 'ws:') return protocol;
     return 'ws:';
 };
 
+const isLikelyInternalHostname = (hostname) => {
+    if (!hostname) return false;
+    const normalized = hostname.toLowerCase().trim();
+    if (normalized === 'localhost' || normalized === '127.0.0.1') return false;
+    if (/^\d+\.\d+\.\d+\.\d+$/.test(normalized)) return false;
+    // Hostnames without dots are typically internal Docker/K8s service DNS names.
+    return !normalized.includes('.');
+};
+
 const getWsBase = () => {
     if (!isBrowser) return '';
+    const forceSecure = window.location.protocol === 'https:';
     const configuredOrigin = WS_ORIGIN || API_ORIGIN;
     if (configuredOrigin) {
         try {
             const parsed = new URL(configuredOrigin);
-            const wsProtocol = resolveWebSocketProtocol(parsed.protocol);
+            const wsProtocol = resolveWebSocketProtocol(parsed.protocol, forceSecure);
+
+            if (isLikelyInternalHostname(parsed.hostname)) {
+                console.warn('Configured WS/API host looks internal for browser runtime. Falling back to window.location host.', {
+                    configuredHost: parsed.host,
+                    runtimeHost: window.location.host,
+                });
+                return `${wsProtocol}//${window.location.host}`;
+            }
+
             return `${wsProtocol}//${parsed.host}`;
         } catch (error) {
             console.error('Invalid WebSocket base configuration:', error);

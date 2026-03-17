@@ -1,9 +1,9 @@
-"""Extra tests for Admin router."""
+"""اختبارات إضافية لمسارات المسؤول بعد إيقاف WS المونوليثي."""
 
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from fastapi import FastAPI, WebSocketDisconnect
+from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from app.api.routers.admin import router
@@ -12,19 +12,19 @@ from app.infrastructure.clients.user_client import user_client
 
 
 @pytest.fixture
-def app():
+def app() -> FastAPI:
     app = FastAPI()
     app.include_router(router)
     return app
 
 
 @pytest.fixture
-def client(app):
+def client(app: FastAPI) -> TestClient:
     return TestClient(app)
 
 
 @pytest.mark.asyncio
-async def test_get_admin_user_count_success(client):
+async def test_get_admin_user_count_success(client: TestClient) -> None:
     from app.deps.auth import CurrentUser, get_current_user
 
     mock_user_obj = MagicMock()
@@ -41,7 +41,7 @@ async def test_get_admin_user_count_success(client):
 
 
 @pytest.mark.asyncio
-async def test_get_admin_user_count_failure(client):
+async def test_get_admin_user_count_failure(client: TestClient) -> None:
     from app.deps.auth import CurrentUser, get_current_user
 
     mock_user_obj = MagicMock()
@@ -59,14 +59,8 @@ async def test_get_admin_user_count_failure(client):
         assert "User Service unavailable" in response.json()["detail"]
 
 
-@pytest.mark.asyncio
-async def test_admin_ws_auth_fail(app):
-    client = TestClient(app)
-    with pytest.raises(WebSocketDisconnect) as exc:
-        with client.websocket_connect("/admin/api/chat/ws"):
-            pass
-    assert exc.value.code == 4401
+def test_admin_ws_path_is_decommissioned(client: TestClient) -> None:
+    """يتحقق من تعطيل WS المحلي للإدارة ومنع مسار split-brain."""
 
-
-# WebSocket testing in FastAPI TestClient is synchronous-looking but handles async.
-# Testing the full stream might be complex, so let's at least cover the auth failure paths.
+    response = client.get("/admin/api/chat/ws")
+    assert response.status_code == 404

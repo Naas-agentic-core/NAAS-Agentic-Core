@@ -1,62 +1,11 @@
-from unittest.mock import MagicMock, patch
+"""Regression: لم يعد هناك WS محلي، لذا لا يجوز اختبار delta عبر المونوليث."""
 
-import pytest
 from fastapi.testclient import TestClient
 
-from app.core.ai_gateway import get_ai_client
-from app.core.database import get_db
-from app.core.domain.user import User
-from app.core.security import generate_service_token
 
+def test_chat_stream_surface_is_decommissioned(test_app) -> None:
+    """يتحقق من أن واجهة WS المحلية مُزالة مما يمنع إعادة ظهور bug القديم."""
 
-@pytest.mark.asyncio
-async def test_chat_stream_has_delta_event_type(test_app, db_session):
-    """
-    Verifies that the WebSocket chat stream emits delta events for content chunks.
-    """
-
-    mock_ai_client = MagicMock()
-
-    async def mock_process(*args, **kwargs):
-        yield "Hello"
-        yield " World"
-
-    mock_orchestrator = MagicMock()
-    mock_orchestrator.process.side_effect = mock_process
-
-    admin_user = User(email="ws-admin@example.com", full_name="Admin", is_admin=True)
-    admin_user.set_password("Secret123!")
-    db_session.add(admin_user)
-    await db_session.commit()
-    await db_session.refresh(admin_user)
-
-    token = generate_service_token(str(admin_user.id))
-
-    def override_get_ai_client():
-        return mock_ai_client
-
-    async def override_get_db():
-        yield db_session
-
-    overrides = {
-        get_ai_client: override_get_ai_client,
-        get_db: override_get_db,
-    }
-
-    with patch.dict(test_app.dependency_overrides, overrides):
-        with patch(
-            "app.services.admin.chat_streamer.get_chat_orchestrator", return_value=mock_orchestrator
-        ):
-            with TestClient(test_app) as client:
-                with client.websocket_connect(f"/admin/api/chat/ws?token={token}") as websocket:
-                    websocket.send_json({"question": "Test question"})
-
-                    has_delta = False
-                    while True:
-                        payload = websocket.receive_json()
-                        if payload.get("type") == "delta":
-                            has_delta = True
-                        if payload.get("type") == "complete":
-                            break
-
-                    assert has_delta, "Expected delta events for streamed content"
+    with TestClient(test_app) as client:
+        response = client.get("/admin/api/chat/ws")
+    assert response.status_code == 404
