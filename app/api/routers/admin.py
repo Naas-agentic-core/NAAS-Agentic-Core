@@ -221,6 +221,16 @@ async def chat_stream_ws(
                     },
                 ):
                     await websocket.send_json(normalize_streaming_event(event))
+            except HTTPException as http_exc:
+                await websocket.send_json(
+                    normalize_streaming_event(
+                        {
+                            "type": "error",
+                            "payload": {"details": str(http_exc.detail), "status_code": http_exc.status_code},
+                        }
+                    )
+                )
+                continue
             except Exception as exc:
                 await websocket.send_json(
                     normalize_streaming_event(

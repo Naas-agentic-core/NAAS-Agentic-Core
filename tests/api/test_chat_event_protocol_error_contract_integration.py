@@ -16,7 +16,7 @@ from app.api.routers.customer_chat import get_db as get_customer_db
 @pytest.mark.asyncio
 async def test_customer_ws_admin_actor_emits_assistant_error_when_flag_enabled(test_app) -> None:
     """يتحقق من أن منع حساب admin على قناة العملاء يُرسل assistant_error بالعقد الموحّد."""
-    mock_actor = SimpleNamespace(is_active=True, is_admin=True)
+    mock_actor = SimpleNamespace(id=1, is_active=True, is_admin=True)
     mock_db = AsyncMock()
     mock_db.get.return_value = mock_actor
 
@@ -41,7 +41,7 @@ async def test_customer_ws_admin_actor_emits_assistant_error_when_flag_enabled(t
 @pytest.mark.asyncio
 async def test_admin_ws_non_admin_actor_emits_assistant_error_when_flag_enabled(test_app) -> None:
     """يتحقق من أن منع الحساب العادي على قناة الإدارة يُرسل assistant_error بالعقد الموحّد."""
-    mock_actor = SimpleNamespace(is_active=True, is_admin=False)
+    mock_actor = SimpleNamespace(id=1, is_active=True, is_admin=False)
     mock_db = AsyncMock()
     mock_db.get.return_value = mock_actor
 
@@ -66,7 +66,7 @@ async def test_admin_ws_non_admin_actor_emits_assistant_error_when_flag_enabled(
 @pytest.mark.asyncio
 async def test_admin_ws_empty_question_emits_assistant_error_when_flag_enabled(test_app) -> None:
     """يتحقق من أن خطأ السؤال الفارغ في قناة الإدارة يُرسل assistant_error بالعقد الموحّد."""
-    mock_actor = SimpleNamespace(is_active=True, is_admin=True)
+    mock_actor = SimpleNamespace(id=1, is_active=True, is_admin=True)
     mock_db = AsyncMock()
     mock_db.get.return_value = mock_actor
 
@@ -93,7 +93,7 @@ async def test_customer_ws_dispatch_http_exception_emits_assistant_error_when_fl
     test_app,
 ) -> None:
     """يتحقق من تحويل فشل dispatch في قناة العملاء إلى assistant_error موحّد."""
-    mock_actor = SimpleNamespace(is_active=True, is_admin=False)
+    mock_actor = SimpleNamespace(id=1, is_active=True, is_admin=False)
     mock_db = AsyncMock()
     mock_db.get.return_value = mock_actor
 
@@ -106,7 +106,7 @@ async def test_customer_ws_dispatch_http_exception_emits_assistant_error_when_fl
         ):
             with patch("app.api.routers.customer_chat.decode_user_id", return_value=1):
                 with patch(
-                    "app.services.chat.orchestrator.ChatOrchestrator.dispatch",
+                        "app.infrastructure.clients.orchestrator_client.OrchestratorClient.chat_with_agent",
                     side_effect=HTTPException(status_code=422, detail="dispatch failed"),
                 ):
                     with TestClient(test_app) as client:
@@ -125,7 +125,7 @@ async def test_admin_ws_dispatch_http_exception_emits_assistant_error_when_flag_
     test_app,
 ) -> None:
     """يتحقق من تحويل فشل dispatch في قناة الإدارة إلى assistant_error موحّد."""
-    mock_actor = SimpleNamespace(is_active=True, is_admin=True)
+    mock_actor = SimpleNamespace(id=1, is_active=True, is_admin=True)
     mock_db = AsyncMock()
     mock_db.get.return_value = mock_actor
 
@@ -138,7 +138,7 @@ async def test_admin_ws_dispatch_http_exception_emits_assistant_error_when_flag_
         ):
             with patch("app.api.routers.admin.decode_user_id", return_value=1):
                 with patch(
-                    "app.services.chat.orchestrator.ChatOrchestrator.dispatch",
+                        "app.infrastructure.clients.orchestrator_client.OrchestratorClient.chat_with_agent",
                     side_effect=HTTPException(status_code=409, detail="admin dispatch failed"),
                 ):
                     with TestClient(test_app) as client:
