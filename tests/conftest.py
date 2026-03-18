@@ -339,8 +339,6 @@ def test_app(static_dir: Path) -> FastAPI:
         "test-secret-key-that-is-very-long-and-secure-enough-for-tests-v4",
     )
     session_factory = _get_session_factory()
-    from app.api.routers.admin import get_session_factory as get_admin_session_factory
-    from app.api.routers.customer_chat import get_session_factory
     from app.core.database import get_db
     from app.core.settings.base import get_settings
     from app.main import create_app
@@ -358,8 +356,6 @@ def test_app(static_dir: Path) -> FastAPI:
             yield session
 
     app.dependency_overrides[get_db] = override_get_db
-    app.dependency_overrides[get_session_factory] = lambda: session_factory
-    app.dependency_overrides[get_admin_session_factory] = lambda: session_factory
     return app
 
 
