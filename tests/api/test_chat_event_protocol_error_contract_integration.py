@@ -106,7 +106,7 @@ async def test_customer_ws_dispatch_http_exception_emits_assistant_error_when_fl
         ):
             with patch("app.api.routers.customer_chat.decode_user_id", return_value=1):
                 with patch(
-                        "app.infrastructure.clients.orchestrator_client.OrchestratorClient.chat_with_agent",
+                    "app.infrastructure.clients.orchestrator_client.OrchestratorClient.chat_with_agent",
                     side_effect=HTTPException(status_code=422, detail="dispatch failed"),
                 ):
                     with TestClient(test_app) as client:
@@ -138,7 +138,7 @@ async def test_admin_ws_dispatch_http_exception_emits_assistant_error_when_flag_
         ):
             with patch("app.api.routers.admin.decode_user_id", return_value=1):
                 with patch(
-                        "app.infrastructure.clients.orchestrator_client.OrchestratorClient.chat_with_agent",
+                    "app.infrastructure.clients.orchestrator_client.OrchestratorClient.chat_with_agent",
                     side_effect=HTTPException(status_code=409, detail="admin dispatch failed"),
                 ):
                     with TestClient(test_app) as client:
