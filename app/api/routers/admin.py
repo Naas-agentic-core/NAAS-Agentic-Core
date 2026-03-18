@@ -226,7 +226,10 @@ async def chat_stream_ws(
                     normalize_streaming_event(
                         {
                             "type": "error",
-                            "payload": {"details": str(http_exc.detail), "status_code": http_exc.status_code},
+                            "payload": {
+                                "details": str(http_exc.detail),
+                                "status_code": http_exc.status_code,
+                            },
                         }
                     )
                 )
