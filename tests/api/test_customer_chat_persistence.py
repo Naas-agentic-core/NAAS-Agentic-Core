@@ -78,7 +78,6 @@ async def test_customer_chat_stream_delivers_final_message(
         yield {"type": "delta", "payload": {"content": "Hello learner"}}
         yield {"type": "complete", "payload": {"status": "done"}}
 
-
     async def override_get_db() -> AsyncGenerator[AsyncSession, None]:
         yield db_session
 
@@ -151,7 +150,6 @@ async def test_customer_chat_returns_error_on_stream_failure(
     async def _failed_stream() -> AsyncGenerator[dict[str, object], None]:
         yield {"type": "conversation_init", "payload": {"conversation_id": 1, "title": "t"}}
         raise RuntimeError("stream failed")
-
 
     async def override_get_db() -> AsyncGenerator[AsyncSession, None]:
         yield db_session
@@ -226,7 +224,11 @@ async def test_customer_chat_history_endpoint_reads_persisted_websocket_messages
     try:
         token = await _create_user_and_token(db_session, "history-visible@example.com")
         user = (
-            (await db_session.execute(select(User).where(User.email == "history-visible@example.com")))
+            (
+                await db_session.execute(
+                    select(User).where(User.email == "history-visible@example.com")
+                )
+            )
             .scalars()
             .one()
         )
