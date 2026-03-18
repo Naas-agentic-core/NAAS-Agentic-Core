@@ -20,7 +20,7 @@ async def test_tool_access_block_returns_fallback_event(
     async def override_get_db() -> AsyncGenerator[object, None]:
         yield db_session
 
-    async def mock_chat_with_agent(**kwargs: object) -> AsyncGenerator[dict[str, object], None]:
+    async def _stream_fallback() -> AsyncGenerator[dict[str, object], None]:
         yield {
             "type": "assistant_fallback",
             "payload": {"content": "لا يمكنني تنفيذ هذا الطلب."},
@@ -34,15 +34,19 @@ async def test_tool_access_block_returns_fallback_event(
         from app.services.chat.tool_router import ToolAuthorizationDecision
 
         with patch(
-            "app.services.chat.tool_router.ToolRouter.authorize_intent",
-            return_value=ToolAuthorizationDecision(
+            "app.api.routers.customer_chat.orchestrator_client.chat_with_agent",
+            return_value=_stream_fallback(),
+        ):
+            with patch(
+                "app.services.chat.tool_router.ToolRouter.authorize_intent",
+                return_value=ToolAuthorizationDecision(
                 intent=ChatIntent.FILE_READ,
                 allowed=False,
                 reason_code="TOOL_NOT_ALLOWED",
                 refusal_message="عذرًا، لا يمكنني تنفيذ هذا الطلب.",
-            ),
-        ):
-            token = await register_and_login_test_user(db_session, "tool-block@example.com")
+                ),
+            ):
+                token = await register_and_login_test_user(db_session, "tool-block@example.com")
 
             refusal_text = ""
             final_payload_type = ""
