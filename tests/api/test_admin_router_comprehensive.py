@@ -3,15 +3,14 @@
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from app.api.routers.admin import (
-    get_ai_client,
     get_current_user_id,
-    get_db,
     router,
 )
+from app.core.database import get_db
 from app.core.domain.user import User
 
 
@@ -127,10 +126,6 @@ def test_chat_stream_ws_orchestrator_error(app):
 
     app.dependency_overrides[get_db] = lambda: mock_db
 
-    def mock_dependency_factory():
-        return MagicMock()
-
-    app.dependency_overrides[get_ai_client] = mock_dependency_factory
     with patch(
         "app.api.routers.admin.extract_websocket_auth",
         return_value=("valid_token", "json"),

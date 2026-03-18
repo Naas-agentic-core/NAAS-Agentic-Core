@@ -9,20 +9,12 @@ def test_chat_routers_keep_compatibility_facade_and_canonical_authority() -> Non
     """يثبت أن مسارات chat في التطبيق تبقى واجهات توافقية وتفويضها للمنسق الرسمي."""
 
     admin_router = Path("app/api/routers/admin.py").read_text(encoding="utf-8")
-    customer_router = Path("app/api/routers/customer_chat.py").read_text(
-        encoding="utf-8"
-    )
+    customer_router = Path("app/api/routers/customer_chat.py").read_text(encoding="utf-8")
 
     assert "COMPATIBILITY_FACADE_MODE = True" in admin_router
     assert "COMPATIBILITY_FACADE_MODE = True" in customer_router
-    assert (
-        'CANONICAL_EXECUTION_AUTHORITY = "orchestrator-service:/agent/chat"'
-        in admin_router
-    )
-    assert (
-        'CANONICAL_EXECUTION_AUTHORITY = "orchestrator-service:/agent/chat"'
-        in customer_router
-    )
+    assert 'CANONICAL_EXECUTION_AUTHORITY = "orchestrator-service:/agent/chat"' in admin_router
+    assert 'CANONICAL_EXECUTION_AUTHORITY = "orchestrator-service:/agent/chat"' in customer_router
 
 
 def test_gateway_remains_canonical_runtime_entry_for_chat_paths() -> None:
@@ -43,19 +35,16 @@ def test_orchestrator_state_uses_microservice_mission_models_only() -> None:
         "microservices/orchestrator_service/src/services/overmind/state.py"
     ).read_text(encoding="utf-8")
 
-    assert (
-        "from microservices.orchestrator_service.src.models.mission import ("
-        in state_module
-    )
+    assert "from microservices.orchestrator_service.src.models.mission import (" in state_module
     assert "from app.core.domain.mission import" not in state_module
 
 
 def test_orchestrator_routes_do_not_import_monolith_api_surfaces() -> None:
     """يمنع توسيع split-brain عبر استيراد واجهات monolith داخل مسارات orchestrator."""
 
-    routes_module = Path(
-        "microservices/orchestrator_service/src/api/routes.py"
-    ).read_text(encoding="utf-8")
+    routes_module = Path("microservices/orchestrator_service/src/api/routes.py").read_text(
+        encoding="utf-8"
+    )
 
     assert "from app.api" not in routes_module
     assert "from app.services.chat" not in routes_module
