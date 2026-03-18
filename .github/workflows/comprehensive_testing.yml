@@ -13,7 +13,7 @@ concurrency:
 env:
   PYTHON_VERSION: '3.12'
   DATABASE_URL: "sqlite+aiosqlite:///:memory:"
-  SECRET_KEY: "test-secret-key-for-ci"
+  SECRET_KEY: "test-secret-key-for-ci-pipeline-secure-length"
   ENVIRONMENT: "testing"
   LLM_MOCK_MODE: '1'
   SUPABASE_URL: "https://dummy.supabase.co"
