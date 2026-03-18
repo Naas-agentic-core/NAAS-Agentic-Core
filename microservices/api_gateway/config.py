@@ -81,13 +81,9 @@ class Settings(BaseSettings):
             ):
                 raise ValueError("SECRET_KEY غير آمن لبيئة production/staging")
             if self.ALLOWED_HOSTS == ["*"]:
-                raise ValueError(
-                    "ALLOWED_HOSTS لا يمكن أن تكون '*' في production/staging"
-                )
+                raise ValueError("ALLOWED_HOSTS لا يمكن أن تكون '*' في production/staging")
             if self.BACKEND_CORS_ORIGINS == ["*"]:
-                raise ValueError(
-                    "BACKEND_CORS_ORIGINS لا يمكن أن تكون '*' في production/staging"
-                )
+                raise ValueError("BACKEND_CORS_ORIGINS لا يمكن أن تكون '*' في production/staging")
 
         rollout_requested = (
             self.ROUTE_CHAT_HTTP_CONVERSATION_ROLLOUT_PERCENT > 0

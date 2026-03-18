@@ -69,9 +69,7 @@ class CircuitBreaker:
             if self.state == CircuitState.HALF_OPEN:
                 self.state = CircuitState.CLOSED
                 self.failures = 0
-                logger.info(
-                    f"Circuit '{self.name}' recovered. State changed to CLOSED."
-                )
+                logger.info(f"Circuit '{self.name}' recovered. State changed to CLOSED.")
 
             return result
         except HTTPException:
@@ -81,18 +79,11 @@ class CircuitBreaker:
             # Count failure for network/system errors
             self.failures += 1
             self.last_failure_time = time.time()
-            logger.error(
-                f"Circuit '{self.name}' recorded failure #{self.failures}: {e!s}"
-            )
+            logger.error(f"Circuit '{self.name}' recorded failure #{self.failures}: {e!s}")
 
-            if (
-                self.state == CircuitState.HALF_OPEN
-                or self.failures >= self.failure_threshold
-            ):
+            if self.state == CircuitState.HALF_OPEN or self.failures >= self.failure_threshold:
                 self.state = CircuitState.OPEN
-                logger.error(
-                    f"Circuit '{self.name}' threshold reached. State changed to OPEN."
-                )
+                logger.error(f"Circuit '{self.name}' threshold reached. State changed to OPEN.")
 
             raise e
 

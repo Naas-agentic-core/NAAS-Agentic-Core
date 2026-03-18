@@ -18,12 +18,12 @@ from app.core.database import get_db
 from app.core.di import get_logger
 from app.core.domain.user import User
 from app.deps.auth import CurrentUser, require_permissions
+from app.infrastructure.clients.orchestrator_client import orchestrator_client
 from app.services.auth.token_decoder import decode_user_id
 from app.services.boundaries.customer_chat_boundary_service import (
     CustomerChatBoundaryService,
 )
 from app.services.chat.event_protocol import normalize_streaming_event
-from app.infrastructure.clients.orchestrator_client import orchestrator_client
 from app.services.rbac import QA_SUBMIT
 
 logger = get_logger(__name__)
@@ -150,9 +150,7 @@ async def chat_stream_ws(
                     normalized_event = normalize_streaming_event(event)
                     await websocket.send_json(normalized_event)
             except Exception as exc:
-                logger.error(
-                    f"Error in compatibility facade stream: {exc}", exc_info=True
-                )
+                logger.error(f"Error in compatibility facade stream: {exc}", exc_info=True)
                 await websocket.send_json(
                     normalize_streaming_event(
                         {
