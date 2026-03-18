@@ -40,10 +40,10 @@ async def test_tool_access_block_returns_fallback_event(
             with patch(
                 "app.services.chat.tool_router.ToolRouter.authorize_intent",
                 return_value=ToolAuthorizationDecision(
-                intent=ChatIntent.FILE_READ,
-                allowed=False,
-                reason_code="TOOL_NOT_ALLOWED",
-                refusal_message="عذرًا، لا يمكنني تنفيذ هذا الطلب.",
+                    intent=ChatIntent.FILE_READ,
+                    allowed=False,
+                    reason_code="TOOL_NOT_ALLOWED",
+                    refusal_message="عذرًا، لا يمكنني تنفيذ هذا الطلب.",
                 ),
             ):
                 token = await register_and_login_test_user(db_session, "tool-block@example.com")
