@@ -45,6 +45,14 @@ jobs:
     name: contracts
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    env:
+      DATABASE_URL: "sqlite+aiosqlite:///:memory:"
+      SECRET_KEY: test-secret-key-for-ci-pipeline-secure-length
+      ENVIRONMENT: testing
+      LLM_MOCK_MODE: "1"
+      SUPABASE_URL: https://dummy.supabase.co
+      SUPABASE_SERVICE_ROLE_KEY: dummy-key-for-ci
+      RECOVERY_ADMIN_PASSWORD: dummy-pass-for-ci
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -66,6 +74,14 @@ jobs:
     name: guardrails
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    env:
+      DATABASE_URL: "sqlite+aiosqlite:///:memory:"
+      SECRET_KEY: test-secret-key-for-ci-pipeline-secure-length
+      ENVIRONMENT: testing
+      LLM_MOCK_MODE: "1"
+      SUPABASE_URL: https://dummy.supabase.co
+      SUPABASE_SERVICE_ROLE_KEY: dummy-key-for-ci
+      RECOVERY_ADMIN_PASSWORD: dummy-pass-for-ci
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
