@@ -43,9 +43,7 @@ async def test_chat_error_handling_with_auth_but_service_error(test_app, db_sess
     }
 
     with patch.dict(test_app.dependency_overrides, overrides):
-        with patch(
-            "app.services.boundaries.admin_chat_boundary_service.AdminChatBoundaryService.stream_chat_response"
-        ) as mock_stream:
+        with patch("app.api.routers.admin.orchestrator_client.chat_with_agent") as mock_stream:
 
             async def mock_generator(*args, **kwargs):
                 yield {"type": "delta", "payload": {"content": "some data"}}
@@ -58,13 +56,16 @@ async def test_chat_error_handling_with_auth_but_service_error(test_app, db_sess
                     websocket.send_json({"question": "Hello"})
 
                     error_payload = None
-                    while True:
-                        payload = websocket.receive_json()
-                        if payload.get("type") == "error":
-                            error_payload = payload
-                            break
-                        if payload.get("type") == "complete":
-                            break
+                    try:
+                        while True:
+                            payload = websocket.receive_json()
+                            if payload.get("type") == "error" or payload.get("type") == "assistant_error":
+                                error_payload = payload
+                                break
+                            if payload.get("type") == "complete":
+                                break
+                    except Exception:
+                        pass
 
             assert error_payload is not None
             assert "AI Service Down" in str(error_payload.get("payload", {}).get("details"))

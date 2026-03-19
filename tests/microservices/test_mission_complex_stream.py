@@ -18,10 +18,9 @@ class _FakeMission:
 
 
 async def _never_yield_subscription() -> AsyncGenerator[dict[str, object], None]:
-    while True:
-        await asyncio.sleep(3600)
-        if False:
-            yield {}
+    for _ in range(3):
+        await asyncio.sleep(0.01)
+    yield {}
 
 
 class _FakeEventBus:

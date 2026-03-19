@@ -1,5 +1,11 @@
-from llama_index.core.workflow import Context, Event, StartEvent, StopEvent, Workflow, step
-
+from microservices.reasoning_agent.src.compat import (
+    Context,
+    Event,
+    StartEvent,
+    StopEvent,
+    Workflow,
+    step,
+)
 from microservices.reasoning_agent.src.core.logging import get_logger
 from microservices.reasoning_agent.src.services.ai_service import ai_service
 from microservices.reasoning_agent.src.services.strategies.mcts import mcts_strategy
