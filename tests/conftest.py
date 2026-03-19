@@ -275,6 +275,9 @@ def db_lifecycle(event_loop: asyncio.AbstractEventLoop, request: pytest.FixtureR
                 # Import microservice models explicitly to ensure schema is correct
                 # This ensures that even if Monolith models aren't loaded, these are.
                 import microservices.user_service.models  # noqa: F401
+        else:
+            # Ensure monolith models are loaded
+            from app.core.domain import audit, user  # noqa: F401
 
         # Deduplicate indexes to handle potential accumulation from multiple test runs
         # or conflicts between Monolith and Microservice models extending the same table
