@@ -8,7 +8,7 @@ permissions:
 
 concurrency:
   group: comprehensive-testing-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 env:
   PYTHON_VERSION: '3.12'

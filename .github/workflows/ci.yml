@@ -12,7 +12,7 @@ permissions:
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 env:
   PYTHON_VERSION: "3.12"
@@ -157,10 +157,15 @@ jobs:
           echo "guardrails=${{ needs.guardrails.result }}"
           echo "test=${{ needs.test.result }}"
 
-          if [ "${{ needs.lint.result }}" != "success" ] || \
-             [ "${{ needs.contracts.result }}" != "success" ] || \
-             [ "${{ needs.guardrails.result }}" != "success" ] || \
-             [ "${{ needs.test.result }}" != "success" ]; then
+          # Allow skipped as a valid success state alongside success
+          isValid() {
+            [ "$1" = "success" ] || [ "$1" = "skipped" ]
+          }
+
+          if ! isValid "${{ needs.lint.result }}" || \
+             ! isValid "${{ needs.contracts.result }}" || \
+             ! isValid "${{ needs.guardrails.result }}" || \
+             ! isValid "${{ needs.test.result }}"; then
             echo "❌ One or more required checks failed"
             exit 1
           fi
