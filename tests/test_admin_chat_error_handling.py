@@ -59,7 +59,10 @@ async def test_chat_error_handling_with_auth_but_service_error(test_app, db_sess
                     try:
                         while True:
                             payload = websocket.receive_json()
-                            if payload.get("type") == "error" or payload.get("type") == "assistant_error":
+                            if (
+                                payload.get("type") == "error"
+                                or payload.get("type") == "assistant_error"
+                            ):
                                 error_payload = payload
                                 break
                             if payload.get("type") == "complete":
