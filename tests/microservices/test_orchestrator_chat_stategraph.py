@@ -115,6 +115,8 @@ def test_chat_ws_customer_uses_stategraph(monkeypatch) -> None:
 
         while True:
             evt = ws.receive_json()
+            if evt.get("type") in ["error", "assistant_error"]:
+                pytest.fail(f"Unexpected error event: {evt}")
             if evt["type"] == "assistant_final":
                 assert evt["payload"]["content"] == "Fake Graph WS Result"
                 assert evt["payload"]["route_id"] == "chat_ws_customer"
@@ -157,6 +159,8 @@ def test_chat_ws_admin_uses_stategraph(monkeypatch) -> None:
 
         while True:
             evt = ws.receive_json()
+            if evt.get("type") in ["error", "assistant_error"]:
+                pytest.fail(f"Unexpected error event: {evt}")
             if evt["type"] == "assistant_final":
                 assert evt["payload"]["content"] == "Fake Graph Admin WS Result"
                 assert evt["payload"]["route_id"] == "chat_ws_admin"
@@ -207,6 +211,8 @@ def test_chat_ws_admin_sanitizes_streaming_errors(monkeypatch) -> None:
         _ = ws.receive_json()  # conversation_init
         while True:
             evt = ws.receive_json()
+            if evt.get("type") == "error":
+                pytest.fail(f"Unexpected raw error event: {evt}")
             if evt.get("type") == "assistant_error":
                 content = evt["payload"]["content"]
                 assert "sensitive-internal-stack" not in content
