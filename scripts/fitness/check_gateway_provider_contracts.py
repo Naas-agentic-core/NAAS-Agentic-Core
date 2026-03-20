@@ -14,7 +14,7 @@ GATEWAY_CONFIG = REPO_ROOT / "microservices/api_gateway/config.py"
 
 def _load_contract() -> dict[str, object]:
     data = json.loads(CONTRACT_PATH.read_text(encoding="utf-8"))
-    if not data.get("http") or not data.get("websocket"):
+    if "http" not in data or "websocket" not in data:
         raise ValueError("Contract must define both http and websocket sections")
     return data
 

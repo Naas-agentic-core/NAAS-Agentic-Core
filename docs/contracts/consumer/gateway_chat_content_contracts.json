@@ -5,47 +5,7 @@
     "orchestrator-service",
     "research-agent"
   ],
-  "http": [
-    {
-      "route": "/api/chat/{path:path}",
-      "methods": [
-        "GET",
-        "POST",
-        "PUT",
-        "DELETE",
-        "PATCH",
-        "OPTIONS",
-        "HEAD"
-      ],
-      "provider_default": "orchestrator-service",
-      "request_content_types": [
-        "application/json"
-      ],
-      "response_content_types": [
-        "application/json",
-        "text/event-stream"
-      ]
-    },
-    {
-      "route": "/v1/content/{path:path}",
-      "methods": [
-        "GET",
-        "POST",
-        "PUT",
-        "DELETE",
-        "PATCH",
-        "OPTIONS",
-        "HEAD"
-      ],
-      "provider_default": "research-agent",
-      "request_content_types": [
-        "application/json"
-      ],
-      "response_content_types": [
-        "application/json"
-      ]
-    }
-  ],
+  "http": [],
   "websocket": [
     {
       "route": "/api/chat/ws",
