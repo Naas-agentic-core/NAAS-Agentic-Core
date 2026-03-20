@@ -9,6 +9,7 @@ on:
       - 'app/**'
       - 'tests/**'
       - 'scripts/validate_structure.py'
+      - 'requirements-ci.txt'
       - 'requirements-test.txt'
       - '.github/workflows/structure-validation.yml'
   workflow_dispatch:
