@@ -9,4 +9,4 @@ aiosqlite>=0.17.0
 openai==1.55.0
 langgraph
 dspy-ai==2.5.43
-litellm==1.50.0
+litellm==1.61.15
