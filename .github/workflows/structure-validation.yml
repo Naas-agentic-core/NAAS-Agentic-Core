@@ -86,7 +86,7 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: pip
-          cache-dependency-path: requirements-test.txt
+          cache-dependency-path: requirements-ci.txt
 
       - name: Set up deterministic environment
         uses: ./.github/actions/setup
@@ -96,7 +96,7 @@ jobs:
         run: |
           set -euo pipefail
           python -m pip install --upgrade pip
-          pip install -r requirements-test.txt
+          pip install -r requirements-ci.txt
           exit 0
 
       - name: Run integration tests (best effort)
