@@ -18,7 +18,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: "Checkout Code"
+      - name: "Fetch Repository"
         uses: actions/checkout@v4
         with:
           fetch-depth: 0  # Full history for deep analysis
@@ -29,14 +29,20 @@ jobs:
           python-version: "3.12"
 
       - name: "Install Enterprise Dependencies"
+        shell: bash
         run: |
+          set -euo pipefail
           pip install requests pyyaml
+          exit 0
 
       - name: "Establish Workload Identity Trust"
         # In a real environment, this step would use google-github-actions/auth
         # Here we simulate the OIDC token presence for our scripts
+        shell: bash
         run: |
+          set -euo pipefail
           echo "GITHUB_OIDC_TOKEN=simulated-oidc-token-$(date +%s)" >> $GITHUB_ENV
+          exit 0
 
       - name: "🚀 Run Omega Orchestrator (Autonomous Mode)"
         env:
@@ -44,9 +50,12 @@ jobs:
           SYNC_GITHUB_ID: ${{ vars.SYNC_GITHUB_ID }}
           SYNC_GITLAB_TOKEN: ${{ secrets.SYNC_GITLAB_TOKEN }}
           SYNC_GITLAB_ID: ${{ vars.SYNC_GITLAB_ID }}
+        shell: bash
         run: |
+          set -euo pipefail
           # The orchestrator runs security checks, self-healing, and sync logic
           python scripts/omega_orchestrator.py --mode=monitor
+          exit 0
 
       - name: "Upload Diagnostic Report"
         if: failure()

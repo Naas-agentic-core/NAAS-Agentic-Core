@@ -22,6 +22,9 @@ Faker==38.2.0
 hypothesis==6.148.7
 sortedcontainers==2.4.0
 
+# Timeout protection for long-running and fuzz suites
+pytest-timeout==2.4.0
+
 # Mutation Testing
 mutmut==3.4.0
 

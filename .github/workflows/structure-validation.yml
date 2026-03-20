@@ -22,6 +22,13 @@ concurrency:
 
 env:
   PYTHON_VERSION: '3.12'
+  DATABASE_URL: "sqlite+aiosqlite:///:memory:"
+  SECRET_KEY: "test-secret-key-for-ci-pipeline-secure-length"
+  ENVIRONMENT: "testing"
+  LLM_MOCK_MODE: '1'
+  SUPABASE_URL: "https://dummy.supabase.co"
+  SUPABASE_SERVICE_ROLE_KEY: "dummy-key-for-ci"
+  RECOVERY_ADMIN_PASSWORD: "dummy-pass-for-ci"
 
 jobs:
   validate-structure:
@@ -30,7 +37,7 @@ jobs:
     timeout-minutes: 15
 
     steps:
-      - name: Checkout code
+      - name: Fetch repository
         uses: actions/checkout@v4
 
       - name: Set up Python
@@ -40,13 +47,23 @@ jobs:
           cache: pip
           cache-dependency-path: requirements-test.txt
 
+      - name: Set up deterministic environment
+        uses: ./.github/actions/setup
+
       - name: Install minimal tooling
+        shell: bash
         run: |
+          set -euo pipefail
           python -m pip install --upgrade pip
           pip install -r requirements-test.txt
+          exit 0
 
       - name: Run structure validation
-        run: python scripts/validate_structure.py
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/validate_structure.py
+          exit 0
 
   validate-integration:
     name: Integration Tests (E2E Chat)
@@ -71,7 +88,7 @@ jobs:
           - 5432:5432
 
     steps:
-      - name: Checkout code
+      - name: Fetch repository
         uses: actions/checkout@v4
 
       - name: Set up Python
@@ -81,10 +98,16 @@ jobs:
           cache: pip
           cache-dependency-path: requirements-test.txt
 
+      - name: Set up deterministic environment
+        uses: ./.github/actions/setup
+
       - name: Install integration test dependencies
+        shell: bash
         run: |
+          set -euo pipefail
           python -m pip install --upgrade pip
           pip install -r requirements-test.txt
+          exit 0
 
       - name: Run integration tests (best effort)
         env:
@@ -94,7 +117,10 @@ jobs:
           LLM_MOCK_MODE: '1'
           SUPABASE_URL: https://dummy.supabase.co
           SUPABASE_SERVICE_ROLE_KEY: dummy-key-for-ci
+          RECOVERY_ADMIN_PASSWORD: dummy-pass-for-ci
+        shell: bash
         run: |
+          set -euo pipefail
           if [ -f "tests/integration/test_chat_e2e.py" ]; then
             if python -m pytest tests/integration/test_chat_e2e.py -v --tb=short; then
               echo "INTEGRATION_STATUS=passed" >> "$GITHUB_ENV"
@@ -106,9 +132,13 @@ jobs:
             echo "ℹ️ tests/integration/test_chat_e2e.py not found, skipping targeted E2E suite."
             echo "INTEGRATION_STATUS=skipped" >> "$GITHUB_ENV"
           fi
+          exit 0
 
       - name: Integration suite summary
         if: always()
+        shell: bash
         run: |
+          set -euo pipefail
           echo "### Integration smoke status: ${INTEGRATION_STATUS:-unknown}" >> "$GITHUB_STEP_SUMMARY"
           echo "ℹ️ Integration smoke is best-effort and does not block merge in this workflow." >> "$GITHUB_STEP_SUMMARY"
+          exit 0

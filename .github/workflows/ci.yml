@@ -45,9 +45,17 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements-dev.txt
       - name: Ruff lint
-        run: ruff check .
+        shell: bash
+        run: |
+          set -euo pipefail
+          ruff check .
+          exit 0
       - name: Ruff format check
-        run: ruff format --check .
+        shell: bash
+        run: |
+          set -euo pipefail
+          ruff format --check .
+          exit 0
 
   contracts:
     name: contracts
@@ -74,9 +82,12 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements-test.txt
       - name: Validate contracts and provider parity
+        shell: bash
         run: |
+          set -euo pipefail
           python scripts/fitness/check_gateway_provider_contracts.py
           python -m pytest -q tests/contracts/test_gateway_provider_contracts.py
+          exit 0
 
   guardrails:
     name: guardrails
@@ -103,11 +114,14 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements-test.txt
       - name: Run architectural guardrails
+        shell: bash
         run: |
+          set -euo pipefail
           python scripts/ci_guardrails.py
           python scripts/fitness/check_no_app_imports_in_microservices.py --strict
           python scripts/fitness/check_route_registry_parity.py
           python scripts/fitness/check_tracing_gate.py
+          exit 0
 
   test:
     name: test
@@ -134,8 +148,11 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements-test.txt
       - name: Run tests
+        shell: bash
         run: |
+          set -euo pipefail
           python -m pytest -v --cov=app --cov-report=xml:coverage.xml --cov-report=term-missing --durations=10 --tb=short
+          exit 0
       - name: Upload coverage artifact
         if: always()
         uses: actions/upload-artifact@v4
@@ -151,7 +168,9 @@ jobs:
     if: always() && !cancelled()
     steps:
       - name: Evaluate required checks
+        shell: bash
         run: |
+          set -euo pipefail
           echo "lint=${{ needs.lint.result }}"
           echo "contracts=${{ needs.contracts.result }}"
           echo "guardrails=${{ needs.guardrails.result }}"
@@ -171,3 +190,4 @@ jobs:
           fi
 
           echo "✅ All required checks passed"
+          exit 0
