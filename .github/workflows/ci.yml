@@ -87,6 +87,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          python -m pip install sqlalchemy PyJWT PyJWT[crypto]
           python scripts/fitness/check_gateway_provider_contracts.py
           python -m pytest -q tests/contracts/test_gateway_provider_contracts.py
           exit 0
