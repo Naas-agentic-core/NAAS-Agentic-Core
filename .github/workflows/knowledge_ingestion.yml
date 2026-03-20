@@ -21,7 +21,7 @@ jobs:
     timeout-minutes: 20
 
     steps:
-      - name: Checkout code
+      - name: Fetch repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
@@ -34,15 +34,21 @@ jobs:
           cache-dependency-path: requirements.txt
 
       - name: Install system dependencies (OCR)
+        shell: bash
         run: |
+          set -euo pipefail
           sudo apt-get update
           sudo apt-get install -y tesseract-ocr libtesseract-dev
+          exit 0
 
       - name: Install Python dependencies
+        shell: bash
         run: |
+          set -euo pipefail
           python -m pip install --upgrade pip
           pip install -r requirements.txt
           pip install pypdf python-docx openpyxl pandas pillow pytesseract httpx
+          exit 0
 
       - name: Get changed files
         id: changed-files
@@ -57,7 +63,9 @@ jobs:
         env:
           MEMORY_API_URL: ${{ secrets.MEMORY_AGENT_API_URL }}
           CHANGED_FILES: ${{ steps.changed-files.outputs.all_changed_files }}
+        shell: bash
         run: |
+          set -euo pipefail
           if [ -z "$MEMORY_API_URL" ]; then
             echo "::warning::MEMORY_AGENT_API_URL secret is not set. Running in dry-run mode."
             DRY_RUN_FLAG="--dry-run"
@@ -95,7 +103,12 @@ jobs:
                   print(f'❌ Failed to ingest {file_path}')
                   sys.exit(1)
           "
+          exit 0
 
       - name: No changes summary
         if: steps.changed-files.outputs.any_changed != 'true'
-        run: echo "ℹ️ No changes detected under knowledge_base/."
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "ℹ️ No changes detected under knowledge_base/."
+          exit 0

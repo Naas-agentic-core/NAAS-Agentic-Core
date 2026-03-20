@@ -18,6 +18,7 @@ env:
   LLM_MOCK_MODE: '1'
   SUPABASE_URL: "https://dummy.supabase.co"
   SUPABASE_SERVICE_ROLE_KEY: "dummy-key-for-ci"
+  RECOVERY_ADMIN_PASSWORD: "dummy-pass-for-ci"
 
 jobs:
   quality-gate:
@@ -51,7 +52,7 @@ jobs:
             extra_args: '--junit-xml=security-junit.xml'
 
     steps:
-      - name: Checkout code
+      - name: Fetch repository
         uses: actions/checkout@v4
 
       - name: Set up Python
@@ -61,14 +62,21 @@ jobs:
           cache: pip
           cache-dependency-path: requirements-test.txt
 
+      - name: Set up deterministic environment
+        uses: ./.github/actions/setup
+
       - name: Install dependencies
+        shell: bash
         run: |
+          set -euo pipefail
           python -m pip install --upgrade pip
           pip install -r requirements-test.txt
+          exit 0
 
       - name: Execute ${{ matrix.suite.name }} suite
         shell: bash
         run: |
+          set -euo pipefail
           if [ ! -d "${{ matrix.suite.path }}" ]; then
             echo "ℹ️ Directory ${{ matrix.suite.path }} not found. Skipping suite=${{ matrix.suite.name }}."
             exit 0
@@ -81,6 +89,7 @@ jobs:
 
           # shellcheck disable=SC2086
           eval "python -m pytest ${{ matrix.suite.path }} -v ${MARKER_ARGS} ${{ matrix.suite.extra_args }}"
+          exit 0
 
       - name: Upload suite artifacts
         if: always()
@@ -101,10 +110,13 @@ jobs:
 
     steps:
       - name: Evaluate matrix outcome
+        shell: bash
         run: |
+          set -euo pipefail
           echo "quality-gate=${{ needs.quality-gate.result }}"
           if [ "${{ needs.quality-gate.result }}" != "success" ]; then
             echo "❌ Comprehensive quality gate failed"
             exit 1
           fi
           echo "✅ Comprehensive quality gate passed"
+          exit 0
