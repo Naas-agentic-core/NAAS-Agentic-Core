@@ -82,13 +82,15 @@ jobs:
             exit 0
           fi
 
-          MARKER_ARGS=""
+          command=(python -m pytest "${{ matrix.suite.path }}" -v)
           if [ -n "${{ matrix.suite.marker }}" ]; then
-            MARKER_ARGS="-m \"${{ matrix.suite.marker }}\""
+            command+=(-m "${{ matrix.suite.marker }}")
           fi
 
-          # shellcheck disable=SC2086
-          eval "python -m pytest ${{ matrix.suite.path }} -v ${MARKER_ARGS} ${{ matrix.suite.extra_args }}"
+          read -r -a extra_args <<< "${{ matrix.suite.extra_args }}"
+          command+=("${extra_args[@]}")
+
+          "${command[@]}"
           exit 0
 
       - name: Upload suite artifacts
