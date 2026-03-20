@@ -29,6 +29,8 @@ tenacity==8.2.3
 redis>=5.0.0
 websockets>=12.0
 beautifulsoup4==4.12.3
+numpy>=1.26.0
+pyyaml==6.0.1
 
 # AI/runtime imports exercised by the current test suite
 langgraph==1.0.8
