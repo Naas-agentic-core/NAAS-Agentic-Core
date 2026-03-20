@@ -70,6 +70,7 @@ def _should_skip_db_fixtures(request: pytest.FixtureRequest) -> bool:
     isolated_paths = (
         "tests/unit/overmind/knowledge_graph/",
         "tests/unit/overmind/langgraph/",
+        "tests/api_gateway/test_trace_propagation.py",
     )
     request_path = str(request.path).replace("\\", "/")
     return any(path in request_path for path in isolated_paths)
