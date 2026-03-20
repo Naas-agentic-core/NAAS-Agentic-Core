@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import subprocess
 from pathlib import Path
 
@@ -23,6 +24,7 @@ def _run_pytest_trace_contract() -> bool:
         cwd=REPO_ROOT,
         check=False,
         capture_output=True,
+        env={**os.environ, "SKIP_DB_FIXTURES": "1"},
         text=True,
     )
     if result.returncode != 0:

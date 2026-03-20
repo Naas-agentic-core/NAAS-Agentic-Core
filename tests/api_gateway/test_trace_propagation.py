@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import pytest
 from fastapi.responses import PlainTextResponse
 from fastapi.testclient import TestClient
 
@@ -46,3 +47,22 @@ def test_gateway_forwards_existing_traceparent(monkeypatch) -> None:
     assert response.status_code == 200
     assert captured["traceparent"] == incoming
     assert response.headers["traceparent"] == incoming
+
+
+@pytest.mark.asyncio
+async def test_gateway_lifespan_skips_startup_probe_in_testing(monkeypatch) -> None:
+    """يتأكد من تعطيل فحص الخدمات الخارجية أثناء الاختبارات لتفادي التعليق في CI."""
+
+    async def fail_if_called(*_args, **_kwargs):
+        raise AssertionError("startup dependency probe should be skipped during testing")
+
+    async def fake_close() -> None:
+        return None
+
+    monkeypatch.setattr(main.settings, "ENVIRONMENT", "testing")
+    monkeypatch.delenv("SKIP_GATEWAY_STARTUP_PROBE", raising=False)
+    monkeypatch.setattr(main.proxy_handler.client, "get", fail_if_called)
+    monkeypatch.setattr(main.proxy_handler, "close", fake_close)
+
+    async with main.lifespan(main.app):
+        pass

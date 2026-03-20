@@ -2,6 +2,7 @@ import asyncio
 import hashlib
 import importlib
 import logging
+import os
 from contextlib import asynccontextmanager
 from urllib.parse import urlparse
 
@@ -207,34 +208,53 @@ def log_telemetry(event_name: str, trace_id: str):
     logger.info(f"TELEMETRY: {event_name} [trace_id: {trace_id}]")
 
 
+def _should_probe_startup_dependencies() -> bool:
+    """يحدد ما إذا كان يجب تنفيذ فحص جاهزية الخدمات عند إقلاع البوابة."""
+
+    environment = settings.ENVIRONMENT.lower().strip()
+    if environment in {"testing", "test"}:
+        return False
+
+    if os.getenv("PYTEST_CURRENT_TEST"):
+        return False
+
+    return os.getenv("SKIP_GATEWAY_STARTUP_PROBE") != "1"
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """
     Lifespan context manager for the FastAPI application.
     Handles startup and shutdown events.
     """
+    _ = app
     logger.info("Starting API Gateway...")
-    orchestrator_url = settings.ORCHESTRATOR_SERVICE_URL
-    if not orchestrator_url:
-        raise RuntimeError("ORCHESTRATOR_SERVICE_URL is missing")
+    try:
+        if _should_probe_startup_dependencies():
+            orchestrator_url = settings.ORCHESTRATOR_SERVICE_URL
+            if not orchestrator_url:
+                raise RuntimeError("ORCHESTRATOR_SERVICE_URL is missing")
 
-    # Check orchestrator health
-    for attempt in range(3):
-        try:
-            # Short timeout for health checks
-            resp = await proxy_handler.client.get(f"{orchestrator_url}/health", timeout=2.0)
-            if resp.status_code == 200:
-                log_telemetry("gateway.ready", trace_id=str(uuid.uuid4()))
-                break
-        except Exception:
-            pass
-        if attempt == 2:
-            raise RuntimeError("orchestrator-service is down")
-        await asyncio.sleep(2**attempt)
+            # Check orchestrator health
+            for attempt in range(3):
+                try:
+                    # Short timeout for health checks
+                    resp = await proxy_handler.client.get(f"{orchestrator_url}/health", timeout=2.0)
+                    if resp.status_code == 200:
+                        log_telemetry("gateway.ready", trace_id=str(uuid.uuid4()))
+                        break
+                except Exception:
+                    pass
+                if attempt == 2:
+                    raise RuntimeError("orchestrator-service is down")
+                await asyncio.sleep(2**attempt)
+        else:
+            logger.info("Skipping startup dependency probe in testing/override mode.")
 
-    yield
-    logger.info("Shutting down API Gateway...")
-    await proxy_handler.close()
+        yield
+    finally:
+        logger.info("Shutting down API Gateway...")
+        await proxy_handler.close()
 
 
 app = FastAPI(title=settings.PROJECT_NAME, lifespan=lifespan)
