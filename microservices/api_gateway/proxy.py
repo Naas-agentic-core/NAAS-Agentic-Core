@@ -154,18 +154,18 @@ class GatewayProxy:
             # Only retry safe/idempotent methods to avoid data corruption or stream exhaustion
             can_retry = request.method in ["GET", "HEAD", "OPTIONS"]
 
+            # Read body into memory to allow retries without stream exhaustion
+            # This is safe for API Gateway usage since payloads are typically small
+            body_content = await request.body()
+
             for attempt in range(retries + 1):
                 try:
-                    # Build request with streaming content
-                    # Note: request.stream() consumes the receive channel.
-                    # It cannot be reused if it was consumed in a previous failed attempt.
-                    # Hence we strictly limit retries.
-
+                    # Build request with buffered content
                     req = self.client.build_request(
                         method=request.method,
                         url=url,
                         headers=headers,
-                        content=request.stream(),
+                        content=body_content,
                         params=request.query_params,
                     )
 

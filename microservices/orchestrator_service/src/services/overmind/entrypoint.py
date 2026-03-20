@@ -112,7 +112,8 @@ async def start_mission(
     client = redis.from_url(redis_url, encoding="utf-8", decode_responses=True)
 
     try:
-        lock = client.lock(lock_key, timeout=10)
+        # Extended timeout to 60s for long-running LangGraph missions
+        lock = client.lock(lock_key, timeout=60)
         acquired = await lock.acquire(blocking=False)
 
         if not acquired:

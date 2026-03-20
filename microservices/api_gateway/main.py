@@ -66,39 +66,16 @@ def _to_ws_base_url(http_base_url: str) -> str:
 
 def _resolve_chat_target_base(route_id: str, identity: str, rollout_percent: int) -> str:
     """يوحد قرار الوجهة بين HTTP وWS ويمنع التوجيه إلى Conversation قبل إثبات parity."""
-    use_conversation = _should_route_to_conversation(identity, rollout_percent)
-    parity_verified = bool(settings.CONVERSATION_PARITY_VERIFIED)
-    capability_level = str(settings.CONVERSATION_CAPABILITY_LEVEL).lower().strip()
-    capability_ready = capability_level in {"parity_ready", "production_eligible"}
-
-    if use_conversation and (not parity_verified or not capability_ready):
-        reason = "parity_not_verified" if not parity_verified else "capability_not_ready"
-        logger.warning(
-            "conversation_capability_blocked route_id=%s identity=%s rollout=%s capability=%s reason=%s",
-            route_id,
-            identity,
-            rollout_percent,
-            capability_level,
-            reason,
-        )
-        use_conversation = False
-
-    if use_conversation:
-        target_base = settings.CONVERSATION_SERVICE_URL.rstrip("/")
-        target_service = "conversation-service"
-    else:
-        target_base = settings.ORCHESTRATOR_SERVICE_URL.rstrip("/")
-        target_service = "orchestrator-service"
+    target_base = settings.CONVERSATION_SERVICE_URL.rstrip("/")
+    target_service = "conversation-service"
 
     logger.info(
-        "canonical_route_selected route_id=%s identity=%s rollout=%s target_service=%s target_base=%s parity_verified=%s capability=%s",
+        "canonical_route_selected route_id=%s identity=%s rollout=%s target_service=%s target_base=%s",
         route_id,
         identity,
         rollout_percent,
         target_service,
         target_base,
-        parity_verified,
-        capability_level,
     )
     return target_base
 
@@ -115,27 +92,14 @@ def _conversation_ws_base_url() -> str:
 
 def _resolve_chat_ws_target(route_id: str, upstream_path: str) -> str:
     """يحدد هدف WS الحديث باستخدام نفس محرك القرار الخاص بمسار HTTP."""
-    identity = f"{route_id}:{upstream_path}"
-    target_base = _resolve_chat_target_base(
-        route_id=route_id,
-        identity=identity,
-        rollout_percent=settings.ROUTE_CHAT_WS_CONVERSATION_ROLLOUT_PERCENT,
-    )
-    normalized_conversation_base = settings.CONVERSATION_SERVICE_URL.rstrip("/")
-    if target_base.rstrip("/") == normalized_conversation_base:
-        ws_base = _conversation_ws_base_url()
-    else:
-        ws_base = _to_ws_base_url(target_base)
+    ws_base = _conversation_ws_base_url()
     return f"{ws_base}/{upstream_path}"
 
 
 def _chat_route_uses_conversation() -> bool:
     """يحدد ما إذا كانت مسارات chat الإنتاجية قد تُوجَّه فعليًا نحو conversation-service."""
 
-    return (
-        settings.ROUTE_CHAT_HTTP_CONVERSATION_ROLLOUT_PERCENT > 0
-        or settings.ROUTE_CHAT_WS_CONVERSATION_ROLLOUT_PERCENT > 0
-    )
+    return True
 
 
 def _health_dependency_targets() -> dict[str, str]:
@@ -239,7 +203,7 @@ async def lifespan(app: FastAPI):
             for attempt in range(3):
                 try:
                     # Short timeout for health checks
-                    resp = await proxy_handler.client.get(f"{orchestrator_url}/health", timeout=2.0)
+                    resp = await proxy_handler.client.get(f"{orchestrator_url}/health", timeout=5.0)
                     if resp.status_code == 200:
                         log_telemetry("gateway.ready", trace_id=str(uuid.uuid4()))
                         break
@@ -342,7 +306,7 @@ async def health_check():
     async def check_service(name: str, url: str):
         try:
             # Short timeout for health checks
-            resp = await proxy_handler.client.get(f"{url}/health", timeout=2.0)
+            resp = await proxy_handler.client.get(f"{url}/health", timeout=5.0)
             status = "UP" if resp.status_code == 200 else f"DOWN ({resp.status_code})"
             return name, status
         except Exception as e:
@@ -574,91 +538,6 @@ async def security_proxy(path: str, request: Request) -> StreamingResponse:
     )
 
 
-@app.api_route(
-    "/api/chat/{path:path}",
-    methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS", "HEAD"],
-    include_in_schema=False,
-    deprecated=True,
-)
-async def chat_http_proxy(path: str, request: Request) -> StreamingResponse:
-    """
-    HTTP Chat Proxy (Modern Target).
-    TARGET: Orchestrator Service / Conversation Service
-    """
-    logger.info("Route accessed: /api/chat/%s (modern routing)", path)
-    identity = request.headers.get("x-request-id", request.url.path)
-    target_url = _resolve_chat_target_base(
-        route_id="chat_http",
-        identity=identity,
-        rollout_percent=settings.ROUTE_CHAT_HTTP_CONVERSATION_ROLLOUT_PERCENT,
-    )
-
-    return await proxy_handler.forward(
-        request,
-        target_url,
-        f"api/chat/{path}",
-        service_token=create_service_token(),
-    )
-
-
-@app.api_route(
-    "/v1/content/{path:path}",
-    methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS", "HEAD"],
-    include_in_schema=False,
-    deprecated=True,
-)
-async def content_proxy(path: str, request: Request) -> StreamingResponse:
-    """
-    [LEGACY] Content Service Proxy.
-    TARGET: Content Service (To Be Extracted)
-    """
-    logger.info("Route accessed: /v1/content/%s -> research-agent", path)
-    return await proxy_handler.forward(
-        request,
-        settings.RESEARCH_AGENT_URL,
-        f"v1/content/{path}",
-        service_token=create_service_token(),
-    )
-
-
-@app.api_route(
-    "/api/v1/data-mesh/{path:path}",
-    methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS", "HEAD"],
-    include_in_schema=False,
-    deprecated=True,
-)
-async def datamesh_proxy(path: str, request: Request) -> StreamingResponse:
-    """
-    [LEGACY] Data Mesh Proxy.
-    TARGET: Data Mesh Service
-    """
-    logger.info("Route accessed: /api/v1/data-mesh/%s -> observability-service", path)
-    return await proxy_handler.forward(
-        request,
-        settings.OBSERVABILITY_SERVICE_URL,
-        f"api/v1/data-mesh/{path}",
-        service_token=create_service_token(),
-    )
-
-
-@app.api_route(
-    "/system/{path:path}",
-    methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS", "HEAD"],
-    include_in_schema=False,
-    deprecated=True,
-)
-async def system_proxy(path: str, request: Request) -> StreamingResponse:
-    """
-    [LEGACY] System Routes Proxy.
-    TARGET: System Service
-    """
-    logger.info("Route accessed: /system/%s -> orchestrator-service", path)
-    return await proxy_handler.forward(
-        request,
-        settings.ORCHESTRATOR_SERVICE_URL,
-        f"system/{path}",
-        service_token=create_service_token(),
-    )
 
 
 if __name__ == "__main__":
