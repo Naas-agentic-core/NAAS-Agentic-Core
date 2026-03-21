@@ -99,7 +99,7 @@ from .git_tool import register_git_tools
 register_git_tools(_TOOL_REGISTRY)
 
 # Register test tools
-from .test_tool import register_test_tools
+from .testing_tool import register_test_tools
 
 register_test_tools(_TOOL_REGISTRY)
 
