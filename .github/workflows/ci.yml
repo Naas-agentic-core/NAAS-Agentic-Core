@@ -81,7 +81,7 @@ jobs:
         run: |
           set -euo pipefail
           python -m pip install --upgrade pip
-          pip install "pytest==7.4.4"
+          pip install "pytest==7.4.4" SQLAlchemy
           exit 0
       - name: Validate contracts and provider parity
         shell: bash
