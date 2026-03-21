@@ -62,7 +62,7 @@ class AdminAgent:
             {
                 "type": "function",
                 "function": {
-                    "name": "get_user_count",
+                    "name": "admin.get_user_count",
                     "description": "Get the total number of users in the system.",
                     "parameters": {"type": "object", "properties": {}},
                 },
@@ -90,7 +90,7 @@ class AdminAgent:
             {
                 "type": "function",
                 "function": {
-                    "name": "count_python_files",
+                    "name": "admin.count_python_files",
                     "description": "Get the total number of Python (.py) files in the project workspace.",
                     "parameters": {"type": "object", "properties": {}},
                 },
@@ -98,7 +98,7 @@ class AdminAgent:
             {
                 "type": "function",
                 "function": {
-                    "name": "count_db_tables",
+                    "name": "admin.count_database_tables",
                     "description": "Get the exact count of all database tables.",
                     "parameters": {"type": "object", "properties": {}},
                 },
@@ -106,7 +106,7 @@ class AdminAgent:
             {
                 "type": "function",
                 "function": {
-                    "name": "list_microservices",
+                    "name": "admin.list_microservices",
                     "description": "List all running microservices.",
                     "parameters": {"type": "object", "properties": {}},
                 },
@@ -114,7 +114,7 @@ class AdminAgent:
             {
                 "type": "function",
                 "function": {
-                    "name": "calculate_stats",
+                    "name": "admin.calculate_full_stats",
                     "description": "Calculate and get complete project statistics.",
                     "parameters": {"type": "object", "properties": {}},
                 },
@@ -155,17 +155,6 @@ class AdminAgent:
 
                     if result is not None:
                         yield f"✅ نتيجة أداة {tool_name}:\n{result}"
-                    # Attempt direct execution if they are DB tools
-                    elif tool_name == "get_user_count":
-                        from microservices.orchestrator_service.src.infrastructure.clients.user_client import (
-                            user_client,
-                        )
-
-                        try:
-                            count = await user_client.get_user_count()
-                            yield f"✅ عدد المستخدمين: {count}"
-                        except Exception as e:
-                            yield f"❌ فشل جلب عدد المستخدمين: {e}"
                     elif tool_name in ["list_all_tables", "get_table_count"]:
                         from microservices.orchestrator_service.src.services.overmind.database_tools.facade import (
                             SuperDatabaseTools,
@@ -189,83 +178,6 @@ class AdminAgent:
                                     yield f"✅ عدد الصفوف في {tool_args.get('table_name')}: {count}"
                         except Exception as e:
                             yield f"❌ فشل تنفيذ أداة قواعد البيانات: {e}"
-                    elif tool_name == "count_python_files":
-                        try:
-                            import asyncio
-
-                            proc = await asyncio.create_subprocess_shell(
-                                "find . -name '*.py' | wc -l",
-                                stdout=asyncio.subprocess.PIPE,
-                                stderr=asyncio.subprocess.PIPE,
-                            )
-                            stdout, _ = await proc.communicate()
-                            count = stdout.decode().strip()
-                            yield f"✅ عدد ملفات بايثون في المشروع: {count} ملف."
-                        except Exception as e:
-                            yield f"❌ فشل حساب ملفات بايثون: {e}"
-                    elif tool_name == "count_db_tables":
-                        from microservices.orchestrator_service.src.services.overmind.database_tools.facade import (
-                            SuperDatabaseTools,
-                        )
-
-                        try:
-                            async with SuperDatabaseTools() as db_tools:
-                                tables = await db_tools.list_all_tables()
-                                yield f"✅ عدد الجداول في قاعدة البيانات: {len(tables)}"
-                        except Exception as e:
-                            yield f"❌ فشل حساب عدد الجداول: {e}"
-                    elif tool_name == "list_microservices":
-                        try:
-                            import asyncio
-
-                            proc = await asyncio.create_subprocess_shell(
-                                "docker ps --format '{{.Names}}' | grep service | wc -l",
-                                stdout=asyncio.subprocess.PIPE,
-                                stderr=asyncio.subprocess.PIPE,
-                            )
-                            stdout, _ = await proc.communicate()
-                            count = stdout.decode().strip()
-                            yield f"✅ عدد الخدمات المصغرة الشغالة: {count}"
-                        except Exception as e:
-                            yield f"❌ فشل إحصاء الخدمات المصغرة: {e}"
-                    elif tool_name == "calculate_stats":
-                        from microservices.orchestrator_service.src.infrastructure.clients.user_client import (
-                            user_client,
-                        )
-                        from microservices.orchestrator_service.src.services.overmind.database_tools.facade import (
-                            SuperDatabaseTools,
-                        )
-
-                        try:
-                            user_count = await user_client.get_user_count()
-
-                            async with SuperDatabaseTools() as db_tools:
-                                admin_convos = await db_tools.execute_sql(
-                                    "SELECT count(*) as c FROM admin_conversations"
-                                )
-                                cust_convos = await db_tools.execute_sql(
-                                    "SELECT count(*) as c FROM customer_conversations"
-                                )
-
-                                admin_c = (
-                                    admin_convos.get("rows", [{"c": 0}])[0]["c"]
-                                    if admin_convos.get("success")
-                                    else 0
-                                )
-                                cust_c = (
-                                    cust_convos.get("rows", [{"c": 0}])[0]["c"]
-                                    if cust_convos.get("success")
-                                    else 0
-                                )
-
-                                yield (
-                                    "✅ إحصائيات النظام:\n"
-                                    f"- المستخدمين النشطين: {user_count}\n"
-                                    f"- محادثات العملاء: {cust_c}\n"
-                                    f"- محادثات الأدمن: {admin_c}"
-                                )
-                        except Exception as e:
-                            yield f"❌ خطأ في حساب الإحصائيات: {e}"
                     else:
                         yield f"⚠️ الأداة {tool_name} غير مدعومة حالياً في هذه النسخة المصغرة."
 
