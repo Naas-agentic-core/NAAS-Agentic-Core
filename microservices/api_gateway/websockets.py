@@ -32,6 +32,18 @@ async def websocket_proxy(client_ws: WebSocket, target_url: str):
     headers.pop("upgrade", None)
     headers.pop("connection", None)
 
+    # Extract token from subprotocols if present and append it to target_url
+    # This prevents 4401 disconnects caused by subprotocol stripping in proxies
+    if parsed_protocols and "jwt" in parsed_protocols:
+        try:
+            jwt_index = parsed_protocols.index("jwt")
+            if jwt_index + 1 < len(parsed_protocols):
+                token = parsed_protocols[jwt_index + 1]
+                separator = "&" if "?" in target_url else "?"
+                target_url = f"{target_url}{separator}token={token}"
+        except ValueError:
+            pass
+
     # Passing all requested subprotocols to websockets.connect correctly to preserve tokens
     # (e.g., ['jwt', '<token>']) rather than just the first selected protocol.
     subprotocols = parsed_protocols or None
