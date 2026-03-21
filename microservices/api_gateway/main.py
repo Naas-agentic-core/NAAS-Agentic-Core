@@ -66,8 +66,8 @@ def _to_ws_base_url(http_base_url: str) -> str:
 
 def _resolve_chat_target_base(route_id: str, identity: str, rollout_percent: int) -> str:
     """يوحد قرار الوجهة بين HTTP وWS ويمنع التوجيه إلى Conversation قبل إثبات parity."""
-    target_base = settings.CONVERSATION_SERVICE_URL.rstrip("/")
-    target_service = "conversation-service"
+    target_base = settings.ORCHESTRATOR_SERVICE_URL.rstrip("/")
+    target_service = "orchestrator-service"
 
     logger.info(
         "canonical_route_selected route_id=%s identity=%s rollout=%s target_service=%s target_base=%s",
@@ -92,14 +92,14 @@ def _conversation_ws_base_url() -> str:
 
 def _resolve_chat_ws_target(route_id: str, upstream_path: str) -> str:
     """يحدد هدف WS الحديث باستخدام نفس محرك القرار الخاص بمسار HTTP."""
-    ws_base = _conversation_ws_base_url()
+    ws_base = _to_ws_base_url(settings.ORCHESTRATOR_SERVICE_URL.rstrip("/"))
     return f"{ws_base}/{upstream_path}"
 
 
 def _chat_route_uses_conversation() -> bool:
     """يحدد ما إذا كانت مسارات chat الإنتاجية قد تُوجَّه فعليًا نحو conversation-service."""
 
-    return True
+    return False
 
 
 def _health_dependency_targets() -> dict[str, str]:
