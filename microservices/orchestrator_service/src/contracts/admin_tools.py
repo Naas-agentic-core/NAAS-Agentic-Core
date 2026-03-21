@@ -37,6 +37,17 @@ def validate_tool_name(name: str) -> None:
         )
 
 
+def _count_python_files_sync(root_dir: str) -> int:
+    count = 0
+    excluded_dirs = {".venv", "__pycache__", "site-packages", "node_modules", ".git"}
+    for _, dirnames, filenames in os.walk(root_dir):
+        dirnames[:] = [d for d in dirnames if d not in excluded_dirs]
+        for f in filenames:
+            if f.endswith(".py"):
+                count += 1
+    return count
+
+
 @kagent_tool(
     name="admin.count_python_files",
     mcp_server="naas.admin.filesystem",
@@ -48,14 +59,7 @@ async def count_python_files() -> str:
     # Resolve dynamic project root to work in both Docker (/workspace) and Native (uvicorn)
     project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../.."))
 
-    cmd = f'find {project_root} -type f -name "*.py" -not -path "*/.venv/*" -not -path "*/__pycache__/*" -not -path "*/site-packages/*" -not -path "*/node_modules/*" -not -path "*/.git/*" | wc -l'
-
-    process = await asyncio.create_subprocess_shell(
-        cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
-    )
-    stdout, _ = await process.communicate()
-
-    count = int(stdout.decode().strip() or 0)
+    count = await asyncio.to_thread(_count_python_files_sync, project_root)
     return f"عدد ملفات بايثون: {count} ملف"
 
 
