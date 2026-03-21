@@ -40,6 +40,8 @@ langchain-openai>=0.2.0
 llama-index
 llama-index-core>=0.14.13
 llama-index-workflows
+llama-index-embeddings-huggingface
+llama-index-vector-stores-supabase
 openai
 sentence-transformers
 dspy
