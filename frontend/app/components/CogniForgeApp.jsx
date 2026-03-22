@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { errorTracker } from '../utils/errorTracker';
 import { useAgentSocket } from '../hooks/useAgentSocket';
 import { ChatInterface } from './ChatInterface';
 import { AgentTimeline } from './AgentTimeline';
@@ -14,7 +15,7 @@ class ErrorBoundary extends React.Component {
         this.state = { hasError: false };
     }
     static getDerivedStateFromError(error) { return { hasError: true }; }
-    componentDidCatch(error, errorInfo) { console.error("React Error:", error, errorInfo); }
+    componentDidCatch(error, errorInfo) { errorTracker.reportError(error, { errorInfo, source: "React ErrorBoundary" }); }
     render() {
         if (this.state.hasError) {
             return (
@@ -136,7 +137,7 @@ const DashboardLayout = ({ user, onLogout }) => {
                  headers: { 'Authorization': `Bearer ${token}` }
              });
              if (res.ok) setConversations(await res.json());
-         } catch (e) { console.error(e); }
+         } catch (e) { errorTracker.reportError(e); }
     }, [convEndpoint]);
 
     useEffect(() => {
@@ -158,7 +159,7 @@ const DashboardLayout = ({ user, onLogout }) => {
                 setMessages(data.messages || []);
                 setConversationId(data.conversation_id);
             }
-        } catch (e) { console.error(e); }
+        } catch (e) { errorTracker.reportError(e); }
     };
 
     const handleNewChat = () => {
@@ -331,7 +332,7 @@ const App = () => {
                         logout();
                     }
                 } catch (error) {
-                    console.error("Failed to fetch user:", error);
+                    errorTracker.reportError(error, { message: "Failed to fetch user" });
                     logout();
                 } finally {
                     setIsLoading(false);

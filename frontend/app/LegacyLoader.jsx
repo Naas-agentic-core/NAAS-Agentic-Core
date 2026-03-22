@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { errorTracker } from "./utils/errorTracker";
 
 const LEGACY_SCRIPTS = [
   {
@@ -202,7 +203,7 @@ export default function LegacyLoader() {
         await waitForLegacyMount();
         setStatus("ready");
       } catch (loadError) {
-        console.error(loadError);
+        errorTracker.reportError(loadError);
         setError(loadError);
         setStatus("error");
       } finally {
