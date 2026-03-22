@@ -3,6 +3,7 @@ Collaboration Context Implementation.
 Implements the CollaborationContext protocol.
 """
 
+
 class InMemoryCollaborationContext:
     """
     In-memory implementation of CollaborationContext.
