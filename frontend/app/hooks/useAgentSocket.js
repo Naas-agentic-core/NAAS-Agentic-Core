@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
+import { errorTracker } from '../utils/errorTracker';
 import { useRealtimeConnection } from './useRealtimeConnection';
 
 const isBrowser = typeof window !== 'undefined';
@@ -21,7 +22,7 @@ const getWsBase = () => {
             const wsProtocol = resolveWebSocketProtocol(parsed.protocol);
             return `${wsProtocol}//${parsed.host}`;
         } catch (error) {
-            console.error('Invalid WebSocket base configuration:', error);
+            errorTracker.reportError(error, { message: 'Invalid WebSocket base configuration' });
             return '';
         }
     }
@@ -52,7 +53,7 @@ const buildWebSocketUrlSafe = (baseUrl, endpoint, token) => {
         // REMOVED query param appending to prevent "double method" drift.
         return wsUrl.toString();
     } catch (error) {
-        console.error('Invalid WebSocket URL parts', error);
+        errorTracker.reportError(error, { message: 'Invalid WebSocket URL parts' });
         return '';
     }
 };
