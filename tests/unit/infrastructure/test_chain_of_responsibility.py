@@ -44,6 +44,7 @@ class TestRequestContext:
         ctx = RequestContext()
         assert ctx.has_errors() is False
 
+
 class ConcreteHandler(Handler[RequestContext, RequestContext]):
     def __init__(self, return_val=None):
         super().__init__()
@@ -53,6 +54,7 @@ class ConcreteHandler(Handler[RequestContext, RequestContext]):
     def _process(self, request: RequestContext) -> RequestContext | None:
         self.processed = True
         return self.return_val
+
 
 class TestBaseHandler:
     def test_set_next(self):
@@ -90,6 +92,7 @@ class TestBaseHandler:
         ctx = RequestContext()
         result = h1.handle(ctx)
         assert result is None
+
 
 class TestRateLimitHandler:
     def test_rate_limit_success(self):
@@ -136,7 +139,7 @@ class TestRateLimitHandler:
 
     def test_rate_limit_anonymous(self):
         handler = RateLimitHandler(max_requests=1)
-        ctx1 = RequestContext({}) # No user_id
+        ctx1 = RequestContext({})  # No user_id
         handler.handle(ctx1)
 
         ctx2 = RequestContext({})
@@ -144,6 +147,7 @@ class TestRateLimitHandler:
         assert result == ctx2
         assert ctx2.stopped is True
         assert "Rate limit exceeded" in ctx2.errors
+
 
 class TestAuthenticationHandler:
     def test_auth_success(self):
@@ -164,20 +168,18 @@ class TestAuthenticationHandler:
     def test_auth_invalid_token(self):
         handler = AuthenticationHandler()
         # Mock _validate_token to return False even for a provided token
-        with patch.object(AuthenticationHandler, '_validate_token', return_value=False):
+        with patch.object(AuthenticationHandler, "_validate_token", return_value=False):
             ctx = RequestContext({"auth_token": "some_token"})
             result = handler.handle(ctx)
             assert result == ctx
             assert ctx.stopped is True
             assert "Invalid authentication token" in ctx.errors
 
+
 class TestAuthorizationHandler:
     def test_authz_success(self):
         handler = AuthorizationHandler()
-        ctx = RequestContext({
-            "required_permission": "read",
-            "user_permissions": ["read", "write"]
-        })
+        ctx = RequestContext({"required_permission": "read", "user_permissions": ["read", "write"]})
         ctx.metadata["authenticated"] = True
         result = handler.handle(ctx)
         assert result is None
@@ -194,15 +196,13 @@ class TestAuthorizationHandler:
 
     def test_authz_missing_permission(self):
         handler = AuthorizationHandler()
-        ctx = RequestContext({
-            "required_permission": "admin",
-            "user_permissions": ["read"]
-        })
+        ctx = RequestContext({"required_permission": "admin", "user_permissions": ["read"]})
         ctx.metadata["authenticated"] = True
         result = handler.handle(ctx)
         assert result == ctx
         assert ctx.stopped is True
         assert "Missing permission: admin" in ctx.errors
+
 
 class TestValidationHandler:
     def test_validation_success(self):
@@ -220,6 +220,7 @@ class TestValidationHandler:
         assert ctx.stopped is True
         assert "Missing required field: field2" in ctx.errors
 
+
 class TestLoggingHandler:
     @patch("logging.getLogger")
     def test_logging_handler(self, mock_get_logger):
@@ -232,6 +233,7 @@ class TestLoggingHandler:
 
         assert result is None
         mock_logger.info.assert_called_with("Processing request: 123")
+
 
 class TestCachingHandler:
     def test_cache_miss(self):
@@ -250,15 +252,18 @@ class TestCachingHandler:
         assert ctx.data["cached_response"] == {"data": "cached"}
         assert ctx.metadata["from_cache"] is True
 
+
 def test_full_pipeline_success():
     pipeline = build_request_pipeline()
-    ctx = RequestContext({
-        "auth_token": "token",
-        "user_id": "user1",
-        "user_permissions": ["read"],
-        "required_permission": "read",
-        "request_id": "req1"
-    })
+    ctx = RequestContext(
+        {
+            "auth_token": "token",
+            "user_id": "user1",
+            "user_permissions": ["read"],
+            "required_permission": "read",
+            "request_id": "req1",
+        }
+    )
     # ValidationHandler doesn't have required_fields by default in build_request_pipeline
 
     result = pipeline.handle(ctx)
