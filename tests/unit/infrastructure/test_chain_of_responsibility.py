@@ -1,14 +1,14 @@
 from unittest.mock import MagicMock, patch
 
 from app.infrastructure.patterns.chain_of_responsibility import (
-    RequestContext,
-    Handler,
-    RateLimitHandler,
     AuthenticationHandler,
     AuthorizationHandler,
-    ValidationHandler,
-    LoggingHandler,
     CachingHandler,
+    Handler,
+    LoggingHandler,
+    RateLimitHandler,
+    RequestContext,
+    ValidationHandler,
     build_request_pipeline,
 )
 
