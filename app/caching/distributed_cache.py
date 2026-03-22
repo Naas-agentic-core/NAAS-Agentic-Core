@@ -251,13 +251,13 @@ class MultiLevelCache(CacheBackend):
         try:
             if await self.l1.exists(key):
                 return True
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning(f"⚠️ L1 Cache exists error for {key}: {e}")
 
         try:
             return await self.l2.exists(key)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning(f"⚠️ L2 Cache exists error for {key}: {e}")
 
         return False
 
