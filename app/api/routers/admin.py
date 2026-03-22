@@ -14,25 +14,20 @@
 
 import inspect
 
-from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.routers.ws_auth import extract_websocket_auth
 from app.api.schemas.admin import (
     ConversationDetailsResponse,
     ConversationSummaryResponse,
 )
-from app.core.config import get_settings
 from app.core.database import get_db
 from app.core.di import get_logger
 from app.core.domain.user import User
 from app.deps.auth import CurrentUser, get_current_user, require_roles
-from app.infrastructure.clients.orchestrator_client import orchestrator_client
 from app.infrastructure.clients.user_client import user_client
-from app.services.auth.token_decoder import decode_user_id
 from app.services.boundaries.admin_chat_boundary_service import AdminChatBoundaryService
-from app.services.chat.event_protocol import normalize_streaming_event
 from app.services.rbac import ADMIN_ROLE
 
 logger = get_logger(__name__)
@@ -146,107 +141,6 @@ async def get_admin_user_count() -> AdminUserCountResponse:
     except Exception as e:
         logger.error(f"Failed to retrieve user count: {e}")
         raise HTTPException(status_code=503, detail="User Service unavailable") from e
-
-
-@router.websocket("/api/chat/ws")
-async def chat_stream_ws(
-    websocket: WebSocket,
-    db: AsyncSession = Depends(get_db),
-) -> None:
-    """
-    قناة WebSocket لبث محادثة المسؤول بشكل حي وآمن.
-    """
-    token, selected_protocol = extract_websocket_auth(websocket)
-    if not token:
-        await websocket.close(code=4401)
-        return
-
-    try:
-        user_id = decode_user_id(token, get_settings().SECRET_KEY)
-    except HTTPException:
-        await websocket.close(code=4401)
-        return
-
-    actor = await db.get(User, user_id)
-    if actor is None or not actor.is_active:
-        await websocket.close(code=4401)
-        return
-
-    await websocket.accept(subprotocol=selected_protocol)
-
-    if not actor.is_admin:
-        await websocket.send_json(
-            normalize_streaming_event(
-                {
-                    "type": "error",
-                    "payload": {
-                        "details": "Standard accounts must use the customer chat endpoint.",
-                        "status_code": 403,
-                    },
-                }
-            )
-        )
-        await websocket.close(code=4403)
-        return
-
-    try:
-        while True:
-            payload = await websocket.receive_json()
-            question = str(payload.get("question", "")).strip()
-            if not question:
-                await websocket.send_json(
-                    normalize_streaming_event(
-                        {
-                            "type": "error",
-                            "payload": {"details": "Question is required."},
-                        }
-                    )
-                )
-                continue
-
-            mission_type = payload.get("mission_type")
-            metadata: dict[str, object] = {}
-            if mission_type:
-                metadata["mission_type"] = mission_type
-
-            try:
-                async for event in orchestrator_client.chat_with_agent(
-                    question=question,
-                    user_id=actor.id,
-                    conversation_id=payload.get("conversation_id"),
-                    context={
-                        "chat_scope": "admin",
-                        "metadata": metadata,
-                        "compatibility_facade": True,
-                    },
-                ):
-                    await websocket.send_json(normalize_streaming_event(event))
-            except HTTPException as http_exc:
-                await websocket.send_json(
-                    normalize_streaming_event(
-                        {
-                            "type": "error",
-                            "payload": {
-                                "details": str(http_exc.detail),
-                                "status_code": http_exc.status_code,
-                            },
-                        }
-                    )
-                )
-                continue
-            except Exception as exc:
-                await websocket.send_json(
-                    normalize_streaming_event(
-                        {
-                            "type": "error",
-                            "payload": {"details": str(exc), "status_code": 500},
-                        }
-                    )
-                )
-                continue
-
-    except WebSocketDisconnect:
-        logger.info("Admin WebSocket disconnected")
 
 
 @router.get(
