@@ -45,16 +45,27 @@ class EventBus:
     def publish(self, event: Event) -> None:
         """يبث الحدث لجميع المشتركين مع حماية من أعطال المعالجات."""
         self._add_to_history(event)
-        for handler in self._subscribers.get(event.event_type, []):
-            try:
-                handler(event)
-            except Exception as exc:  # pragma: no cover - دفاعي
-                logger.error("Error in event handler: %s", exc)
-        for handler in self._subscribers.get("*", []):
-            try:
-                handler(event)
-            except Exception as exc:  # pragma: no cover - دفاعي
-                logger.error("Error in wildcard handler: %s", exc)
+
+        # تحسين الكفاءة عبر تقليل استدعاءات القواميس وتجنب الحلقات الفارغة
+        # Optimized by reducing dict lookups and avoiding empty loops
+
+        subscribers = self._subscribers
+
+        # Specific handlers
+        if specific_handlers := subscribers.get(event.event_type):
+            for handler in specific_handlers:
+                try:
+                    handler(event)
+                except Exception as exc:  # pragma: no cover - دفاعي
+                    logger.error("Error in event handler: %s", exc)
+
+        # Wildcard handlers
+        if wildcard_handlers := subscribers.get("*"):
+            for handler in wildcard_handlers:
+                try:
+                    handler(event)
+                except Exception as exc:  # pragma: no cover - دفاعي
+                    logger.error("Error in wildcard handler: %s", exc)
 
     async def _safe_async_call(self, handler: Callable[[Event], object], event: Event) -> None:
         """يستدعي معالجًا غير متزامنًا بأمان مع تسجيل الأخطاء."""
