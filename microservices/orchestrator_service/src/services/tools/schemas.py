@@ -30,7 +30,7 @@ class SearchContentSchema(BaseModel):
 
     @model_validator(mode="before")
     @classmethod
-    def log_unexpected_fields(cls, data: Any) -> Any:
+    def log_unexpected_fields(cls, data: object) -> object:
         if isinstance(data, dict):
             known_fields = set(cls.model_fields.keys()) | {"query"}  # Add known aliases
             unexpected = set(data.keys()) - known_fields

@@ -8,11 +8,11 @@ class ReviewRequest(BaseModel):
     Request payload for reviewing work or plans.
     """
 
-    result: dict[str, Any] = Field(
+    result: dict[str, object] = Field(
         ..., description="The execution result or proposed plan to review."
     )
     original_objective: str = Field(..., description="The original objective of the mission.")
-    context: dict[str, Any] = Field(
+    context: dict[str, object] = Field(
         default_factory=dict, description="Contextual information (shared memory)."
     )
 
@@ -36,7 +36,7 @@ class ConsultRequest(BaseModel):
     """
 
     situation: str = Field(..., description="Description of the situation.")
-    analysis: dict[str, Any] = Field(..., description="Analysis data.")
+    analysis: dict[str, object] = Field(..., description="Analysis data.")
 
 
 class ConsultResponse(BaseModel):

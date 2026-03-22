@@ -1,7 +1,7 @@
 import json
 import logging
 import re
-from typing import Any
+from typing import Any, TypeVar
 
 from pydantic import ValidationError
 
@@ -18,6 +18,8 @@ from microservices.auditor_service.src.utils.dec_pomdp import (
 )
 
 logger = logging.getLogger(__name__)
+
+T = TypeVar("T")
 
 
 class AuditorService:
@@ -86,7 +88,7 @@ class AuditorService:
         # LLM Gate with Retry
         return await self._call_ai_with_validation(system_prompt, user_message, ConsultResponse)
 
-    async def _review_plan(self, plan: dict[str, Any], objective: str) -> ReviewResponse:
+    async def _review_plan(self, plan: dict[str, object], objective: str) -> ReviewResponse:
         """
         Review a proposed plan.
         """
@@ -120,7 +122,7 @@ class AuditorService:
 
         return await self._call_ai_with_validation(system_prompt, user_message, ReviewResponse)
 
-    async def _review_execution(self, result: dict[str, Any], objective: str) -> ReviewResponse:
+    async def _review_execution(self, result: dict[str, object], objective: str) -> ReviewResponse:
         """
         Review execution results.
         """
@@ -153,8 +155,8 @@ class AuditorService:
         return await self._call_ai_with_validation(system_prompt, user_message, ReviewResponse)
 
     async def _call_ai_with_validation(
-        self, system_prompt: str, user_message: str, model_class: Any
-    ) -> Any:
+        self, system_prompt: str, user_message: str, model_class: type[T]
+    ) -> T:
         """
         The LLM Output Gate.
         Calls AI, parses JSON, validates against Pydantic model.
@@ -202,7 +204,7 @@ class AuditorService:
             return text[start : end + 1].strip()
         return text
 
-    def _create_fallback(self, model_class: Any, error_msg: str) -> Any:
+    def _create_fallback(self, model_class: type[T], error_msg: str) -> T:
         """
         Create a safe fallback response if validation fails completely.
         """

@@ -11,13 +11,13 @@ class InMemoryCollaborationContext:
     In-memory implementation of CollaborationContext.
     """
 
-    def __init__(self, initial_data: dict[str, Any] | None = None) -> None:
-        self.shared_memory: dict[str, Any] = initial_data or {}
+    def __init__(self, initial_data: dict[str, object] | None = None) -> None:
+        self.shared_memory: dict[str, object] = initial_data or {}
 
-    def update(self, key: str, value: Any) -> None:
+    def update(self, key: str, value: object) -> None:
         """Update a value in shared memory."""
         self.shared_memory[key] = value
 
-    def get(self, key: str) -> Any | None:
+    def get(self, key: str) -> object | None:
         """Get a value from shared memory."""
         return self.shared_memory.get(key)

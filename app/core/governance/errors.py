@@ -12,7 +12,6 @@ Philosophy:
 """
 
 from enum import StrEnum
-from typing import Any
 
 
 class FailureClass(StrEnum):
@@ -53,7 +52,7 @@ class GovernanceError(Exception):
         self,
         message: str,
         failure_class: FailureClass,
-        context: dict[str, Any] | None = None,
+        context: dict[str, object] | None = None,
         cause: Exception | None = None,
     ) -> None:
         super().__init__(message)
@@ -61,7 +60,7 @@ class GovernanceError(Exception):
         self.context = context or {}
         self.cause = cause
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> dict[str, object]:
         return {
             "error": self.__class__.__name__,
             "message": str(self),
