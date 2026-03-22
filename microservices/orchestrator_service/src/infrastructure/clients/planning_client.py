@@ -41,8 +41,8 @@ class PlanningClient:
         return get_http_client(self.config)
 
     async def create_plan(
-        self, objective: str, context: dict[str, Any] | list[str]
-    ) -> dict[str, Any]:
+        self, objective: str, context: dict[str, object] | list[str]
+    ) -> dict[str, object]:
         """
         Request a strategic plan from the Planning Agent.
         """

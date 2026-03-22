@@ -40,14 +40,14 @@ def _load_search_nodes() -> tuple[type, type, type, type, type]:
 
 
 class AgentState(TypedDict):
-    messages: Annotated[list[Any], add]
+    messages: Annotated[list[object], add]
     query: str
     intent: str
-    filters: Any
-    retrieved_docs: list[Any]
-    reranked_docs: list[Any]
+    filters: object
+    retrieved_docs: list[object]
+    reranked_docs: list[object]
     used_web: bool
-    final_response: Any
+    final_response: object
     tools_executed: bool
 
 

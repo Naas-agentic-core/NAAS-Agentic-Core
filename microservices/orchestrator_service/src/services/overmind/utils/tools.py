@@ -18,7 +18,7 @@ class ToolRegistry:
     Provides .execute() method.
     """
 
-    async def execute(self, tool_name: str, params: dict[str, Any]) -> Any:
+    async def execute(self, tool_name: str, params: dict[str, object]) -> object:
         """Execute a tool by name."""
         registry = get_registry()
         func: Callable | None = registry.get(tool_name)

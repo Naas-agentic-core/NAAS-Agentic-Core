@@ -39,8 +39,8 @@ class AIClient:
         self,
         model: str | None = None,
         messages: list[dict[str, str]] | None = None,
-        **kwargs: Any,
-    ) -> Any:
+        **kwargs: object,
+    ) -> object:
         """
         Generate a complete response.
         If 'response_format' is JSON, returns the parsed object if possible, or the raw response.
@@ -64,7 +64,7 @@ class AIClient:
         self,
         messages: list[dict[str, str]],
         model: str | None = None,
-        **kwargs: Any,
+        **kwargs: object,
     ) -> AsyncGenerator[ChatCompletionChunk, None]:
         """
         Stream chat completion.
@@ -84,7 +84,7 @@ class AIClient:
             logger.error(f"AI Stream failed: {e}")
             raise
 
-    async def generate_text(self, prompt: str, **kwargs: Any) -> str:
+    async def generate_text(self, prompt: str, **kwargs: object) -> str:
         """Helper for simple text generation."""
         response = await self.generate(prompt=prompt, **kwargs)
         return response.choices[0].message.content or ""

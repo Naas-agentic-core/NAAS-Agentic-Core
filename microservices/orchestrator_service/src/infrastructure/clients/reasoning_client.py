@@ -41,7 +41,7 @@ class ReasoningClient:
     async def _get_client(self) -> httpx.AsyncClient:
         return get_http_client(self.config)
 
-    async def reason_deeply(self, query: str) -> dict[str, Any]:
+    async def reason_deeply(self, query: str) -> dict[str, object]:
         """
         Request deep reasoning analysis.
         """

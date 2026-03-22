@@ -96,7 +96,10 @@ class SuperSearchOrchestrator:
     """
 
     def __init__(
-        self, llm: Any | None = None, search_tool: Any | None = None, web_scraper: Any | None = None
+        self,
+        llm: object | None = None,
+        search_tool: object | None = None,
+        web_scraper: object | None = None,
     ):
         # 1. Initialize LLM
         if llm:

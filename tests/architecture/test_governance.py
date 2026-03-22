@@ -17,7 +17,7 @@ import pytest
 GOVERNED_DIRS = [
     "app/core/governance",
     "app/services/overmind",
-    # "microservices" # TODO: Expand to microservices later
+    "microservices",
 ]
 
 
@@ -35,6 +35,22 @@ class GovernanceVisitor(ast.NodeVisitor):
     def __init__(self, filename):
         self.filename = filename
         self.violations = []
+
+    def visit_AsyncFunctionDef(self, node):
+        """
+        Check for 'Any' in async type hints.
+        """
+        self.visit_FunctionDef(node)
+
+    def visit_AnnAssign(self, node):
+        """
+        Check for 'Any' in type-annotated assignments (e.g., class attributes, TypedDict).
+        """
+        if self._has_any(node.annotation):
+            self.violations.append(
+                f"{self.filename}:{node.lineno} - Type annotation uses 'Any'. Use strict types."
+            )
+        self.generic_visit(node)
 
     def visit_ExceptHandler(self, node):
         """
@@ -64,11 +80,24 @@ class GovernanceVisitor(ast.NodeVisitor):
         if "test" in self.filename:
             return
 
+        # Check standard arguments
         for arg in node.args.args:
             if self._has_any(arg.annotation):
                 self.violations.append(
                     f"{self.filename}:{node.lineno} - Argument '{arg.arg}' uses 'Any'. Use strict types."
                 )
+
+        # Check *args
+        if node.args.vararg and self._has_any(node.args.vararg.annotation):
+            self.violations.append(
+                f"{self.filename}:{node.lineno} - Argument '*{node.args.vararg.arg}' uses 'Any'. Use strict types."
+            )
+
+        # Check **kwargs
+        if node.args.kwarg and self._has_any(node.args.kwarg.annotation):
+            self.violations.append(
+                f"{self.filename}:{node.lineno} - Argument '**{node.args.kwarg.arg}' uses 'Any'. Use strict types."
+            )
 
         if self._has_any(node.returns):
             self.violations.append(
@@ -95,12 +124,12 @@ class GovernanceVisitor(ast.NodeVisitor):
 @pytest.mark.architecture
 def test_governance_contracts_any():
     """
-    Enforce NO usage of 'Any' in the new Governance Core.
+    Enforce NO usage of 'Any' in the Governed Core and Microservices.
     """
     visitor = GovernanceVisitor("")
 
-    # We only enforce strictness on the NEW core for now to prove the concept
-    target_files = list(get_python_files(["app/core/governance"]))
+    # Enforce strictness on all governed directories
+    target_files = list(get_python_files(GOVERNED_DIRS))
 
     all_violations = []
     for file_path in target_files:
