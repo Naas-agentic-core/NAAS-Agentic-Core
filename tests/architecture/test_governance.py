@@ -113,11 +113,14 @@ class GovernanceVisitor(ast.NodeVisitor):
             return True
         if isinstance(annotation, ast.Attribute) and annotation.attr == "Any":
             return True
-        # Recursive check for List[Any], etc.
+        # Recursive check for List[Any], dict[str, Any], etc.
         if isinstance(annotation, ast.Subscript):
-            if hasattr(annotation.slice, "value"):  # Python < 3.9
-                return self._has_any(annotation.slice.value)
-            return self._has_any(annotation.slice)
+            # Handle slice.value (Python < 3.9) or slice directly (Python 3.9+)
+            slc = getattr(annotation.slice, "value", annotation.slice)
+            # Handle Tuple in subscript: dict[str, Any]
+            if isinstance(slc, ast.Tuple):
+                return any(self._has_any(elt) for elt in slc.elts)
+            return self._has_any(slc)
         return False
 
 

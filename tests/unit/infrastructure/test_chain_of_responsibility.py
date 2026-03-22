@@ -1,6 +1,5 @@
-import pytest
-import logging
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
+
 from app.infrastructure.patterns.chain_of_responsibility import (
     RequestContext,
     Handler,

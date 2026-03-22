@@ -1,7 +1,7 @@
 import json
 import logging
 import re
-from typing import Any, TypeVar
+from typing import TypeVar
 
 from pydantic import ValidationError
 

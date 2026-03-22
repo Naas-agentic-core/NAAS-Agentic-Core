@@ -13,7 +13,6 @@ Features:
 
 import asyncio
 import os
-from typing import Any
 
 import httpx
 from bs4 import BeautifulSoup

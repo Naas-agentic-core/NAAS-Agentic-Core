@@ -1,6 +1,6 @@
 import asyncio
 from operator import add
-from typing import Annotated, Any, TypedDict
+from typing import Annotated, TypedDict
 
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import END, StateGraph

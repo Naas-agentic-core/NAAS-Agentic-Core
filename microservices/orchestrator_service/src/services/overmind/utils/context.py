@@ -3,9 +3,6 @@ Collaboration Context Implementation.
 Implements the CollaborationContext protocol.
 """
 
-from typing import Any
-
-
 class InMemoryCollaborationContext:
     """
     In-memory implementation of CollaborationContext.
