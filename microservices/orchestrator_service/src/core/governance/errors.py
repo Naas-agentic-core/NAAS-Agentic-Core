@@ -12,6 +12,8 @@ Philosophy:
 """
 
 from enum import StrEnum
+
+
 class FailureClass(StrEnum):
     """
     The Single Source of Truth for Failure Semantics.
