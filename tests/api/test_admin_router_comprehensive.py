@@ -1,6 +1,6 @@
 """Comprehensive tests for Admin router."""
 
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from fastapi import FastAPI
@@ -69,5 +69,3 @@ def test_get_latest_chat_not_admin(client, mock_db):
     response = client.get("/admin/api/chat/latest")
     assert response.status_code == 403
     assert "Admin access required" in response.json()["detail"]
-
-
