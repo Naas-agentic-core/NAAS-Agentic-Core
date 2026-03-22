@@ -93,8 +93,9 @@ async def run_async_migrations() -> None:
 
     async with connectable.connect() as connection:
         if "postgresql" in settings.DATABASE_URL or "asyncpg" in settings.DATABASE_URL:
-            await connection.execute(text(f"CREATE SCHEMA IF NOT EXISTS {target_schema}"))
-            await connection.execute(text(f"SET search_path TO {target_schema}"))
+            safe_schema = target_schema.replace('"', '""')
+            await connection.execute(text(f'CREATE SCHEMA IF NOT EXISTS "{safe_schema}"'))
+            await connection.execute(text(f'SET search_path TO "{safe_schema}"'))
         await connection.run_sync(do_run_migrations)
 
     await connectable.dispose()
