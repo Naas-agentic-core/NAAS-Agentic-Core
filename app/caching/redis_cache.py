@@ -79,8 +79,8 @@ class RedisCache(CacheBackend):
         config = breaker_config or CircuitBreakerConfig(
             failure_threshold=5, timeout=30.0, success_threshold=2
         )
-        # استخدام MD5 لضمان ثبات الاسم عبر التشغيلات المختلفة
-        url_hash = hashlib.md5(redis_url.encode()).hexdigest()
+        # استخدام SHA-256 لضمان ثبات الاسم عبر التشغيلات المختلفة بطريقة آمنة
+        url_hash = hashlib.sha256(redis_url.encode()).hexdigest()
         self._breaker = get_circuit_breaker(f"redis_cache_breaker_{url_hash}", config)
 
         logger.info(f"✅ Redis Cache initialized with URL: {redis_url}")
