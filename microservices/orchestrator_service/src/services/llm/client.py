@@ -5,7 +5,6 @@ Provides a simple interface to OpenAI-compatible LLMs.
 
 import logging
 from collections.abc import AsyncGenerator
-from typing import Any
 
 from openai import AsyncOpenAI
 from openai.types.chat import ChatCompletionChunk

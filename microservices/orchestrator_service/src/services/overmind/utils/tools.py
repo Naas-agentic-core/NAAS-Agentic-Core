@@ -4,7 +4,6 @@ Wraps the microservice's tool registry to provide the interface expected by Mono
 """
 
 from collections.abc import Callable
-from typing import Any
 
 from microservices.orchestrator_service.src.core.logging import get_logger
 from microservices.orchestrator_service.src.services.tools.registry import get_registry
