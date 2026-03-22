@@ -3,14 +3,15 @@ from unittest.mock import MagicMock, patch
 from app.infrastructure.patterns.chain_of_responsibility import (
     AuthenticationHandler,
     AuthorizationHandler,
+    build_request_pipeline,
     CachingHandler,
     Handler,
     LoggingHandler,
     RateLimitHandler,
     RequestContext,
     ValidationHandler,
-    build_request_pipeline,
 )
+
 
 class TestRequestContext:
     def test_initial_state(self):
