@@ -41,11 +41,15 @@ async def websocket_proxy(client_ws: WebSocket, target_url: str):
                 token = parsed_protocols[jwt_index + 1]
                 separator = "&" if "?" in target_url else "?"
                 target_url = f"{target_url}{separator}token={token}"
+
+                # If we appended the token to the URL, we shouldn't pass it as a subprotocol
+                # Otherwise, python websockets will duplicate the sec-websocket-protocol header,
+                # causing decoding errors downstream since it receives: "jwt, <token>, jwt, <token>"
+                parsed_protocols = ["jwt"]
         except ValueError:
             pass
 
-    # Passing all requested subprotocols to websockets.connect correctly to preserve tokens
-    # (e.g., ['jwt', '<token>']) rather than just the first selected protocol.
+    # Passing subprotocols to websockets.connect
     subprotocols = parsed_protocols or None
 
     try:
