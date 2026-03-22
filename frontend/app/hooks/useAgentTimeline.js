@@ -1,4 +1,4 @@
-import { useEffect, useReducer } from "react";
+import { useEffect, useMemo, useReducer } from "react";
 
 const PHASE_MAPPING = {
   'CONTEXT_ENRICHMENT': 'contextualize',
@@ -98,6 +98,10 @@ function timelineReducer(state, action) {
   return state;
 }
 
+/**
+ * هاد الخطاف (Hook) يقوم بإدارة ومتابعة الجدول الزمني لمراحل عمل الوكيل (Agent).
+ * يقوم بتجميع الحالات من جميع الدورات (Runs) لضمان إظهار التقدم التراكمي بشكل صحيح.
+ */
 export function useAgentTimeline() {
   const [state, dispatch] = useReducer(timelineReducer, initialState);
 
@@ -150,28 +154,21 @@ export function useAgentTimeline() {
 
   // Transform State to flat Events Array for Component Compatibility
   // Fix: Aggregate phases from ALL runs to show cumulative progress
-  const allPhases = {};
+  return useMemo(() => {
+    const allPhases = {};
 
-  // Sort runs to ensure later runs overwrite earlier ones if needed (chronological order)
-  Object.keys(state.runs).sort((a, b) => {
-    // Attempt to extract numerical suffix (iteration)
-    const aParts = a.split(':');
-    const bParts = b.split(':');
-    const aIter = parseInt(aParts[aParts.length - 1], 10);
-    const bIter = parseInt(bParts[bParts.length - 1], 10);
+    // Sort runs to ensure later runs overwrite earlier ones if needed (chronological order)
+    // We use numeric localeCompare to correctly handle mission:9 vs mission:10
+    Object.keys(state.runs)
+      .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))
+      .forEach((runId) => {
+        const runPhases = state.runs[runId].phases;
+        Object.assign(allPhases, runPhases);
+      });
 
-    if (!isNaN(aIter) && !isNaN(bIter)) {
-      return aIter - bIter;
-    }
-    // Fallback to string comparison
-    return a.localeCompare(b);
-  }).forEach(runId => {
-    const runPhases = state.runs[runId].phases;
-    Object.assign(allPhases, runPhases);
-  });
-
-  return Object.entries(allPhases).map(([phase, status]) => ({
-    phase,
-    status
-  }));
+    return Object.entries(allPhases).map(([phase, status]) => ({
+      phase,
+      status,
+    }));
+  }, [state.runs]);
 }
