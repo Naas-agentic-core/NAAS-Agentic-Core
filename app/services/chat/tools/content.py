@@ -8,6 +8,7 @@
 """
 
 import difflib
+import json
 
 from app.core.logging import get_logger
 from app.domain.constants import BRANCH_MAP
@@ -23,6 +24,26 @@ _BRANCH_LABELS: dict[str, str] = {
     "foreign_languages": "لغات أجنبية",
     "literature_philosophy": "آداب وفلسفة",
 }
+
+
+def _scan_for_error(data: object) -> str | None:
+    """يبحث بشكل عميق عن أي مفاتيح خطأ."""
+    if isinstance(data, dict):
+        if data.get("type") == "error":
+            return str(data.get("content") or data.get("error") or "Unknown Error")
+        return next((err for v in data.values() if (err := _scan_for_error(v))), None)
+
+    if isinstance(data, list):
+        return next((err for item in data if (err := _scan_for_error(item))), None)
+
+    if isinstance(data, str) and '"type": "error"' in data:
+        try:
+            if data.strip().startswith("{"):
+                return _scan_for_error(json.loads(data))
+        except json.JSONDecodeError:
+            pass
+
+    return None
 
 
 def _normalize_branch(value: str | None) -> str | None:
@@ -164,32 +185,6 @@ async def search_content(
 
     # 🛑 Strict Validation: Detect "Soft Failures" (Error-as-Data Anti-Pattern)
     # recursive check for error objects inside list/dict structures
-    def _scan_for_error(data: object) -> str | None:
-        if isinstance(data, dict):
-            if data.get("type") == "error":
-                return str(data.get("content") or data.get("error") or "Unknown Error")
-            for v in data.values():
-                err = _scan_for_error(v)
-                if err:
-                    return err
-        elif isinstance(data, list):
-            for item in data:
-                err = _scan_for_error(item)
-                if err:
-                    return err
-        elif isinstance(data, str):
-            # Fallback for JSON string inside string
-            if '"type": "error"' in data:
-                import json
-
-                try:
-                    if data.strip().startswith("{"):
-                        loaded = json.loads(data)
-                        return _scan_for_error(loaded)
-                except json.JSONDecodeError:
-                    pass
-        return None
-
     error_found = _scan_for_error(report)
     if error_found:
         raise ValueError(f"Research Tool Error: {error_found}")
