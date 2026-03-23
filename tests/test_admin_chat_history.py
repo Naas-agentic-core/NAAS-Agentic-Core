@@ -90,8 +90,12 @@ async def test_admin_websocket_persists_and_history_reads_same_records(
         db_session.add(conv)
         await db_session.flush()
 
-        msg_user = AdminMessage(conversation_id=conv.id, role=MessageRole.USER, content="حلّل هذه المهمة")
-        msg_assist = AdminMessage(conversation_id=conv.id, role=MessageRole.ASSISTANT, content="Admin persisted answer")
+        msg_user = AdminMessage(
+            conversation_id=conv.id, role=MessageRole.USER, content="حلّل هذه المهمة"
+        )
+        msg_assist = AdminMessage(
+            conversation_id=conv.id, role=MessageRole.ASSISTANT, content="Admin persisted answer"
+        )
         db_session.add_all([msg_user, msg_assist])
         await db_session.commit()
 
@@ -241,6 +245,7 @@ async def test_admin_websocket_persists_error_message_on_stream_failure(
 
     async def failing_chat(self, **kwargs: object) -> AsyncGenerator[dict[str, object], None]:
         from app.core.domain.chat import AdminConversation, AdminMessage, MessageRole
+
         user_email = "admin-fail@example.com"
         user_res = await db_session.execute(select(User).where(User.email == user_email))
         user = user_res.scalars().one()
@@ -249,8 +254,12 @@ async def test_admin_websocket_persists_error_message_on_stream_failure(
         db_session.add(conv)
         await db_session.flush()
 
-        msg_user = AdminMessage(conversation_id=conv.id, role=MessageRole.USER, content="اختبار مسار الفشل")
-        msg_assist = AdminMessage(conversation_id=conv.id, role=MessageRole.ASSISTANT, content="admin stream failed")
+        msg_user = AdminMessage(
+            conversation_id=conv.id, role=MessageRole.USER, content="اختبار مسار الفشل"
+        )
+        msg_assist = AdminMessage(
+            conversation_id=conv.id, role=MessageRole.ASSISTANT, content="admin stream failed"
+        )
         db_session.add_all([msg_user, msg_assist])
         await db_session.commit()
 
