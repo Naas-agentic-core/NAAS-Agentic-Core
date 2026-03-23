@@ -12,9 +12,6 @@ from app.core.database import get_db
 from app.core.domain.chat import AdminConversation, AdminMessage, MessageRole
 from app.core.domain.user import User
 from app.core.settings.base import get_settings
-from app.services.chat.contracts import ChatDispatchRequest, ChatDispatchResult
-from app.services.chat.dispatcher import ChatRoleDispatcher
-from app.services.chat.orchestrator import ChatOrchestrator
 
 
 async def _create_admin_user_and_token(db_session: AsyncSession, email: str) -> str:
