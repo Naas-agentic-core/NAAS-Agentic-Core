@@ -47,7 +47,7 @@ fastapi
 httpx
 sqlalchemy
 pydantic-settings
-pyjwt
+PyJWT
 uvicorn
 langchain-core
 langgraph
