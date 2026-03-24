@@ -48,6 +48,13 @@ dspy
 opentelemetry-api
 opentelemetry-sdk
 
+# Missing dependencies for CI test environments
+python-json-logger
+redis-om
+asgi-lifespan
+argon2_cffi
+docker
+
 # File/content tooling imported in tested code paths
 pypdf
 python-docx==1.2.0
