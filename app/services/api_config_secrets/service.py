@@ -127,9 +127,6 @@ class ConfigSecretsService:
         """الحصول على تقرير تدقيق الوصول عبر الواجهة المجمّعة."""
         return self._manager.get_audit_report(secret_id, accessed_by, limit)
 
-    def _initialize_environments(self):
-        pass
-
 
 _config_secrets_instance: ConfigSecretsService | None = None
 _config_lock = threading.Lock()
