@@ -65,9 +65,7 @@ def _extract_probability_parameters(
     return n, r, g, k, declared_prob
 
 
-def _calculate_probability_metrics(
-    n: int, r: int, g: int, k: int
-) -> tuple[int, int, int, float]:
+def _calculate_probability_metrics(n: int, r: int, g: int, k: int) -> tuple[int, int, int, float]:
     """يحسب احتمالات الحالات."""
     omega = math.comb(n, k)
     favorable_red = math.comb(r, k) if r >= k else 0
