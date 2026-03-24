@@ -81,6 +81,10 @@ if _schema_module is None or _workflow_module is None:
             self.timeout = timeout
             self.verbose = verbose
 
+        async def run(self, **kwargs: object) -> object:
+            """دالة تشغيل وهمية للاختبارات."""
+            return None
+
     def step(func: Callable[..., object]) -> Callable[..., object]:
         """ديكوريتر بديل لا يغير سلوك الدالة."""
 
