@@ -65,14 +65,16 @@ def _extract_probability_parameters(
     return n, r, g, k, declared_prob
 
 
-def _calculate_probability_metrics(n: int, r: int, g: int, k: int) -> tuple[int, int, int, float]:
+def _calculate_probability_metrics(
+    n: int, r: int, g: int, k: int
+) -> tuple[int, int, int, int, float]:
     """يحسب احتمالات الحالات."""
     omega = math.comb(n, k)
     favorable_red = math.comb(r, k) if r >= k else 0
     favorable_green = math.comb(g, k) if g >= k else 0
     favorable_total = favorable_red + favorable_green
     calculated_prob = favorable_total / omega if omega > 0 else 0.0
-    return omega, favorable_red, favorable_green, calculated_prob
+    return omega, favorable_red, favorable_green, favorable_total, calculated_prob
 
 
 def verify_probability_logic(nodes: list[KnowledgeNode], relations: list[Relation]) -> AuditResult:
@@ -95,9 +97,13 @@ def verify_probability_logic(nodes: list[KnowledgeNode], relations: list[Relatio
     n, r, g, k, declared_prob = _extract_probability_parameters(urn_node, event_node)
 
     # 3. الحساب الإجرائي (Procedural Calculation)
-    omega, favorable_red, favorable_green, calculated_prob = _calculate_probability_metrics(
-        n, r, g, k
-    )
+    (
+        omega,
+        favorable_red,
+        favorable_green,
+        _favorable_total,
+        calculated_prob,
+    ) = _calculate_probability_metrics(n, r, g, k)
 
     # 4. المقارنة (مع تسامح بسيط للفاصلة العائمة)
     is_valid = abs(calculated_prob - declared_prob) < 1e-9
