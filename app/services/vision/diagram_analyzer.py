@@ -6,10 +6,20 @@
 """
 
 import logging
+import re
 from dataclasses import dataclass
 from enum import StrEnum
 
 logger = logging.getLogger(__name__)
+
+_FUNCTION_GRAPH_PATTERN = re.compile(r"دالة|function|منحنى|curve")
+_PROBABILITY_TREE_PATTERN = re.compile(r"شجرة|tree|فروع")
+_VENN_DIAGRAM_PATTERN = re.compile(r"فن|venn|تقاطع|اتحاد")
+_GEOMETRIC_SHAPE_PATTERN = re.compile(
+    r"مثلث|مربع|دائرة|هندسي|triangle|square|circle|geometric|shape"
+)
+_COMPLEX_PLANE_PATTERN = re.compile(r"مركب|complex|تخيلي|imaginary")
+_TABLE_PATTERN = re.compile(r"جدول|table|صف|عمود")
 
 
 class DiagramType(StrEnum):
@@ -67,35 +77,22 @@ class DiagramAnalyzer:
     def _classify_diagram(self, description: str) -> DiagramType:
         """يصنف نوع الرسم."""
 
-        if any(x in description for x in ["دالة", "function", "منحنى", "curve"]):
+        if _FUNCTION_GRAPH_PATTERN.search(description):
             return DiagramType.FUNCTION_GRAPH
 
-        if any(x in description for x in ["شجرة", "tree", "فروع"]):
+        if _PROBABILITY_TREE_PATTERN.search(description):
             return DiagramType.PROBABILITY_TREE
 
-        if any(x in description for x in ["فن", "venn", "تقاطع", "اتحاد"]):
+        if _VENN_DIAGRAM_PATTERN.search(description):
             return DiagramType.VENN_DIAGRAM
 
-        if any(
-            x in description
-            for x in [
-                "مثلث",
-                "مربع",
-                "دائرة",
-                "هندسي",
-                "triangle",
-                "square",
-                "circle",
-                "geometric",
-                "shape",
-            ]
-        ):
+        if _GEOMETRIC_SHAPE_PATTERN.search(description):
             return DiagramType.GEOMETRIC_SHAPE
 
-        if any(x in description for x in ["مركب", "complex", "تخيلي", "imaginary"]):
+        if _COMPLEX_PLANE_PATTERN.search(description):
             return DiagramType.COMPLEX_PLANE
 
-        if any(x in description for x in ["جدول", "table", "صف", "عمود"]):
+        if _TABLE_PATTERN.search(description):
             return DiagramType.TABLE
 
         return DiagramType.UNKNOWN
