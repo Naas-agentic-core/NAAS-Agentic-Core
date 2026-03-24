@@ -53,6 +53,30 @@ def verify_inventory_consistency(
     )
 
 
+def _extract_probability_parameters(
+    urn_node: KnowledgeNode, event_node: KnowledgeNode
+) -> tuple[int, int, int, int, float]:
+    """يستخرج معاملات الاحتمالات من العقد."""
+    n = urn_node.attributes.get("total_count", 0)
+    r = urn_node.attributes.get("red_count", 0)
+    g = urn_node.attributes.get("green_count", 0)
+    k = event_node.attributes.get("draw_count", 0)
+    declared_prob = float(event_node.attributes.get("declared_probability", 0.0))
+    return n, r, g, k, declared_prob
+
+
+def _calculate_probability_metrics(
+    n: int, r: int, g: int, k: int
+) -> tuple[int, int, int, float]:
+    """يحسب احتمالات الحالات."""
+    omega = math.comb(n, k)
+    favorable_red = math.comb(r, k) if r >= k else 0
+    favorable_green = math.comb(g, k) if g >= k else 0
+    favorable_total = favorable_red + favorable_green
+    calculated_prob = favorable_total / omega if omega > 0 else 0.0
+    return omega, favorable_red, favorable_green, calculated_prob
+
+
 def verify_probability_logic(nodes: list[KnowledgeNode], relations: list[Relation]) -> AuditResult:
     """
     قاعدة: التحقق من صحة الحساب المنطقي لاحتمال الحادثة A (سحب 3 كرات من نفس اللون).
@@ -70,23 +94,12 @@ def verify_probability_logic(nodes: list[KnowledgeNode], relations: list[Relatio
         )
 
     # 2. استخراج المعاملات
-    n = urn_node.attributes.get("total_count", 0)  # 8
-    r = urn_node.attributes.get("red_count", 0)  # 5
-    g = urn_node.attributes.get("green_count", 0)  # 3
-    k = event_node.attributes.get("draw_count", 0)  # 3
-
-    declared_prob = event_node.attributes.get("declared_probability", 0.0)
+    n, r, g, k, declared_prob = _extract_probability_parameters(urn_node, event_node)
 
     # 3. الحساب الإجرائي (Procedural Calculation)
-    # الفضاء الكلي Omega = C(8, 3)
-    omega = math.comb(n, k)
-
-    # الحالات الملائمة: C(5, 3) + C(3, 3)
-    favorable_red = math.comb(r, k) if r >= k else 0
-    favorable_green = math.comb(g, k) if g >= k else 0
-    favorable_total = favorable_red + favorable_green
-
-    calculated_prob = favorable_total / omega if omega > 0 else 0
+    omega, favorable_red, favorable_green, calculated_prob = _calculate_probability_metrics(
+        n, r, g, k
+    )
 
     # 4. المقارنة (مع تسامح بسيط للفاصلة العائمة)
     is_valid = abs(calculated_prob - declared_prob) < 1e-9
