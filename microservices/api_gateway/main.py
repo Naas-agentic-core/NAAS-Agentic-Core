@@ -64,6 +64,29 @@ def _to_ws_base_url(http_base_url: str) -> str:
     return f"{scheme}://{netloc}".rstrip("/")
 
 
+def _extract_session_id(websocket: WebSocket) -> str | None:
+    """Extracts the session_id from query parameters or headers for sticky routing."""
+    query_session_id = websocket.query_params.get("session_id")
+    if query_session_id and len(query_session_id) >= 8:
+        logger.debug("session_id source=query")
+        return query_session_id
+
+    header_session_id = websocket.headers.get("x-session-id")
+    if header_session_id and len(header_session_id) >= 8:
+        logger.debug("session_id source=header")
+        return header_session_id
+
+    logger.debug("session_id source=absent")
+    return None
+
+
+def _build_routing_identity(route_id: str, upstream_path: str, session_id: str | None) -> str:
+    """Builds a routing identity prioritizing session_id to maintain sticky routing."""
+    if session_id:
+        return f"session:{session_id}"
+    return f"{route_id}:{upstream_path}:{uuid.uuid4().hex[:8]}"
+
+
 def _resolve_chat_target_base(route_id: str, identity: str, rollout_percent: int) -> str:
     """يوحد قرار الوجهة بين HTTP وWS ويمنع التوجيه إلى Conversation قبل إثبات parity."""
     use_conversation = _should_route_to_conversation(identity, rollout_percent)
@@ -113,14 +136,17 @@ def _conversation_ws_base_url() -> str:
     return _to_ws_base_url(settings.CONVERSATION_SERVICE_URL.rstrip("/"))
 
 
-def _resolve_chat_ws_target(route_id: str, upstream_path: str) -> str:
+def _resolve_chat_ws_target(route_id: str, upstream_path: str, websocket: WebSocket) -> str:
     """يحدد هدف WS الحديث باستخدام نفس محرك القرار الخاص بمسار HTTP."""
-    identity = f"{route_id}:{upstream_path}"
+    session_id = _extract_session_id(websocket)
+    identity = _build_routing_identity(route_id, upstream_path, session_id)
+
     target_base = _resolve_chat_target_base(
         route_id=route_id,
         identity=identity,
         rollout_percent=settings.ROUTE_CHAT_WS_CONVERSATION_ROLLOUT_PERCENT,
     )
+    logger.info(f"ws_routing session_id={'present' if session_id else 'absent'} bucket={_rollout_bucket(identity)}")
     normalized_conversation_base = settings.CONVERSATION_SERVICE_URL.rstrip("/")
     if target_base.rstrip("/") == normalized_conversation_base:
         ws_base = _conversation_ws_base_url()
@@ -283,8 +309,11 @@ async def chat_ws_proxy(websocket: WebSocket):
         logger.info(
             f"Chat WebSocket route_id={route_id} legacy_flag=false traceparent={headers.get('traceparent', 'unknown')}"
         )
+        session_id = _extract_session_id(websocket)
+        logger.info(f"session_id presence: {'present' if session_id else 'absent'} in chat_ws_proxy")
+
         _record_ws_session_metric(route_id)
-        target_url = _resolve_chat_ws_target(route_id, "api/chat/ws")
+        target_url = _resolve_chat_ws_target(route_id, "api/chat/ws", websocket)
         try:
             await websocket_proxy(websocket, target_url)
         except Exception:
@@ -313,8 +342,11 @@ async def admin_chat_ws_proxy(websocket: WebSocket):
         logger.info(
             f"Chat WebSocket route_id={route_id} legacy_flag=false traceparent={headers.get('traceparent', 'unknown')}"
         )
+        session_id = _extract_session_id(websocket)
+        logger.info(f"session_id presence: {'present' if session_id else 'absent'} in admin_chat_ws_proxy")
+
         _record_ws_session_metric(route_id)
-        target_url = _resolve_chat_ws_target(route_id, "admin/api/chat/ws")
+        target_url = _resolve_chat_ws_target(route_id, "admin/api/chat/ws", websocket)
         try:
             await websocket_proxy(websocket, target_url)
         except Exception:

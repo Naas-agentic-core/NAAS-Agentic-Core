@@ -17,6 +17,8 @@ class ChatEventType(StrEnum):
     ASSISTANT_FINAL = "assistant_final"
     ASSISTANT_ERROR = "assistant_error"
     STATUS = "status"
+    CONVERSATION_INIT = "conversation_init"
+    COMPLETE = "complete"
 
 
 class ChatEventPayload(RobustBaseModel):
