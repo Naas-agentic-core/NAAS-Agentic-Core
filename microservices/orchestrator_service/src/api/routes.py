@@ -14,6 +14,7 @@ from fastapi import (
     WebSocketDisconnect,
 )
 from fastapi.responses import StreamingResponse
+import httpx
 from langchain_core.messages import HumanMessage
 from pydantic import BaseModel, Field
 from sqlalchemy import text
@@ -294,6 +295,28 @@ def _extract_chat_objective(payload: dict[str, object]) -> str | None:
     return None
 
 
+async def _create_new_conversation(
+    user_id: int,
+    question: str,
+    is_admin_scope: bool,
+    session: AsyncSession
+) -> int:
+    create_query = (
+        text(
+            "INSERT INTO admin_conversations (title, user_id) VALUES (:title, :user_id) RETURNING id"
+        )
+        if is_admin_scope
+        else text(
+            "INSERT INTO customer_conversations (title, user_id) VALUES (:title, :user_id) RETURNING id"
+        )
+    )
+    title = question.strip()[:120] or "Super Agent Mission"
+    created = await session.execute(create_query, {"title": title, "user_id": user_id})
+    created_id = created.scalar_one_or_none()
+    if created_id is None:
+        raise HTTPException(status_code=500, detail="failed to create conversation")
+    return int(created_id)
+
 async def _ensure_conversation(
     *,
     chat_scope: str,
@@ -304,21 +327,18 @@ async def _ensure_conversation(
     """ينشئ أو يتحقق من المحادثة ويحفظ رسالة المستخدم لضمان اتساق التاريخ."""
     is_admin_scope = chat_scope == "admin"
     check_query = (
-        text("SELECT id FROM admin_conversations WHERE id=:conversation_id AND user_id=:user_id")
+        text("SELECT id, title, created_at FROM admin_conversations WHERE id=:conversation_id AND user_id=:user_id")
         if is_admin_scope
         else text(
-            "SELECT id FROM customer_conversations WHERE id=:conversation_id AND user_id=:user_id"
+            "SELECT id, title, created_at FROM customer_conversations WHERE id=:conversation_id AND user_id=:user_id"
         )
     )
-    create_query = (
-        text(
-            "INSERT INTO admin_conversations (title, user_id) VALUES (:title, :user_id) RETURNING id"
-        )
+    get_messages_query = (
+        text("SELECT id, role, content, created_at FROM admin_messages WHERE conversation_id=:conversation_id ORDER BY id ASC")
         if is_admin_scope
-        else text(
-            "INSERT INTO customer_conversations (title, user_id) VALUES (:title, :user_id) RETURNING id"
-        )
+        else text("SELECT id, role, content, created_at FROM customer_messages WHERE conversation_id=:conversation_id ORDER BY id ASC")
     )
+
     insert_message_query = (
         text(
             "INSERT INTO admin_messages (conversation_id, role, content) "
@@ -338,16 +358,45 @@ async def _ensure_conversation(
                 check_query,
                 {"conversation_id": conversation_id, "user_id": user_id},
             )
-            exists = result.scalar_one_or_none()
-            if exists is None:
+            conv_row = result.fetchone()
+            if conv_row is None:
                 raise HTTPException(status_code=403, detail="conversation does not belong to user")
+
+            try:
+                messages_res = await session.execute(get_messages_query, {"conversation_id": conversation_id})
+                messages_rows = messages_res.fetchall()
+
+                messages = [
+                    {"role": str(m.role), "content": str(m.content), "created_at": m.created_at.isoformat()}
+                    for m in messages_rows
+                ]
+                conv_metadata = {
+                    "title": str(conv_row.title),
+                    "created_at": conv_row.created_at.isoformat()
+                }
+
+                payload = {
+                    "conversation_id": conversation_id,
+                    "user_id": user_id,
+                    "idempotency_key": f"{conversation_id}:{user_id}",
+                    "max_messages": 50,
+                    "conversation_metadata": conv_metadata,
+                    "messages": messages
+                }
+
+                settings = get_settings()
+                conv_service_url = settings.CONVERSATION_SERVICE_URL.rstrip("/")
+                async with httpx.AsyncClient(timeout=10.0) as client:
+                    resp = await client.post(f"{conv_service_url}/api/v1/conversations/import", json=payload)
+                    resp.raise_for_status()
+                    data = resp.json()
+                    if data.get("status") not in {"imported", "already_exists"}:
+                        raise ValueError(f"Unexpected import status: {data.get('status')}")
+            except Exception as e:
+                logger.warning(f"Lazy import failed for conversation {conversation_id}: {e}")
+                conversation_id = await _create_new_conversation(user_id, question, is_admin_scope, session)
         else:
-            title = question.strip()[:120] or "Super Agent Mission"
-            created = await session.execute(create_query, {"title": title, "user_id": user_id})
-            created_id = created.scalar_one_or_none()
-            if created_id is None:
-                raise HTTPException(status_code=500, detail="failed to create conversation")
-            conversation_id = int(created_id)
+            conversation_id = await _create_new_conversation(user_id, question, is_admin_scope, session)
 
         await session.execute(
             insert_message_query,

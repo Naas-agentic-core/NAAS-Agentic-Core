@@ -23,9 +23,11 @@ def test_conversation_health_and_http_chat() -> None:
 def test_conversation_ws_synthetic_journey_customer() -> None:
     """يراقب رحلة WS: اتصال ثم إرسال question ثم استقبال response envelope."""
     with TestClient(app).websocket_connect("/api/chat/ws") as ws:
+        init_payload = ws.receive_json()
+        assert init_payload["type"] == "conversation_init"
+
         ws.send_json({"question": "hello"})
         payload = ws.receive_json()
 
-    assert payload["status"] == "ok"
-    assert payload["response"] == "conversation-service:hello"
-    assert payload["route_id"] == "chat_ws_customer"
+    assert payload["type"] == "assistant_delta"
+    assert "conversation-service:hello" in payload["payload"]["content"]
