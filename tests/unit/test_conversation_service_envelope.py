@@ -64,7 +64,9 @@ def test_conversation_ws_error_envelope_shape():
     client = TestClient(app)
 
     # We patch _response_envelope to raise an Exception to test the error block
-    with patch("microservices.conversation_service.main._response_envelope", side_effect=ValueError("Boom")):
+    with patch(
+        "microservices.conversation_service.main._response_envelope", side_effect=ValueError("Boom")
+    ):
         with client.websocket_connect("/api/chat/ws") as ws:
             init_event = ws.receive_json()
             assert init_event["type"] == "conversation_init"

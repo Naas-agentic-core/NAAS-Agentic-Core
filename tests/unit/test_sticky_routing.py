@@ -15,6 +15,7 @@ def test_same_session_id_produces_same_bucket():
     assert identity1 == identity2
     assert _rollout_bucket(identity1) == _rollout_bucket(identity2)
 
+
 def test_different_sessions_distribute_across_buckets():
     buckets = set()
     for i in range(100):
@@ -23,35 +24,45 @@ def test_different_sessions_distribute_across_buckets():
     # Should distribute to more than 1 bucket
     assert len(buckets) > 1
 
+
 def test_extract_session_id_from_query_param():
     class MockWS:
         query_params: ClassVar[dict[str, str]] = {"session_id": "sess-12345"}
         headers: ClassVar[dict[str, str]] = {}
+
     assert _extract_session_id(MockWS()) == "sess-12345"
+
 
 def test_extract_session_id_from_header_fallback():
     class MockWS:
         query_params: ClassVar[dict[str, str]] = {}
         headers: ClassVar[dict[str, str]] = {"x-session-id": "sess-67890"}
+
     assert _extract_session_id(MockWS()) == "sess-67890"
+
 
 def test_query_param_takes_priority_over_header():
     class MockWS:
         query_params: ClassVar[dict[str, str]] = {"session_id": "sess-from-query"}
         headers: ClassVar[dict[str, str]] = {"x-session-id": "sess-from-header"}
+
     assert _extract_session_id(MockWS()) == "sess-from-query"
+
 
 def test_missing_session_id_returns_none():
     class MockWS:
         query_params: ClassVar[dict[str, str]] = {}
         headers: ClassVar[dict[str, str]] = {}
+
     assert _extract_session_id(MockWS()) is None
 
     # Also test short session ids
     class MockWSShort:
         query_params: ClassVar[dict[str, str]] = {"session_id": "short"}
         headers: ClassVar[dict[str, str]] = {"x-session-id": "short"}
+
     assert _extract_session_id(MockWSShort()) is None
+
 
 def test_rollout_at_10_percent_routes_roughly_10_percent():
     routed = 0
