@@ -15,7 +15,7 @@ import httpx
 from pydantic import BaseModel
 from tenacity import AsyncRetrying, retry_if_exception_type, stop_after_attempt, wait_exponential
 
-from app.contracts.chat_events import ChatEventEnvelope, ChatEventPayload, ChatEventType
+from shared.chat_protocol.chat_events import ChatEventEnvelope, ChatEventPayload, ChatEventType
 from app.core.http_client_factory import HTTPClientConfig, get_http_client
 from app.core.settings.base import get_settings
 from app.infrastructure.clients.routing_policy import ChatRoutingPolicy
