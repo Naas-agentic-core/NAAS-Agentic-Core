@@ -299,6 +299,10 @@ class MissionWriterProtocol(Protocol):
         """تسجيل حدث للمهمة."""
         ...
 
+    async def rollback(self) -> None:
+        """إلغاء التغييرات الحالية في قاعدة البيانات (Rollback)."""
+        ...
+
 
 @runtime_checkable
 class TaskStateProtocol(Protocol):
