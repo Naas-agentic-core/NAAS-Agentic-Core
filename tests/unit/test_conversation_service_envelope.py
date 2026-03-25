@@ -5,6 +5,7 @@ from fastapi.testclient import TestClient
 from microservices.conversation_service.main import app
 
 
+@patch.dict("os.environ", {"CHAT_USE_UNIFIED_EVENT_ENVELOPE": "1"})
 def test_conversation_ws_customer_envelope_shape():
     client = TestClient(app)
     with client.websocket_connect("/api/chat/ws") as ws:
@@ -29,6 +30,7 @@ def test_conversation_ws_customer_envelope_shape():
         assert "payload" in complete_event
 
 
+@patch.dict("os.environ", {"CHAT_USE_UNIFIED_EVENT_ENVELOPE": "1"})
 def test_conversation_ws_admin_envelope_shape():
     client = TestClient(app)
     with client.websocket_connect("/admin/api/chat/ws") as ws:

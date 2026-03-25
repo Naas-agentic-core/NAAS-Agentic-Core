@@ -2,13 +2,15 @@
 
 from __future__ import annotations
 
+from typing import ClassVar
+
 from microservices.api_gateway import main
 from microservices.api_gateway.config import settings
 
 
 class MockWebSocket:
-    query_params = {}
-    headers = {}
+    query_params: ClassVar[dict[str, str]] = {}
+    headers: ClassVar[dict[str, str]] = {}
 
 def test_resolve_chat_ws_target_uses_conversation_ws_url_when_conversation_selected(
     monkeypatch,
