@@ -1,10 +1,9 @@
-import pytest
-from fastapi.testclient import TestClient
-from fastapi.websockets import WebSocketDisconnect
 from unittest.mock import patch
-import json
+
+from fastapi.testclient import TestClient
 
 from microservices.conversation_service.main import app
+
 
 def test_conversation_ws_customer_envelope_shape():
     client = TestClient(app)

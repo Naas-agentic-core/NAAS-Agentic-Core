@@ -32,8 +32,8 @@ from app.infrastructure.clients.orchestrator_client import orchestrator_client
 from app.infrastructure.clients.user_client import user_client
 from app.services.auth.token_decoder import decode_user_id
 from app.services.boundaries.admin_chat_boundary_service import AdminChatBoundaryService
-from shared.chat_protocol.event_protocol import normalize_streaming_event
 from app.services.rbac import ADMIN_ROLE
+from shared.chat_protocol.event_protocol import normalize_streaming_event
 
 logger = get_logger(__name__)
 
