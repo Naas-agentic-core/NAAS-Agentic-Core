@@ -425,6 +425,10 @@ class MissionStateManager:
             # Explicit commit to ensure persistence
             await self.session.commit()
 
+    async def rollback(self) -> None:
+        """إلغاء التغييرات الحالية في الجلسة (Rollback)."""
+        await self.session.rollback()
+
     async def log_event(
         self, mission_id: int, event_type: MissionEventType, payload: dict[str, JsonValue]
     ) -> None:
