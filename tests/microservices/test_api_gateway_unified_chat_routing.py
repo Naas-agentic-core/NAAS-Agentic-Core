@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import ClassVar
+
 from microservices.api_gateway import main
 from microservices.api_gateway.config import settings
 
@@ -14,8 +16,8 @@ def test_http_and_ws_share_same_orchestrator_decision(monkeypatch) -> None:
 
     http_target = main._resolve_chat_target_base("chat_http", "id-123", 0)
     class MockWebSocket:
-        query_params = {}
-        headers = {}
+        query_params: ClassVar[dict[str, str]] = {}
+        headers: ClassVar[dict[str, str]] = {}
     ws_target = main._resolve_chat_ws_target("chat_ws_customer", "api/chat/ws", MockWebSocket())
 
     assert http_target == "http://orchestrator-service:8006"
@@ -32,8 +34,8 @@ def test_http_and_ws_share_same_conversation_decision(monkeypatch) -> None:
 
     http_target = main._resolve_chat_target_base("chat_http", "id-123", 100)
     class MockWebSocket:
-        query_params = {}
-        headers = {}
+        query_params: ClassVar[dict[str, str]] = {}
+        headers: ClassVar[dict[str, str]] = {}
     ws_target = main._resolve_chat_ws_target("chat_ws_customer", "api/chat/ws", MockWebSocket())
 
     assert http_target == "http://conversation-service:8010"

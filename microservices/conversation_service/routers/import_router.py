@@ -121,4 +121,4 @@ async def import_conversation(
                 messages_imported=len(messages_to_import)
             )
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
