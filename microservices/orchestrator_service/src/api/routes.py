@@ -2,6 +2,7 @@ import logging
 import uuid
 from typing import TypedDict
 
+import httpx
 import jwt
 from fastapi import (
     APIRouter,
@@ -14,7 +15,6 @@ from fastapi import (
     WebSocketDisconnect,
 )
 from fastapi.responses import StreamingResponse
-import httpx
 from langchain_core.messages import HumanMessage
 from pydantic import BaseModel, Field
 from sqlalchemy import text

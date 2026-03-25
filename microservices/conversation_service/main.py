@@ -3,18 +3,17 @@
 from __future__ import annotations
 
 import os
-import jsonschema
 
+import jsonschema
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.responses import JSONResponse
 
+from microservices.conversation_service.routers.import_router import router as import_router
 from shared.chat_protocol.event_protocol import (
     ChatEventType,
     build_chat_event_envelope,
     normalize_streaming_event,
 )
-
-from microservices.conversation_service.routers.import_router import router as import_router
 
 app = FastAPI(title="Conversation Service", version="0.1.0")
 app.include_router(import_router)
@@ -117,7 +116,7 @@ async def _chat_ws_loop(websocket: WebSocket, route_id: str) -> None:
             await websocket.send_json(complete_event)
     except WebSocketDisconnect:
         return
-    except Exception as e:
+    except Exception:
         error_event = build_chat_event_envelope(
             event_type=ChatEventType.ASSISTANT_ERROR,
             details="Internal Server Error"

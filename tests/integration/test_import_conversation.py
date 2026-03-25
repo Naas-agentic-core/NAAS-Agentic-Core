@@ -1,9 +1,9 @@
-import pytest
+from unittest.mock import AsyncMock, MagicMock
+
 from fastapi.testclient import TestClient
-from unittest.mock import AsyncMock, MagicMock, patch
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from microservices.conversation_service.main import app
+
 
 def make_mock_db(exists=False):
     mock_result = MagicMock()          # NOT AsyncMock

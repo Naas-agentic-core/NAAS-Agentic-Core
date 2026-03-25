@@ -1,11 +1,10 @@
-import pytest
 from microservices.api_gateway.main import (
-    _extract_session_id,
     _build_routing_identity,
+    _extract_session_id,
     _rollout_bucket,
-    _should_route_to_conversation
+    _should_route_to_conversation,
 )
-from types import SimpleNamespace
+
 
 def test_same_session_id_produces_same_bucket():
     session_id = "sess-12345"
