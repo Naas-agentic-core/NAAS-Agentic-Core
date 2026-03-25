@@ -6,6 +6,10 @@ from microservices.api_gateway import main
 from microservices.api_gateway.config import settings
 
 
+class MockWebSocket:
+    query_params = {}
+    headers = {}
+
 def test_resolve_chat_ws_target_uses_conversation_ws_url_when_conversation_selected(
     monkeypatch,
 ) -> None:
@@ -17,7 +21,7 @@ def test_resolve_chat_ws_target_uses_conversation_ws_url_when_conversation_selec
     monkeypatch.setattr(settings, "CONVERSATION_SERVICE_URL", "http://conversation-service:8010")
     monkeypatch.setattr(settings, "CONVERSATION_WS_URL", "wss://chat-edge.example.com/socket")
 
-    target = main._resolve_chat_ws_target("chat_ws_customer", "api/chat/ws")
+    target = main._resolve_chat_ws_target("chat_ws_customer", "api/chat/ws", MockWebSocket())
 
     assert target == "wss://chat-edge.example.com/socket/api/chat/ws"
 
@@ -33,7 +37,7 @@ def test_resolve_chat_ws_target_falls_back_to_conversation_http_url_when_ws_url_
     monkeypatch.setattr(settings, "CONVERSATION_SERVICE_URL", "https://conversation-service:8010")
     monkeypatch.setattr(settings, "CONVERSATION_WS_URL", "")
 
-    target = main._resolve_chat_ws_target("chat_ws_customer", "api/chat/ws")
+    target = main._resolve_chat_ws_target("chat_ws_customer", "api/chat/ws", MockWebSocket())
 
     assert target == "wss://conversation-service:8010/api/chat/ws"
 
@@ -47,6 +51,6 @@ def test_resolve_chat_ws_target_keeps_orchestrator_when_conversation_not_selecte
     monkeypatch.setattr(settings, "ORCHESTRATOR_SERVICE_URL", "http://orchestrator-service:8006")
     monkeypatch.setattr(settings, "CONVERSATION_WS_URL", "wss://chat-edge.example.com/socket")
 
-    target = main._resolve_chat_ws_target("chat_ws_customer", "api/chat/ws")
+    target = main._resolve_chat_ws_target("chat_ws_customer", "api/chat/ws", MockWebSocket())
 
     assert target == "ws://orchestrator-service:8006/api/chat/ws"

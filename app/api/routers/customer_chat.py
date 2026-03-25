@@ -23,7 +23,7 @@ from app.services.auth.token_decoder import decode_user_id
 from app.services.boundaries.customer_chat_boundary_service import (
     CustomerChatBoundaryService,
 )
-from app.services.chat.event_protocol import normalize_streaming_event
+from shared.chat_protocol.event_protocol import normalize_streaming_event
 from app.services.rbac import QA_SUBMIT
 
 logger = get_logger(__name__)

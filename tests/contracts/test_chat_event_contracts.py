@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
-from app.contracts.chat_events import ChatEventEnvelope, ChatEventType
+from shared.chat_protocol.chat_events import ChatEventEnvelope, ChatEventType
 
 
 def test_chat_event_envelope_accepts_assistant_delta() -> None:

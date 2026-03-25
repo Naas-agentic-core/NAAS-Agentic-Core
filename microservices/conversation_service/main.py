@@ -8,7 +8,7 @@ import jsonschema
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.responses import JSONResponse
 
-from app.services.chat.event_protocol import (
+from shared.chat_protocol.event_protocol import (
     ChatEventType,
     build_chat_event_envelope,
     normalize_streaming_event,

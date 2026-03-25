@@ -2,8 +2,6 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import text
-from typing import List, Dict, Any
-
 from microservices.conversation_service.database import get_conv_db_session
 
 router = APIRouter(prefix="/api/v1/conversations")
@@ -13,8 +11,8 @@ class ImportConversationRequest(BaseModel):
     user_id: int
     idempotency_key: str = Field(min_length=3)
     max_messages: int = Field(default=50, ge=1, le=200)
-    conversation_metadata: Dict[str, Any]
-    messages: List[Dict[str, Any]]
+    conversation_metadata: dict[str, object]
+    messages: list[dict[str, object]]
 
 class ImportConversationResponse(BaseModel):
     status: str
