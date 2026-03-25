@@ -4,6 +4,7 @@ import httpx
 import pytest
 
 from app.infrastructure.clients.orchestrator_client import OrchestratorClient
+from app.infrastructure.clients.routing_policy import ChatRoutingPolicy
 
 
 class _AlwaysFailClient:
@@ -17,7 +18,7 @@ class _AlwaysFailClient:
 
 
 @pytest.mark.asyncio
-async def test_build_chat_url_candidates_uses_single_canonical_target_by_default(
+async def test_candidate_urls_uses_single_canonical_target_by_default(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """يفرض مرشحًا وحيدًا افتراضيًا لمنع split-brain في مسار الدردشة."""
@@ -28,13 +29,13 @@ async def test_build_chat_url_candidates_uses_single_canonical_target_by_default
     monkeypatch.delenv("ORCHESTRATOR_ALLOW_MULTI_TARGET_CHAT", raising=False)
     client = OrchestratorClient(base_url="http://localhost:8006")
 
-    candidates = client._build_chat_url_candidates()
+    candidates = ChatRoutingPolicy.from_environment(client.base_url).candidate_urls()
 
     assert candidates == ["http://localhost:8006/agent/chat"]
 
 
 @pytest.mark.asyncio
-async def test_build_chat_url_candidates_allows_multi_target_only_in_breakglass(
+async def test_candidate_urls_allows_multi_target_only_in_breakglass(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """يسمح بتعدد المرشحات فقط عند تفعيل breakglass صراحة."""
@@ -45,7 +46,7 @@ async def test_build_chat_url_candidates_allows_multi_target_only_in_breakglass(
     )
     client = OrchestratorClient(base_url="http://localhost:8006")
 
-    candidates = client._build_chat_url_candidates()
+    candidates = ChatRoutingPolicy.from_environment(client.base_url).candidate_urls()
 
     assert candidates[0] == "http://localhost:8006/agent/chat"
     assert "http://orchestrator-service:8006/agent/chat" in candidates

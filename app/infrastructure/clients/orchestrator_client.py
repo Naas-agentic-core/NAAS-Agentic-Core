@@ -71,11 +71,6 @@ class OrchestratorClient:
             max_connections=50,
         )
 
-    def _build_chat_url_candidates(self) -> list[str]:
-        """يبني مرشّحات التوجيه عبر سياسة مركزية تمنع split-brain إلا في وضع breakglass."""
-        policy = ChatRoutingPolicy.from_environment(self.base_url)
-        return policy.candidate_urls()
-
     def _file_intelligence_decision(self, question: str) -> tuple[bool, str | None]:
         """يستدعي قدرة ذكاء الملفات الرسمية لإنتاج قرار موحد."""
         decision = detect_file_intelligence(FileIntelligenceRequest(question=question))
