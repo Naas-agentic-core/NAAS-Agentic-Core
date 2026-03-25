@@ -97,16 +97,6 @@ class CustomerChatStreamer:
             except Exception as exc:
                 logger.error(f"⚠️ Failed to inject customer context: {exc}")
 
-    def _extract_chunk_content(self, chunk: object) -> str:
-        if isinstance(chunk, dict):
-            choices = chunk.get("choices", [])
-            if choices:
-                return str(choices[0].get("delta", {}).get("content", ""))
-            return ""
-        if isinstance(chunk, str):
-            return chunk
-        return ""
-
     def _get_orchestrator(self) -> ChatOrchestrator:
         """
         إرجاع منسق المحادثة القياسي لضمان استخدام وكلاء Overmind المتعددين.
