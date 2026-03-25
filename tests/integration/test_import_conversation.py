@@ -6,19 +6,27 @@ from microservices.conversation_service.main import app
 
 
 def make_mock_db(exists=False):
-    mock_result = MagicMock()          # NOT AsyncMock
+    mock_result = MagicMock()  # NOT AsyncMock
     mock_result.scalar.return_value = 1 if exists else None
     mock_result.mappings.return_value.first.return_value = (
-        {"id": 9999, "user_id": 1, "title": "test",
-         "created_at": None, "updated_at": None,
-         "metadata": None}
-        if exists else None
+        {
+            "id": 9999,
+            "user_id": 1,
+            "title": "test",
+            "created_at": None,
+            "updated_at": None,
+            "metadata": None,
+        }
+        if exists
+        else None
     )
     mock_result.mappings.return_value.all.return_value = []
 
     # To avoid the 'coroutine' object does not support the asynchronous context manager protocol error,
     # we use a MagicMock for the return value of mock_db.begin (which makes it NOT a coroutine)
-    mock_db = MagicMock() # Changed to MagicMock from AsyncMock so its methods aren't automatically coroutines
+    mock_db = (
+        MagicMock()
+    )  # Changed to MagicMock from AsyncMock so its methods aren't automatically coroutines
     mock_db.execute = AsyncMock(return_value=mock_result)
 
     mock_begin_cm = MagicMock()
@@ -27,6 +35,7 @@ def make_mock_db(exists=False):
     mock_db.begin.return_value = mock_begin_cm
 
     return mock_db
+
 
 def test_import_new_conversation_returns_imported():
     client = TestClient(app)
@@ -38,12 +47,11 @@ def test_import_new_conversation_returns_imported():
         "idempotency_key": "100:42",
         "max_messages": 50,
         "conversation_metadata": {"title": "Test conversation"},
-        "messages": [
-            {"role": "user", "content": "hello"}
-        ]
+        "messages": [{"role": "user", "content": "hello"}],
     }
 
     from microservices.conversation_service.database import get_conv_db_session
+
     app.dependency_overrides[get_conv_db_session] = lambda: mock_session
     response = client.post("/api/v1/conversations/import", json=payload)
 
@@ -64,12 +72,11 @@ def test_import_twice_returns_already_exists():
         "idempotency_key": "100:42",
         "max_messages": 50,
         "conversation_metadata": {"title": "Test conversation"},
-        "messages": [
-            {"role": "user", "content": "hello"}
-        ]
+        "messages": [{"role": "user", "content": "hello"}],
     }
 
     from microservices.conversation_service.database import get_conv_db_session
+
     app.dependency_overrides[get_conv_db_session] = lambda: mock_session
     response = client.post("/api/v1/conversations/import", json=payload)
 
@@ -90,10 +97,11 @@ def test_import_wrong_user_id_returns_not_found():
         "idempotency_key": "100:99",
         "max_messages": 50,
         "conversation_metadata": {},
-        "messages": []
+        "messages": [],
     }
 
     from microservices.conversation_service.database import get_conv_db_session
+
     app.dependency_overrides[get_conv_db_session] = lambda: mock_session
     response = client.post("/api/v1/conversations/import", json=payload)
 

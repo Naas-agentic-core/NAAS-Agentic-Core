@@ -12,6 +12,7 @@ class MockWebSocket:
     query_params: ClassVar[dict[str, str]] = {}
     headers: ClassVar[dict[str, str]] = {}
 
+
 def test_resolve_chat_ws_target_uses_conversation_ws_url_when_conversation_selected(
     monkeypatch,
 ) -> None:

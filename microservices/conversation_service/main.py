@@ -118,8 +118,7 @@ async def _chat_ws_loop(websocket: WebSocket, route_id: str) -> None:
         return
     except Exception:
         error_event = build_chat_event_envelope(
-            event_type=ChatEventType.ASSISTANT_ERROR,
-            details="Internal Server Error"
+            event_type=ChatEventType.ASSISTANT_ERROR, details="Internal Server Error"
         )
         if env != "production":
             _assert_envelope_schema(error_event)

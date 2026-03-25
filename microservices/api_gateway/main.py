@@ -146,7 +146,9 @@ def _resolve_chat_ws_target(route_id: str, upstream_path: str, websocket: WebSoc
         identity=identity,
         rollout_percent=settings.ROUTE_CHAT_WS_CONVERSATION_ROLLOUT_PERCENT,
     )
-    logger.info(f"ws_routing session_id={'present' if session_id else 'absent'} bucket={_rollout_bucket(identity)}")
+    logger.info(
+        f"ws_routing session_id={'present' if session_id else 'absent'} bucket={_rollout_bucket(identity)}"
+    )
     normalized_conversation_base = settings.CONVERSATION_SERVICE_URL.rstrip("/")
     if target_base.rstrip("/") == normalized_conversation_base:
         ws_base = _conversation_ws_base_url()
@@ -310,7 +312,9 @@ async def chat_ws_proxy(websocket: WebSocket):
             f"Chat WebSocket route_id={route_id} legacy_flag=false traceparent={headers.get('traceparent', 'unknown')}"
         )
         session_id = _extract_session_id(websocket)
-        logger.info(f"session_id presence: {'present' if session_id else 'absent'} in chat_ws_proxy")
+        logger.info(
+            f"session_id presence: {'present' if session_id else 'absent'} in chat_ws_proxy"
+        )
 
         _record_ws_session_metric(route_id)
         target_url = _resolve_chat_ws_target(route_id, "api/chat/ws", websocket)
@@ -343,7 +347,9 @@ async def admin_chat_ws_proxy(websocket: WebSocket):
             f"Chat WebSocket route_id={route_id} legacy_flag=false traceparent={headers.get('traceparent', 'unknown')}"
         )
         session_id = _extract_session_id(websocket)
-        logger.info(f"session_id presence: {'present' if session_id else 'absent'} in admin_chat_ws_proxy")
+        logger.info(
+            f"session_id presence: {'present' if session_id else 'absent'} in admin_chat_ws_proxy"
+        )
 
         _record_ws_session_metric(route_id)
         target_url = _resolve_chat_ws_target(route_id, "admin/api/chat/ws", websocket)
