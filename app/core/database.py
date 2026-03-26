@@ -112,7 +112,9 @@ def create_db_engine(settings: BaseServiceSettings) -> AsyncEngine:
                     ctx.load_default_certs()
 
                     # Load custom CA certificate if provided securely
-                    db_ca_cert_path = getattr(settings, "DB_CA_CERT_PATH", None) or os.environ.get("DB_CA_CERT_PATH")
+                    db_ca_cert_path = getattr(settings, "DB_CA_CERT_PATH", None) or os.environ.get(
+                        "DB_CA_CERT_PATH"
+                    )
                     if db_ca_cert_path:
                         ctx.load_verify_locations(cafile=db_ca_cert_path)
 
