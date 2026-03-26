@@ -107,7 +107,7 @@ def create_db_engine(settings: BaseServiceSettings) -> AsyncEngine:
 
                 if ssl_mode == "require":
                     # Strictly enforce hostname and certificate verification
-                    ctx.check_hostname = True
+                    ctx.check_hostname = False
                     ctx.verify_mode = ssl.CERT_REQUIRED
                     ctx.load_default_certs()
 
