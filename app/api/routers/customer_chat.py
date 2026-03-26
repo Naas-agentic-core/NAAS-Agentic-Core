@@ -14,7 +14,7 @@ from app.api.schemas.customer_chat import (
     CustomerConversationSummary,
 )
 from app.core.config import get_settings
-from app.core.database import get_db
+from app.core.database import async_session_factory, get_db
 from app.core.di import get_logger
 from app.core.domain.user import User
 from app.deps.auth import CurrentUser, require_permissions
@@ -78,7 +78,6 @@ def get_customer_service(
 @router.websocket("/ws")
 async def chat_stream_ws(
     websocket: WebSocket,
-    db: AsyncSession = Depends(get_db),
 ) -> None:
     """
     قناة WebSocket لبث محادثة تعليمية للمستخدم القياسي.
@@ -94,10 +93,14 @@ async def chat_stream_ws(
         await websocket.close(code=4401)
         return
 
-    actor = await db.get(User, user_id)
-    if actor is None or not actor.is_active:
-        await websocket.close(code=4401)
-        return
+    async with async_session_factory() as db:
+        actor = await db.get(User, user_id)
+        if actor is None or not actor.is_active:
+            await websocket.close(code=4401)
+            return
+
+        # Expunge the actor so we can use it after the session is closed
+        db.expunge(actor)
 
     await websocket.accept(subprotocol=selected_protocol)
 
