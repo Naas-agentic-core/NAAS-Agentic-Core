@@ -79,18 +79,27 @@ def test_chat_stream_ws_not_admin(app):
 
     mock_db = AsyncMock()
     mock_db.get.return_value = mock_actor
+    # Ensure db.expunge is a synchronous MagicMock, not AsyncMock, because it's called synchronously
+    mock_db.expunge = MagicMock()
 
-    app.dependency_overrides[get_db] = lambda: mock_db
-    # Mock extract_websocket_auth to return a token
+    mock_session_manager = MagicMock()
+    mock_session_manager.__aenter__.return_value = mock_db
+    mock_session_manager.__aexit__.return_value = None
+
     with patch(
-        "app.api.routers.admin.extract_websocket_auth",
-        return_value=("valid_token", "json"),
+        "app.api.routers.admin.async_session_factory",
+        return_value=mock_session_manager,
     ):
-        with patch("app.api.routers.admin.decode_user_id", return_value=1):
-            with client.websocket_connect("/admin/api/chat/ws") as websocket:
-                data = websocket.receive_json()
-                assert data["type"] == "error"
-                assert "Standard accounts" in data["payload"]["details"]
+        # Mock extract_websocket_auth to return a token
+        with patch(
+            "app.api.routers.admin.extract_websocket_auth",
+            return_value=("valid_token", "json"),
+        ):
+            with patch("app.api.routers.admin.decode_user_id", return_value=1):
+                with client.websocket_connect("/admin/api/chat/ws") as websocket:
+                    data = websocket.receive_json()
+                    assert data["type"] == "error"
+                    assert "Standard accounts" in data["payload"]["details"]
 
 
 def test_chat_stream_ws_empty_question(app):
@@ -101,18 +110,26 @@ def test_chat_stream_ws_empty_question(app):
 
     mock_db = AsyncMock()
     mock_db.get.return_value = mock_actor
+    mock_db.expunge = MagicMock()
 
-    app.dependency_overrides[get_db] = lambda: mock_db
+    mock_session_manager = MagicMock()
+    mock_session_manager.__aenter__.return_value = mock_db
+    mock_session_manager.__aexit__.return_value = None
+
     with patch(
-        "app.api.routers.admin.extract_websocket_auth",
-        return_value=("valid_token", "json"),
+        "app.api.routers.admin.async_session_factory",
+        return_value=mock_session_manager,
     ):
-        with patch("app.api.routers.admin.decode_user_id", return_value=1):
-            with client.websocket_connect("/admin/api/chat/ws") as websocket:
-                websocket.send_json({"question": ""})
-                data = websocket.receive_json()
-                assert data["type"] == "error"
-                assert "Question is required" in data["payload"]["details"]
+        with patch(
+            "app.api.routers.admin.extract_websocket_auth",
+            return_value=("valid_token", "json"),
+        ):
+            with patch("app.api.routers.admin.decode_user_id", return_value=1):
+                with client.websocket_connect("/admin/api/chat/ws") as websocket:
+                    websocket.send_json({"question": ""})
+                    data = websocket.receive_json()
+                    assert data["type"] == "error"
+                    assert "Question is required" in data["payload"]["details"]
 
 
 def test_chat_stream_ws_orchestrator_error(app):
@@ -123,20 +140,27 @@ def test_chat_stream_ws_orchestrator_error(app):
 
     mock_db = AsyncMock()
     mock_db.get.return_value = mock_actor
+    mock_db.expunge = MagicMock()
 
-    app.dependency_overrides[get_db] = lambda: mock_db
+    mock_session_manager = MagicMock()
+    mock_session_manager.__aenter__.return_value = mock_db
+    mock_session_manager.__aexit__.return_value = None
 
     with patch(
-        "app.api.routers.admin.extract_websocket_auth",
-        return_value=("valid_token", "json"),
+        "app.api.routers.admin.async_session_factory",
+        return_value=mock_session_manager,
     ):
-        with patch("app.api.routers.admin.decode_user_id", return_value=1):
-            with patch(
-                "app.api.routers.admin.orchestrator_client.chat_with_agent",
-                side_effect=RuntimeError("Orchestrator error"),
-            ):
-                with client.websocket_connect("/admin/api/chat/ws") as websocket:
-                    websocket.send_json({"question": "test"})
-                    data = websocket.receive_json()
-                    assert data["type"] == "error"
-                    assert "Orchestrator error" in data["payload"]["details"]
+        with patch(
+            "app.api.routers.admin.extract_websocket_auth",
+            return_value=("valid_token", "json"),
+        ):
+            with patch("app.api.routers.admin.decode_user_id", return_value=1):
+                with patch(
+                    "app.api.routers.admin.orchestrator_client.chat_with_agent",
+                    side_effect=RuntimeError("Orchestrator error"),
+                ):
+                    with client.websocket_connect("/admin/api/chat/ws") as websocket:
+                        websocket.send_json({"question": "test"})
+                        data = websocket.receive_json()
+                        assert data["type"] == "error"
+                        assert "Orchestrator error" in data["payload"]["details"]
