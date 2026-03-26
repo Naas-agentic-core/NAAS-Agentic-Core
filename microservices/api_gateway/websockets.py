@@ -32,15 +32,14 @@ async def websocket_proxy(client_ws: WebSocket, target_url: str):
     headers.pop("upgrade", None)
     headers.pop("connection", None)
 
-    # Extract token from subprotocols if present and append it to target_url
-    # This prevents 4401 disconnects caused by subprotocol stripping in proxies
+    # Extract token from subprotocols if present and add it to Authorization header
+    # This prevents token leakage in access logs by not appending it to the URL
     if parsed_protocols and "jwt" in parsed_protocols:
         try:
             jwt_index = parsed_protocols.index("jwt")
             if jwt_index + 1 < len(parsed_protocols):
                 token = parsed_protocols[jwt_index + 1]
-                separator = "&" if "?" in target_url else "?"
-                target_url = f"{target_url}{separator}token={token}"
+                headers["Authorization"] = f"Bearer {token}"
         except ValueError:
             pass
 
