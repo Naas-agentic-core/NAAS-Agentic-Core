@@ -24,7 +24,7 @@ from app.api.schemas.admin import (
     ConversationSummaryResponse,
 )
 from app.core.config import get_settings
-from app.core.database import get_db
+from app.core.database import async_session_factory, get_db
 from app.core.di import get_logger
 from app.core.domain.user import User
 from app.deps.auth import CurrentUser, get_current_user, require_roles
@@ -151,7 +151,6 @@ async def get_admin_user_count() -> AdminUserCountResponse:
 @router.websocket("/api/chat/ws")
 async def chat_stream_ws(
     websocket: WebSocket,
-    db: AsyncSession = Depends(get_db),
 ) -> None:
     """
     قناة WebSocket لبث محادثة المسؤول بشكل حي وآمن.
@@ -167,10 +166,14 @@ async def chat_stream_ws(
         await websocket.close(code=4401)
         return
 
-    actor = await db.get(User, user_id)
-    if actor is None or not actor.is_active:
-        await websocket.close(code=4401)
-        return
+    async with async_session_factory() as db:
+        actor = await db.get(User, user_id)
+        if actor is None or not actor.is_active:
+            await websocket.close(code=4401)
+            return
+
+        # Expunge the actor so we can use it after the session is closed
+        db.expunge(actor)
 
     await websocket.accept(subprotocol=selected_protocol)
 
