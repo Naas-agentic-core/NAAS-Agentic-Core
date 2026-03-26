@@ -99,15 +99,22 @@ def create_db_engine(settings: BaseServiceSettings) -> AsyncEngine:
             # Create SSL Context based on mode
             # 'disable' is default (no ssl arg)
             if ssl_mode in ("require", "verify-ca", "verify-full"):
+                import os
                 import ssl
 
                 # Create a default context that verifies certificates
                 ctx = ssl.create_default_context()
 
                 if ssl_mode == "require":
-                    # In 'require', we want SSL but don't strictly verify hostname/cert
-                    ctx.check_hostname = False
-                    ctx.verify_mode = ssl.CERT_NONE
+                    # Strictly enforce hostname and certificate verification
+                    ctx.check_hostname = True
+                    ctx.verify_mode = ssl.CERT_REQUIRED
+                    ctx.load_default_certs()
+
+                    # Load custom CA certificate if provided securely
+                    db_ca_cert_path = getattr(settings, "DB_CA_CERT_PATH", None) or os.environ.get("DB_CA_CERT_PATH")
+                    if db_ca_cert_path:
+                        ctx.load_verify_locations(cafile=db_ca_cert_path)
 
                 engine_args["connect_args"]["ssl"] = ctx
                 logger.info(f"🔒 SSL Enabled (Mode: {ssl_mode})")
