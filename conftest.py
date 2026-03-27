@@ -34,10 +34,7 @@ def pytest_sessionfinish(session: object, exitstatus: int) -> None:
 
     reporter_obj.write_sep(
         "=",
-        (
-            "تم تفعيل سياسة الجودة الصارمة: "
-            f"skipped={skipped_count}, warnings={warning_count}"
-        ),
+        (f"تم تفعيل سياسة الجودة الصارمة: skipped={skipped_count}, warnings={warning_count}"),
         red=True,
     )
     if hasattr(session, "exitstatus"):
