@@ -66,6 +66,10 @@ class SupervisorOrchestrator:
         """
         تحديد العقدة التالية بناءً على حالة التنفيذ الحالية.
         """
+        max_iters = state.get("max_iterations", 5)
+        if state.get("iteration", 0) >= max_iters:
+            return SupervisorDecision(next_step="end", reason="MAX_ITERATIONS_REACHED")
+
         if state.get("loop_detected"):
             if state.get("audit") is None:
                 return SupervisorDecision(
@@ -460,6 +464,7 @@ class LangGraphOvermindEngine:
         """
         decision = self.supervisor.decide(state)
         return {
+            "iteration": state.get("iteration", 0) + 1,
             "next_step": decision.next_step,
             "timeline": self._append_timeline(
                 state,
