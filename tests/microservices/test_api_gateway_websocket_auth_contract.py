@@ -44,7 +44,7 @@ async def test_gateway_ws_proxy_selects_jwt_subprotocol_even_if_not_first(monkey
     await ws_proxy.websocket_proxy(client_ws, "ws://orchestrator-service:8006/api/chat/ws")
 
     assert client_ws.accepted_subprotocol == "jwt"
-    assert captured["kwargs"]["subprotocols"] == ["my_token", "jwt"]
+    assert captured["kwargs"]["subprotocols"] == ["jwt"]
     assert client_ws.closed
     assert client_ws.closed[0][0] == 1011
 

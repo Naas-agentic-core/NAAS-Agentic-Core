@@ -43,9 +43,12 @@ async def websocket_proxy(client_ws: WebSocket, target_url: str):
         except ValueError:
             pass
 
-    # Passing all requested subprotocols to websockets.connect correctly to preserve tokens
-    # (e.g., ['jwt', '<token>']) rather than just the first selected protocol.
-    subprotocols = parsed_protocols or None
+    # Remove the token from subprotocols if we extracted it, leaving only 'jwt'
+    # to prevent token leakage in upstream access logs and avoid 4401 errors.
+    if parsed_protocols and "jwt" in parsed_protocols:
+        subprotocols = ["jwt"]
+    else:
+        subprotocols = parsed_protocols or None
 
     try:
         try:
