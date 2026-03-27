@@ -43,7 +43,8 @@ jobs:
         run: |
           set -euo pipefail
           python -m pip install --upgrade pip
-          pip install "ruff==0.14.9"
+          # Keep lint setup resilient when an exact pinned Ruff build is unavailable
+          pip install "ruff>=0.6,<1"
           exit 0
       - name: Ruff lint
         shell: bash
