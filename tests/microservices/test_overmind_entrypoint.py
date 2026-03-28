@@ -110,9 +110,11 @@ async def test_start_mission_dispatches_in_degraded_mode_when_redis_lock_fails(m
         created_tasks.append(coro)
         if hasattr(coro, "close"):
             coro.close()
+
         class DummyTask:
             def add_done_callback(self, cb):
                 pass
+
         return DummyTask()
 
     def _fake_redis_client(*args, **kwargs):
@@ -149,9 +151,11 @@ async def test_start_mission_dispatches_when_lock_not_acquired(monkeypatch) -> N
         created_tasks.append(coro)
         if hasattr(coro, "close"):
             coro.close()
+
         class DummyTask:
             def add_done_callback(self, cb):
                 pass
+
         return DummyTask()
 
     def _fake_redis_client_not_acquired(*args, **kwargs):
