@@ -196,6 +196,7 @@ async def _build_project_index_with_feedback() -> dict[str, object]:
     feedback_messages.append("📊 جارٍ فهرسة المشروع للحصول على سياق عميق...\n")
 
     try:
+
         async def _build_index_async():
             return ""
 
