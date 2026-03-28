@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import subprocess
+import sys
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -20,7 +21,7 @@ def _contains_token(path: Path, token: str) -> bool:
 def _run_pytest_trace_contract() -> bool:
     """يشغّل اختبار تمرير التتبع الحقيقي ويعيد نجاحه كقيمة منطقية."""
     result = subprocess.run(
-        ["python", "-m", "pytest", "-q", str(TRACE_TEST)],
+        [sys.executable, "-m", "pytest", "-q", str(TRACE_TEST)],
         cwd=REPO_ROOT,
         check=False,
         capture_output=True,
