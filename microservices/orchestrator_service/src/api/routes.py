@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import uuid
 from typing import TypedDict
@@ -308,7 +309,13 @@ async def _create_new_conversation(
         )
     )
     title = question.strip()[:120] or "Super Agent Mission"
-    created = await session.execute(create_query, {"title": title, "user_id": user_id})
+    try:
+        created = await asyncio.wait_for(
+            session.execute(create_query, {"title": title, "user_id": user_id}),
+            timeout=5.0,
+        )
+    except TimeoutError as e:
+        raise HTTPException(status_code=504, detail="Database timeout during conversation creation") from e
     created_id = created.scalar_one_or_none()
     if created_id is None:
         raise HTTPException(status_code=500, detail="failed to create conversation")
@@ -358,18 +365,28 @@ async def _ensure_conversation(
     async with async_session_factory() as session:
         conversation_id = requested_conversation_id
         if conversation_id is not None:
-            result = await session.execute(
-                check_query,
-                {"conversation_id": conversation_id, "user_id": user_id},
-            )
+            try:
+                result = await asyncio.wait_for(
+                    session.execute(
+                        check_query,
+                        {"conversation_id": conversation_id, "user_id": user_id},
+                    ),
+                    timeout=5.0,
+                )
+            except TimeoutError as e:
+                raise HTTPException(status_code=504, detail="Database timeout checking conversation") from e
             conv_row = result.fetchone()
             if conv_row is None:
                 raise HTTPException(status_code=403, detail="conversation does not belong to user")
 
             try:
-                messages_res = await session.execute(
-                    get_messages_query, {"conversation_id": conversation_id}
-                )
+                try:
+                    messages_res = await asyncio.wait_for(
+                        session.execute(get_messages_query, {"conversation_id": conversation_id}),
+                        timeout=5.0,
+                    )
+                except TimeoutError as e:
+                    raise HTTPException(status_code=504, detail="Database timeout retrieving messages") from e
                 messages_rows = messages_res.fetchall()
 
                 messages = [
@@ -414,14 +431,20 @@ async def _ensure_conversation(
                 user_id, question, is_admin_scope, session
             )
 
-        await session.execute(
-            insert_message_query,
-            {
-                "conversation_id": int(conversation_id),
-                "role": "user",
-                "content": question,
-            },
-        )
+        try:
+            await asyncio.wait_for(
+                session.execute(
+                    insert_message_query,
+                    {
+                        "conversation_id": int(conversation_id),
+                        "role": "user",
+                        "content": question,
+                    },
+                ),
+                timeout=5.0,
+            )
+        except TimeoutError as e:
+            raise HTTPException(status_code=504, detail="Database timeout inserting message") from e
         await session.commit()
 
     return int(conversation_id)
@@ -452,26 +475,38 @@ async def _persist_assistant_message(
     )
 
     async with async_session_factory() as session:
-        await session.execute(
-            insert_message_query,
-            {
-                "conversation_id": conversation_id,
-                "role": "assistant",
-                "content": content,
-            },
-        )
-        if is_admin_scope and mission_id is not None:
-            await session.execute(
-                link_query,
-                {
-                    "mission_id": mission_id,
-                    "conversation_id": conversation_id,
-                },
+        try:
+            await asyncio.wait_for(
+                session.execute(
+                    insert_message_query,
+                    {
+                        "conversation_id": conversation_id,
+                        "role": "assistant",
+                        "content": content,
+                    },
+                ),
+                timeout=5.0,
             )
+        except TimeoutError as e:
+            raise HTTPException(status_code=504, detail="Database timeout persisting assistant message") from e
+
+        if is_admin_scope and mission_id is not None:
+            try:
+                await asyncio.wait_for(
+                    session.execute(
+                        link_query,
+                        {
+                            "mission_id": mission_id,
+                            "conversation_id": conversation_id,
+                        },
+                    ),
+                    timeout=5.0,
+                )
+            except TimeoutError as e:
+                raise HTTPException(status_code=504, detail="Database timeout linking mission") from e
         await session.commit()
 
 
-import asyncio
 
 
 async def _stream_chat_langgraph(
