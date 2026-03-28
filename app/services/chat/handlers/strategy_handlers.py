@@ -575,9 +575,7 @@ class DefaultChatHandler(IntentHandler):
         super().__init__("DEFAULT", priority=-1)
         # Deferred imports to avoid circular dependency
         from app.services.chat.context_service import get_context_service
-        from app.services.overmind.identity import OvermindIdentity
 
-        self._identity = OvermindIdentity()
         self._context_service = get_context_service()
 
     async def can_handle(self, context: ChatContext) -> bool:

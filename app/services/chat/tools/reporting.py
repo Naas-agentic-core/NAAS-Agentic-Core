@@ -8,7 +8,6 @@ from app.core.database import async_session_factory
 from app.core.domain.chat import CustomerConversation, CustomerMessage, MessageRole
 from app.core.domain.mission import Mission, MissionStatus
 from app.core.logging import get_logger
-from app.services.overmind.user_knowledge.service import UserKnowledge
 
 logger = get_logger("reporting-tools")
 
@@ -25,8 +24,7 @@ async def fetch_comprehensive_student_history(user_id: int) -> dict[str, object]
         missions_summary = await _get_detailed_missions_summary(user_id)
 
         # 3. جلب الملف الشخصي
-        async with UserKnowledge() as knowledge:
-            profile = await knowledge.get_user_complete_profile(user_id)
+        profile = {}
 
     return {
         "user_id": user_id,

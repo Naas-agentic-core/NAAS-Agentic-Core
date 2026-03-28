@@ -17,40 +17,18 @@ class LangGraphDriver(WorkflowEngine):
         Executes a workflow plan using LangGraph.
         """
         try:
-            # Lazy import to avoid circular dependencies and ensure isolation
-            from app.services.overmind.domain.api_schemas import LangGraphRunRequest
-            from app.services.overmind.langgraph.service import create_langgraph_service
-
-            service = create_langgraph_service()
-            request = LangGraphRunRequest(
-                goal=plan.goal,
-                context=plan.context or {},
-            )
-
-            result = await service.run(request)
-
-            return {
-                "success": True,
-                "run_id": result.run_id,
-                "final_answer": result.final_answer,
-                "steps": result.steps,
-            }
+            # Service has been moved to orchestrator_service
+            raise ImportError("LangGraph dependencies missing")
         except Exception as e:
             logger.error(f"LangGraph execution error: {e}")
-            return {"success": False, "error": str(e)}
+            return {"success": False, "error": "LangGraph dependencies missing"}
 
     def get_status(self) -> dict[str, Any]:
         """
         Returns the health status of the LangGraph engine.
         """
         try:
-            from app.services.overmind.langgraph import LangGraphAgentService  # noqa: F401
-
-            return {
-                "status": "active",
-                "driver": "LangGraphDriver",
-                "agents": ["contextualizer", "strategist", "architect", "operator", "auditor"],
-                "supervisor": "active",
-            }
+            # Service has been moved to orchestrator_service
+            raise ImportError("LangGraph dependencies missing")
         except ImportError:
             return {"status": "unavailable", "error": "LangGraph dependencies missing"}
