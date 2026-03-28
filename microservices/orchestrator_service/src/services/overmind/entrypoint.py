@@ -22,6 +22,8 @@ from microservices.orchestrator_service.src.services.overmind.state import Missi
 
 logger = logging.getLogger(__name__)
 
+active_background_tasks = set()
+
 
 async def _dispatch_mission_task(
     *,
@@ -37,6 +39,8 @@ async def _dispatch_mission_task(
         {"status": "starting", "triggered_by": triggered_by},
     )
     _task = asyncio.create_task(_run_mission_task(mission_id, force_research))  # noqa: RUF006
+    active_background_tasks.add(_task)
+    _task.add_done_callback(active_background_tasks.discard)
 
 
 async def _dispatch_mission_task_degraded(

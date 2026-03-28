@@ -48,6 +48,8 @@ from microservices.orchestrator_service.src.services.tools.registry import get_r
 
 logger = logging.getLogger(__name__)
 
+active_background_tasks = set()
+
 type JsonObject = dict[str, object]
 
 
@@ -552,6 +554,8 @@ async def _stream_chat_langgraph(
             await queue.put({"type": "__ERROR__", "error": str(e)})
 
     task = asyncio.create_task(_runner())
+    active_background_tasks.add(task)
+    task.add_done_callback(active_background_tasks.discard)
     _task_ref = task  # store reference to avoid GC
 
     from datetime import UTC, datetime
@@ -1054,6 +1058,8 @@ async def chat_with_agent_endpoint(
                         ai_msg=response_text,
                     )
                 )
+                active_background_tasks.add(_task_ref)
+                _task_ref.add_done_callback(active_background_tasks.discard)
                 background_tasks.add_task(lambda: _task_ref)
                 yield response_text
             except Exception:
@@ -1100,6 +1106,8 @@ async def chat_with_agent_endpoint(
                         ai_msg=final_text,
                     )
                 )
+                active_background_tasks.add(_task_ref_cust)
+                _task_ref_cust.add_done_callback(active_background_tasks.discard)
                 background_tasks.add_task(lambda: _task_ref_cust)
 
         except Exception:
