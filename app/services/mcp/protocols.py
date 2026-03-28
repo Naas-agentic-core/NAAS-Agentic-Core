@@ -224,18 +224,6 @@ class StatsFetcher:
     async def fetch(self, project_root: Path) -> dict[str, object]:
         return {"error": "Service moved to orchestrator_service"}
 
-        return {
-            "summary": {
-                "total_python_files": 0,
-                "total_functions": 0,
-                "total_classes": 0,
-                "total_lines": 0,
-                "total_microservices": 0,
-            },
-            "by_directory": structure.get("by_directory", {}),
-            "microservices": microservices.get("services_names", []),
-        }
-
 
 # ============== Genius Services Fetchers ==============
 

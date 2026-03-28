@@ -656,13 +656,11 @@ class DefaultChatHandler(IntentHandler):
 
     def _build_identity_context(self) -> str:
         """
-        بناء سياق الهوية التفصيلي لـ Overmind.
+        بناء سياق الهوية التفصيلي للدردشة.
 
         Returns:
-            str: نص هوية شامل للمؤسس ودور النظام.
+            str: نص هوية شامل للنظام.
         """
-        founder = self._identity.get_founder_info()
-        overmind = self._identity.get_overmind_info()
         principles_text = format_system_principles(
             header="المبادئ الصارمة للنظام (تُطبّق على الشيفرة بالكامل):",
             bullet="-",
@@ -673,15 +671,7 @@ class DefaultChatHandler(IntentHandler):
             bullet="-",
             include_header=True,
         )
-        return f"""أنت {overmind["name_ar"]} (Overmind)، {overmind["role_ar"]}.
-
-معلومات المؤسس (مهمة جداً):
-- الاسم الكامل: {founder["name_ar"]} ({founder["name"]})
-- الاسم الأول: {founder["first_name_ar"]} ({founder["first_name"]})
-- اللقب: {founder["last_name_ar"]} ({founder["last_name"]})
-- تاريخ الميلاد: {founder["birth_date"]} (11 أغسطس 1997)
-- الدور: {founder["role_ar"]} ({founder["role"]})
-- GitHub: @{founder["github"]}
+        return f"""أنت مساعد ذكي.
 
 {principles_text}
 

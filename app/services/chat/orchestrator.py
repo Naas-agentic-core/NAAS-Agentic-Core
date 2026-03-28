@@ -107,10 +107,10 @@ class ChatOrchestrator:
 
     def _build_overmind_system_context(self) -> str:
         """
-        بناء سياق Overmind الموحّد للدردشة.
+        بناء سياق الموحّد للدردشة.
 
         Returns:
-            str: نص سياق موحّد يغذي LLMs عبر منظومة Overmind.
+            str: نص سياق موحّد يغذي LLMs.
         """
         context_service = get_context_service()
 
@@ -126,15 +126,7 @@ class ChatOrchestrator:
             include_header=True,
         )
 
-        identity_context = f"""أنت {overmind["name_ar"]} (Overmind)، {overmind["role_ar"]}.
-
-معلومات المؤسس (مهمة جداً):
-- الاسم الكامل: {founder["name_ar"]} ({founder["name"]})
-- الاسم الأول: {founder["first_name_ar"]} ({founder["first_name"]})
-- اللقب: {founder["last_name_ar"]} ({founder["last_name"]})
-- تاريخ الميلاد: {founder["birth_date"]} (11 أغسطس 1997)
-- الدور: {founder["role_ar"]} ({founder["role"]})
-- GitHub: @{founder["github"]}
+        identity_context = f"""أنت مساعد ذكي.
 
 {principles_text}
 

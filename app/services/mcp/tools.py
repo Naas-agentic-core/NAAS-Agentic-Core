@@ -335,4 +335,4 @@ class MCPToolRegistry:
 
     async def _get_microservices(self) -> dict[str, object]:
         """معلومات الخدمات المصغرة."""
-        return build_microservices_summary(self.project_root)
+        return {"error": "Tool migrated to orchestrator_service"}
