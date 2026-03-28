@@ -21,6 +21,8 @@ from microservices.orchestrator_service.src.services.overmind.state import Missi
 
 logger = logging.getLogger(__name__)
 
+active_background_tasks = set()
+
 MISSION_EVENT_WAIT_TIMEOUT_SECONDS = 5.0
 MISSION_EVENT_MAX_IDLE_CYCLES = 3
 MISSION_EVENT_MAX_RECOVERY_CYCLES = 24
@@ -160,6 +162,8 @@ async def handle_mission_complex_stream(
                 await queue.put(None)
 
         pump_task = asyncio.create_task(_pump_events())
+        active_background_tasks.add(pump_task)
+        pump_task.add_done_callback(active_background_tasks.discard)
         # To avoid the garbage collector destroying the task prematurely
         _pump_task_ref = pump_task
 

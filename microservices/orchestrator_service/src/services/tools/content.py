@@ -21,6 +21,8 @@ from .schemas import SearchContentSchema
 
 logger = get_logger("content-tools")
 
+active_background_tasks = set()
+
 _BRANCH_LABELS: dict[str, str] = {
     "experimental_sciences": "علوم تجريبية",
     "math_tech": "تقني رياضي",
@@ -343,7 +345,11 @@ async def search_content(
         internal_task = asyncio.create_task(
             _do_internal_search(q, limit, subject, normalized_branch, set_name, year, type)
         )
+        active_background_tasks.add(internal_task)
+        internal_task.add_done_callback(active_background_tasks.discard)
         web_task = asyncio.create_task(_do_internet_search(full_query))
+        active_background_tasks.add(web_task)
+        web_task.add_done_callback(active_background_tasks.discard)
 
         internal_res, web_res = await asyncio.gather(internal_task, web_task)
 
