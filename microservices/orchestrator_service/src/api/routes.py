@@ -942,8 +942,71 @@ def _serialize_mission(mission: Mission) -> MissionResponse:
     )
 
 
+async def _save_chat_to_db(
+    chat_scope: str,
+    user_id: int,
+    conversation_id: int | None,
+    user_msg: str,
+    ai_msg: str,
+) -> None:
+    """خلفية غير محظورة لحفظ رسائل الدردشة في قاعدة البيانات."""
+    is_admin = chat_scope == "admin"
+    async with async_session_factory() as session:
+        try:
+            if conversation_id is None:
+                create_query = (
+                    text(
+                        "INSERT INTO admin_conversations (title, user_id) VALUES (:title, :user_id) RETURNING id"
+                    )
+                    if is_admin
+                    else text(
+                        "INSERT INTO customer_conversations (title, user_id) VALUES (:title, :user_id) RETURNING id"
+                    )
+                )
+                title = user_msg.strip()[:120] or "Super Agent Mission"
+                res = await asyncio.wait_for(
+                    session.execute(create_query, {"title": title, "user_id": user_id}),
+                    timeout=5.0,
+                )
+                created_id = res.scalar_one_or_none()
+                if created_id is not None:
+                    conversation_id = int(created_id)
+
+            if conversation_id is not None:
+                insert_msg_query = (
+                    text(
+                        "INSERT INTO admin_messages (conversation_id, role, content) VALUES (:conversation_id, :role, :content)"
+                    )
+                    if is_admin
+                    else text(
+                        "INSERT INTO customer_messages (conversation_id, role, content) VALUES (:conversation_id, :role, :content)"
+                    )
+                )
+                await session.execute(
+                    insert_msg_query,
+                    {
+                        "conversation_id": conversation_id,
+                        "role": "user",
+                        "content": user_msg,
+                    },
+                )
+                await session.execute(
+                    insert_msg_query,
+                    {
+                        "conversation_id": conversation_id,
+                        "role": "assistant",
+                        "content": ai_msg,
+                    },
+                )
+                await session.commit()
+        except Exception as e:
+            logger.error(f"Background save chat failed: {e}", exc_info=True)
+
+
 @router.post("/agent/chat", summary="Chat with Orchestrator Agent")
-async def chat_with_agent_endpoint(request: ChatRequest, fastapi_req: Request) -> StreamingResponse:
+async def chat_with_agent_endpoint(
+    request: ChatRequest, fastapi_req: Request, background_tasks: BackgroundTasks
+) -> StreamingResponse:
     """
     Direct chat endpoint for the Orchestrator Agent (Microservice).
     Streams the response chunk by chunk.
@@ -982,6 +1045,16 @@ async def chat_with_agent_endpoint(request: ChatRequest, fastapi_req: Request) -
                     response_text = str(final_resp or "لا توجد تفاصيل متاحة.")
                 # We need to simulate a streaming response with proper chunking if caller expects it,
                 # but orchestrator client expects raw strings anyway
+                _task_ref = asyncio.create_task(
+                    _save_chat_to_db(
+                        chat_scope="admin",
+                        user_id=request.user_id,
+                        conversation_id=request.conversation_id,
+                        user_msg=request.question,
+                        ai_msg=response_text,
+                    )
+                )
+                background_tasks.add_task(lambda: _task_ref)
                 yield response_text
             except Exception:
                 request_id = str(uuid.uuid4())
@@ -1000,8 +1073,35 @@ async def chat_with_agent_endpoint(request: ChatRequest, fastapi_req: Request) -
     async def _stream_generator():
         try:
             run_result = agent.run(request.question, context=context)
+            ai_chunks = []
             async for chunk in run_result:
+                if isinstance(chunk, str):
+                    ai_chunks.append(chunk)
+                elif isinstance(chunk, dict) and chunk.get("type") == "assistant_delta":
+                    delta_content = chunk.get("payload", {}).get("content", "")
+                    if delta_content:
+                        ai_chunks.append(str(delta_content))
+                elif isinstance(chunk, dict) and chunk.get("type") == "assistant_final":
+                    final_content = chunk.get("payload", {}).get("content", "")
+                    if final_content:
+                        ai_chunks.append(str(final_content))
+
                 yield chunk
+
+            # The run completed successfully, trigger persistence
+            final_text = "".join(ai_chunks)
+            if final_text:
+                _task_ref_cust = asyncio.create_task(
+                    _save_chat_to_db(
+                        chat_scope="customer",
+                        user_id=request.user_id,
+                        conversation_id=request.conversation_id,
+                        user_msg=request.question,
+                        ai_msg=final_text,
+                    )
+                )
+                background_tasks.add_task(lambda: _task_ref_cust)
+
         except Exception:
             request_id = str(uuid.uuid4())
             logger.error(
