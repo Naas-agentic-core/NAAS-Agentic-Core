@@ -101,9 +101,7 @@ class AuditorClient(AgentReflector):
             current_hash = hashlib.sha256(encoded).hexdigest()
 
             if history_hashes.count(current_hash) >= 2:
-                from app.services.overmind.domain.exceptions import StalemateError
-
-                raise StalemateError("Infinite loop detected by Client.")
+                raise RuntimeError("Infinite loop detected by Client.")
         except Exception as e:
             logger.warning(f"Loop detection failed: {e}")
 

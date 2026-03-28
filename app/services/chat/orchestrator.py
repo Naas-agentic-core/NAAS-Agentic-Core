@@ -45,7 +45,6 @@ from app.services.chat.orchestration_rollout import (
 )
 from app.services.chat.ports import IntentDetectorPort
 from app.services.chat.tools import ToolRegistry
-from app.services.overmind.identity import OvermindIdentity
 
 logger = logging.getLogger(__name__)
 
@@ -113,10 +112,7 @@ class ChatOrchestrator:
         Returns:
             str: نص سياق موحّد يغذي LLMs عبر منظومة Overmind.
         """
-        identity = OvermindIdentity()
         context_service = get_context_service()
-        founder = identity.get_founder_info()
-        overmind = identity.get_overmind_info()
 
         base_prompt = context_service.get_context_system_prompt().strip()
         principles_text = format_system_principles(

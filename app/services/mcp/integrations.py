@@ -213,13 +213,7 @@ class MCPIntegrations:
         يتم فحص الحالة فعلياً بدلاً من إرجاع قيم ثابتة.
         """
         # جلب إحصائيات الإصلاح الحقيقية
-        try:
-            from app.services.overmind.agents.self_healing import get_self_healing_agent
-
-            healing_agent = get_self_healing_agent()
-            healing_stats = healing_agent.get_healing_stats()
-        except ImportError:
-            healing_stats = {"status": "module_not_found"}
+        healing_stats = {"status": "module_not_found"}
 
         return {
             "langgraph": self.get_langgraph_status(),

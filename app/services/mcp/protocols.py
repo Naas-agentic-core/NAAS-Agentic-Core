@@ -82,9 +82,7 @@ class StructureFetcher:
     uri = "project://structure"
 
     async def fetch(self, project_root: Path) -> dict[str, object]:
-        from app.services.overmind.knowledge_structure import build_project_structure
-
-        return build_project_structure(project_root)
+        return {"error": "Service moved to orchestrator_service"}
 
 
 class MicroservicesFetcher:
@@ -93,9 +91,7 @@ class MicroservicesFetcher:
     uri = "project://microservices"
 
     async def fetch(self, project_root: Path) -> dict[str, object]:
-        from app.services.overmind.knowledge_structure import build_microservices_summary
-
-        return build_microservices_summary(project_root)
+        return {"error": "Service moved to orchestrator_service"}
 
 
 class DatabaseFetcher:
@@ -107,15 +103,7 @@ class DatabaseFetcher:
         self._knowledge = knowledge
 
     async def fetch(self, project_root: Path) -> dict[str, object]:
-        try:
-            if self._knowledge:
-                return await self._knowledge.get_database_info()
-            from app.services.overmind.knowledge import ProjectKnowledge
-
-            pk = ProjectKnowledge()
-            return await pk.get_database_info()
-        except Exception as e:
-            return {"error": str(e), "message": "تعذر الاتصال بقاعدة البيانات"}
+        return {"error": "Service moved to orchestrator_service"}
 
 
 class EnvironmentFetcher:
@@ -127,15 +115,7 @@ class EnvironmentFetcher:
         self._knowledge = knowledge
 
     async def fetch(self, project_root: Path) -> dict[str, object]:
-        try:
-            if self._knowledge:
-                return self._knowledge.get_environment_info()
-            from app.services.overmind.knowledge import ProjectKnowledge
-
-            pk = ProjectKnowledge()
-            return pk.get_environment_info()
-        except Exception as e:
-            return {"error": str(e)}
+        return {"error": "Service moved to orchestrator_service"}
 
 
 class TechnologiesFetcher:
@@ -149,7 +129,7 @@ class TechnologiesFetcher:
                 {
                     "name": "LangGraph",
                     "status": "✅ نشط",
-                    "location": "app/services/overmind/langgraph/",
+                    "location": "microservices/orchestrator_service/src/services/overmind/langgraph/",
                     "description": "محرك الوكلاء المتعددين باستخدام الرسوم البيانية",
                 },
                 {
@@ -199,7 +179,7 @@ class TechnologiesFetcher:
                 {
                     "name": "Self-Healing Agent",
                     "status": "✅ نشط",
-                    "location": "app/services/overmind/agents/self_healing.py",
+                    "location": "microservices/orchestrator_service/src/services/overmind/agents/self_healing.py",
                     "description": "الوكيل ذاتي الإصلاح - يتعلم من أخطائه",
                 },
                 {
@@ -242,21 +222,15 @@ class StatsFetcher:
     uri = "project://stats"
 
     async def fetch(self, project_root: Path) -> dict[str, object]:
-        from app.services.overmind.knowledge_structure import (
-            build_microservices_summary,
-            build_project_structure,
-        )
-
-        structure = build_project_structure(project_root)
-        microservices = build_microservices_summary(project_root)
+        return {"error": "Service moved to orchestrator_service"}
 
         return {
             "summary": {
-                "total_python_files": structure["python_files"],
-                "total_functions": structure["total_functions"],
-                "total_classes": structure["total_classes"],
-                "total_lines": structure["total_lines"],
-                "total_microservices": microservices["total_services"],
+                "total_python_files": 0,
+                "total_functions": 0,
+                "total_classes": 0,
+                "total_lines": 0,
+                "total_microservices": 0,
             },
             "by_directory": structure.get("by_directory", {}),
             "microservices": microservices.get("services_names", []),

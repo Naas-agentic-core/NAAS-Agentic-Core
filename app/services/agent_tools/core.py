@@ -7,8 +7,6 @@ The central nervous system of the toolset.
 import time
 from collections.abc import Callable
 
-from app.services.overmind.tool_canonicalizer import canonicalize_tool_name as new_canonicalizer
-
 from .core_execution import _execute_tool_with_error_handling
 from .core_metrics import _enrich_result_metadata, _record_invocation
 from .core_models import ToolExecutionContext, ToolExecutionInfo
@@ -24,14 +22,10 @@ from .utils import _generate_trace_id, _lower
 
 def canonicalize_tool_name(raw_name: str, description: str = "") -> tuple[str, list[str]]:
     """
-    Canonicalize tool name using the new modular strategy-based system.
-
-    This function now delegates to the refactored ToolCanonicalizer which uses
-    Strategy Pattern + Chain of Responsibility for better maintainability.
-
-    Complexity reduced from CC:22 to CC:3.
+    Canonicalize tool name.
+    Simplified version.
     """
-    canonical, notes = new_canonicalizer(raw_name, description)
+    canonical, notes = raw_name, []
 
     name = _lower(canonical)
     if name in _TOOL_REGISTRY and not _TOOL_REGISTRY[name].get("is_alias"):

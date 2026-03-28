@@ -14,13 +14,6 @@ from collections.abc import Callable, Coroutine
 from pathlib import Path
 
 from app.core.logging import get_logger
-from app.services.overmind.knowledge import ProjectKnowledge
-from app.services.overmind.knowledge_structure import (
-    build_microservices_summary,
-    build_project_structure,
-    get_file_details,
-    search_files_by_name,
-)
 
 logger = get_logger(__name__)
 
@@ -83,7 +76,6 @@ class MCPToolRegistry:
     def __init__(self, project_root: Path) -> None:
         self.project_root = project_root
         self.tools: dict[str, MCPTool] = {}
-        self._project_knowledge = ProjectKnowledge()
 
     async def register_all_tools(self) -> None:
         """تسجيل جميع الأدوات المتاحة."""
@@ -264,49 +256,19 @@ class MCPToolRegistry:
 
     async def _get_project_metrics(self) -> dict[str, object]:
         """الحصول على إحصائيات المشروع الدقيقة."""
-        structure = build_project_structure(self.project_root)
-
-        return {
-            "total_python_files": structure["python_files"],
-            "total_functions": structure["total_functions"],
-            "total_classes": structure["total_classes"],
-            "total_lines": structure["total_lines"],
-            "by_directory": {
-                dir_name: {
-                    "python_files": stats["python_files"],
-                    "functions": stats["total_functions"],
-                    "classes": stats["total_classes"],
-                }
-                for dir_name, stats in structure.get("by_directory", {}).items()
-            },
-            "main_modules": structure.get("main_modules", []),
-        }
+        return {"error": "Tool migrated to orchestrator_service"}
 
     async def _get_complete_knowledge(self) -> dict[str, object]:
         """الحصول على المعرفة الكاملة."""
-        try:
-            return await self._project_knowledge.get_complete_knowledge()
-        except Exception as e:
-            logger.error(f"خطأ في جلب المعرفة الكاملة: {e}")
-            # Fallback: معلومات البنية فقط
-            return {
-                "structure": build_project_structure(self.project_root),
-                "microservices": build_microservices_summary(self.project_root),
-                "error": str(e),
-            }
+        return {"error": "Tool migrated to orchestrator_service"}
 
     async def _analyze_file(self, file_path: str) -> dict[str, object]:
         """تحليل ملف بايثون."""
-        return get_file_details(self.project_root, file_path)
+        return {"error": "Tool migrated to orchestrator_service"}
 
     async def _search_files(self, pattern: str) -> dict[str, object]:
         """البحث عن ملفات."""
-        results = search_files_by_name(self.project_root, pattern)
-        return {
-            "pattern": pattern,
-            "count": len(results),
-            "files": results,
-        }
+        return {"error": "Tool migrated to orchestrator_service"}
 
     async def _search_codebase(self, query: str, search_type: str = "lexical") -> dict[str, object]:
         """البحث في الكود."""
@@ -326,25 +288,7 @@ class MCPToolRegistry:
 
     async def _list_functions(self, path: str = "app") -> dict[str, object]:
         """قائمة الدوال في مسار معين."""
-        from app.services.overmind.knowledge_structure import _analyze_directory
-
-        target_path = self.project_root / path
-        if not target_path.exists():
-            return {"error": f"المسار غير موجود: {path}"}
-
-        stats = _analyze_directory(target_path, self.project_root)
-
-        all_functions = []
-        for file_info in stats.get("files", []):
-            for func in file_info.get("functions", []):
-                func["file"] = file_info.get("relative_path", "")
-                all_functions.append(func)
-
-        return {
-            "path": path,
-            "total_functions": len(all_functions),
-            "functions": all_functions[:100],  # أول 100 دالة
-        }
+        return {"error": "Tool migrated to orchestrator_service"}
 
     async def _get_technologies(self) -> dict[str, object]:
         """قائمة التقنيات المستخدمة."""
@@ -352,7 +296,7 @@ class MCPToolRegistry:
             "ai_frameworks": {
                 "LangGraph": {
                     "status": "active",
-                    "location": "app/services/overmind/langgraph/",
+                    "location": "microservices/orchestrator_service/src/services/overmind/langgraph/",
                     "purpose": "تنسيق الوكلاء المتعددين",
                 },
                 "LlamaIndex": {
