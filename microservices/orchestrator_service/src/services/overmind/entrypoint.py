@@ -38,7 +38,7 @@ async def _dispatch_mission_task(
         MissionEventType.STATUS_CHANGE,
         {"status": "starting", "triggered_by": triggered_by},
     )
-    _task = asyncio.create_task(_run_mission_task(mission_id, force_research))  # noqa: RUF006
+    _task = asyncio.create_task(_run_mission_task(mission_id, force_research))
     active_background_tasks.add(_task)
     _task.add_done_callback(active_background_tasks.discard)
 
