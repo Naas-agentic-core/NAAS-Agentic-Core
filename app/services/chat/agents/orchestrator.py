@@ -165,17 +165,7 @@ class OrchestratorAgent:
             yield "عذرًا، حدث خطأ غير متوقع أثناء معالجة طلبك."
 
     async def _capture_memory_intent(self, question: str, intent: ChatIntent) -> None:
-        if not self.memory_agent:
-            return
-        try:
-            collab_context = InMemoryCollaborationContext({"intent": intent.value})
-            await self.memory_agent.capture_memory(
-                collab_context,
-                label="user_intent",
-                payload={"question": question, "intent": intent.value},
-            )
-        except Exception as e:
-            logger.warning(f"Memory capture failed: {e}")
+        pass
 
     def _enrich_curriculum_context(self, context: dict, question: str) -> None:
         lowered = question.lower()

@@ -45,16 +45,6 @@ class ToolRegistry:
         from app.services.chat.tools.retrieval import search_educational_content
 
         # Admin / Core Tools
-        self.register("get_user_count", self._get_user_count)
-        self.register("list_users", self._list_users)
-        self.register("get_user_profile", self._get_user_profile)
-        self.register("get_user_statistics", self._get_user_statistics)
-        self.register("get_project_overview", self._get_project_overview)
-        self.register("get_microservices_overview", self._get_microservices_overview)
-        self.register("get_database_tables", self._get_database_tables)
-        self.register("get_table_schema", self._get_table_schema)
-        self.register("get_table_count", self._get_table_count)
-        self.register("get_database_map", self._get_database_map)
         self.register("search_codebase", self._search_codebase)
         self.register("find_symbol", self._find_symbol)
         self.register("find_route", self._find_route)

@@ -78,36 +78,14 @@ async def get_project_metrics_handler() -> dict[str, object]:
         metrics["source"] = "calculated"
         metrics["content"] = "Metrics file not found. Calculating live..."
 
-    # Use Deep Indexer for robust counting (includes JS/TS/etc)
-    try:
-        loop = asyncio.get_running_loop()
-        # Run synchronous build_index in a thread to avoid blocking the loop
-        analysis = await loop.run_in_executor(None, build_index, ".")
-
-        # Calculate language breakdown
-        js_ts_count = sum(
-            1 for f in analysis.files if f.file_path.endswith((".js", ".jsx", ".ts", ".tsx"))
-        )
-        py_count = sum(1 for f in analysis.files if f.file_path.endswith(".py"))
-
-        metrics["live_stats"] = {
-            "total_files": analysis.total_files,
-            "python_files": py_count,
-            "js_ts_files": js_ts_count,
-            "total_lines": analysis.total_lines,
-            "code_lines": analysis.total_code_lines,
-            "avg_complexity": analysis.avg_file_complexity,
-        }
-
-    except Exception as e:
-        # Fallback to simple counter if deep indexer fails
-        py_count = (await count_files_handler(".", ".py"))["count"]
-        total_count = (await count_files_handler("."))["count"]
-        metrics["live_stats"] = {
-            "python_files": py_count,
-            "total_files": total_count,
-            "error": f"Deep Indexer failed: {e!s}",
-        }
+    # Fallback to simple counter since deep indexer moved
+    py_count = (await count_files_handler(".", ".py"))["count"]
+    total_count = (await count_files_handler("."))["count"]
+    metrics["live_stats"] = {
+        "python_files": py_count,
+        "total_files": total_count,
+        "error": "Deep Indexer moved to orchestrator_service",
+    }
 
     return metrics
 
