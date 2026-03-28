@@ -315,7 +315,9 @@ async def _create_new_conversation(
             timeout=5.0,
         )
     except TimeoutError as e:
-        raise HTTPException(status_code=504, detail="Database timeout during conversation creation") from e
+        raise HTTPException(
+            status_code=504, detail="Database timeout during conversation creation"
+        ) from e
     created_id = created.scalar_one_or_none()
     if created_id is None:
         raise HTTPException(status_code=500, detail="failed to create conversation")
@@ -374,7 +376,9 @@ async def _ensure_conversation(
                     timeout=5.0,
                 )
             except TimeoutError as e:
-                raise HTTPException(status_code=504, detail="Database timeout checking conversation") from e
+                raise HTTPException(
+                    status_code=504, detail="Database timeout checking conversation"
+                ) from e
             conv_row = result.fetchone()
             if conv_row is None:
                 raise HTTPException(status_code=403, detail="conversation does not belong to user")
@@ -386,7 +390,9 @@ async def _ensure_conversation(
                         timeout=5.0,
                     )
                 except TimeoutError as e:
-                    raise HTTPException(status_code=504, detail="Database timeout retrieving messages") from e
+                    raise HTTPException(
+                        status_code=504, detail="Database timeout retrieving messages"
+                    ) from e
                 messages_rows = messages_res.fetchall()
 
                 messages = [
@@ -488,7 +494,9 @@ async def _persist_assistant_message(
                 timeout=5.0,
             )
         except TimeoutError as e:
-            raise HTTPException(status_code=504, detail="Database timeout persisting assistant message") from e
+            raise HTTPException(
+                status_code=504, detail="Database timeout persisting assistant message"
+            ) from e
 
         if is_admin_scope and mission_id is not None:
             try:
@@ -503,10 +511,10 @@ async def _persist_assistant_message(
                     timeout=5.0,
                 )
             except TimeoutError as e:
-                raise HTTPException(status_code=504, detail="Database timeout linking mission") from e
+                raise HTTPException(
+                    status_code=504, detail="Database timeout linking mission"
+                ) from e
         await session.commit()
-
-
 
 
 async def _stream_chat_langgraph(
