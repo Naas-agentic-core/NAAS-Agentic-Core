@@ -446,7 +446,7 @@ async def _ensure_conversation(
                     {
                         "conversation_id": int(conversation_id),
                         "role": "user",
-                        "content": question,
+                        "content": question.replace("\x00", ""),
                     },
                 ),
                 timeout=5.0,
@@ -490,7 +490,7 @@ async def _persist_assistant_message(
                     {
                         "conversation_id": conversation_id,
                         "role": "assistant",
-                        "content": content,
+                        "content": content.replace("\x00", ""),
                     },
                 ),
                 timeout=5.0,
@@ -1003,7 +1003,7 @@ async def _save_chat_to_db(
                     {
                         "conversation_id": conversation_id,
                         "role": "user",
-                        "content": user_msg,
+                        "content": user_msg.replace("\x00", ""),
                     },
                 )
                 await session.execute(
@@ -1011,7 +1011,7 @@ async def _save_chat_to_db(
                     {
                         "conversation_id": conversation_id,
                         "role": "assistant",
-                        "content": ai_msg,
+                        "content": ai_msg.replace("\x00", ""),
                     },
                 )
                 await session.commit()
