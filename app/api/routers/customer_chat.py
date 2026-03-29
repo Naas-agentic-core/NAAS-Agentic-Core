@@ -16,6 +16,7 @@ from app.api.schemas.customer_chat import (
 from app.core.config import get_settings
 from app.core.database import async_session_factory, get_db
 from app.core.di import get_logger
+from app.core.domain.chat import MessageRole
 from app.core.domain.user import User
 from app.deps.auth import CurrentUser, require_permissions
 from app.infrastructure.clients.orchestrator_client import orchestrator_client
@@ -140,12 +141,61 @@ async def chat_stream_ws(
                 metadata["mission_type"] = mission_type
 
             original_conversation_id = payload.get("conversation_id")
+            local_conversation_id: int | None = None
+
+            try:
+                async with async_session_factory() as db:
+                    persistence_service = CustomerChatBoundaryService(db)
+                    local_conversation = await persistence_service.get_or_create_conversation(
+                        actor,
+                        question,
+                        original_conversation_id,
+                    )
+                    local_conversation_id = local_conversation.id
+                    await persistence_service.save_message(
+                        local_conversation_id,
+                        MessageRole.USER,
+                        question,
+                    )
+            except HTTPException as http_exc:
+                await websocket.send_json(
+                    normalize_streaming_event(
+                        {
+                            "type": "error",
+                            "payload": {
+                                "details": str(http_exc.detail),
+                                "status_code": http_exc.status_code,
+                            },
+                        }
+                    )
+                )
+                continue
+            except Exception as exc:
+                logger.error(
+                    f"Failed to persist customer user message locally: {exc}",
+                    exc_info=True,
+                )
+                await websocket.send_json(
+                    normalize_streaming_event(
+                        {
+                            "type": "error",
+                            "payload": {
+                                "details": "Failed to save your message locally.",
+                                "status_code": 500,
+                            },
+                        }
+                    )
+                )
+                continue
+
+            complete_ai_response = ""
+            assistant_message_persisted = False
 
             try:
                 async for event in orchestrator_client.chat_with_agent(
                     question=question,
                     user_id=actor.id,
-                    conversation_id=original_conversation_id,
+                    conversation_id=local_conversation_id,
                     context={
                         "chat_scope": "customer",
                         "metadata": metadata,
@@ -160,16 +210,20 @@ async def chat_stream_ws(
                     if normalized_event.get("type") == "conversation_init" and isinstance(
                         normalized_event.get("payload"), dict
                     ):
-                        if original_conversation_id:
+                        if local_conversation_id is not None:
                             # Rewrite to the established local sequence
-                            normalized_event["payload"]["conversation_id"] = (
-                                original_conversation_id
-                            )
+                            normalized_event["payload"]["conversation_id"] = local_conversation_id
                         else:
                             # Strip it to avoid overwriting local state with a foreign ID
                             normalized_event["payload"].pop("conversation_id", None)
 
                     await websocket.send_json(normalized_event)
+
+                    if isinstance(normalized_event.get("payload"), dict):
+                        chunk_text = normalized_event["payload"].get("content")
+                        if isinstance(chunk_text, str) and chunk_text:
+                            complete_ai_response += chunk_text
+
             except HTTPException as http_exc:
                 logger.error(
                     f"HTTPException in compatibility facade stream: {http_exc}", exc_info=True
@@ -197,6 +251,29 @@ async def chat_stream_ws(
                     )
                 )
                 continue
+            finally:
+                if (
+                    not assistant_message_persisted
+                    and complete_ai_response
+                    and local_conversation_id is not None
+                ):
+                    try:
+                        async with async_session_factory() as db:
+                            persistence_service = CustomerChatBoundaryService(db)
+                            await persistence_service.save_message(
+                                conversation_id=local_conversation_id,
+                                role=MessageRole.ASSISTANT,
+                                content=complete_ai_response.replace("\x00", ""),
+                            )
+                            assistant_message_persisted = True
+                    except Exception as persistence_exc:
+                        logger.error(
+                            (
+                                "Failed to persist customer assistant message locally "
+                                f"for conversation {local_conversation_id}: {persistence_exc}"
+                            ),
+                            exc_info=True,
+                        )
 
     except WebSocketDisconnect:
         logger.info("Customer WebSocket disconnected")
