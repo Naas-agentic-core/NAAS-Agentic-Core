@@ -1069,18 +1069,30 @@ async def chat_with_agent_endpoint(request: ChatRequest, fastapi_req: Request) -
 
                 full_user_message = request.question
                 full_ai_response = response_text
-                try:
-                    await _save_chat_to_db(
+
+                # Background save to avoid blocking the stream
+                save_task = asyncio.create_task(
+                    _save_chat_to_db(
                         chat_scope="admin",
                         user_id=request.user_id,
                         conversation_id=request.conversation_id,
                         user_msg=full_user_message,
                         ai_msg=full_ai_response,
                     )
-                    yield format_chunk("\n\n✅ [DB SAVED]")
-                except Exception as e:
-                    error_msg = str(e)
-                    yield format_chunk(f"\n\n🚨 **SYSTEM DB ERROR:** {error_msg}")
+                )
+                active_background_tasks.add(save_task)
+
+                def _handle_admin_save_error(t: asyncio.Task) -> None:
+                    active_background_tasks.discard(t)
+                    try:
+                        t.result()
+                    except Exception as e:
+                        logger.error(f"Admin background chat save failed: {e}", exc_info=True)
+
+                save_task.add_done_callback(_handle_admin_save_error)
+
+                yield format_chunk("\n\n✅ [DB SAVING]")
+
             except Exception:
                 request_id = str(uuid.uuid4())
                 logger.error(
@@ -1125,18 +1137,28 @@ async def chat_with_agent_endpoint(request: ChatRequest, fastapi_req: Request) -
             full_user_message = request.question
             full_ai_response = "".join(ai_chunks)
             if full_ai_response:
-                try:
-                    await _save_chat_to_db(
+                # Background save to avoid blocking the stream
+                save_task = asyncio.create_task(
+                    _save_chat_to_db(
                         chat_scope="customer",
                         user_id=request.user_id,
                         conversation_id=request.conversation_id,
                         user_msg=full_user_message,
                         ai_msg=full_ai_response,
                     )
-                    yield format_chunk("\n\n✅ [DB SAVED]")
-                except Exception as e:
-                    error_msg = str(e)
-                    yield format_chunk(f"\n\n🚨 **SYSTEM DB ERROR:** {error_msg}")
+                )
+                active_background_tasks.add(save_task)
+
+                def _handle_customer_save_error(t: asyncio.Task) -> None:
+                    active_background_tasks.discard(t)
+                    try:
+                        t.result()
+                    except Exception as e:
+                        logger.error(f"Customer background chat save failed: {e}", exc_info=True)
+
+                save_task.add_done_callback(_handle_customer_save_error)
+
+                yield format_chunk("\n\n✅ [DB SAVING]")
 
         except Exception:
             request_id = str(uuid.uuid4())
