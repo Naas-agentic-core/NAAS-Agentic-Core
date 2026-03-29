@@ -678,15 +678,24 @@ async def _stream_chat_langgraph(
         else:
             await websocket.send_json(evt)
 
-    await websocket.send_json({"type": "complete", "payload": {}})
-
     if final_content.strip():
-        await _persist_assistant_message(
-            chat_scope=chat_scope,
-            conversation_id=conversation_id,
-            content=final_content,
-            mission_id=None,
-        )
+        try:
+            await _persist_assistant_message(
+                chat_scope=chat_scope,
+                conversation_id=conversation_id,
+                content=final_content,
+                mission_id=None,
+            )
+            await websocket.send_json(
+                {"type": "assistant_delta", "payload": {"content": "\n\n✅ [DB SAVED]"}}
+            )
+        except Exception as e:
+            error_msg = str(e)
+            await websocket.send_json(
+                {"type": "assistant_delta", "payload": {"content": f"\n\n🚨 **SYSTEM DB ERROR:** {error_msg}"}}
+            )
+
+    await websocket.send_json({"type": "complete", "payload": {}})
 
 
 async def _run_chat_langgraph(
