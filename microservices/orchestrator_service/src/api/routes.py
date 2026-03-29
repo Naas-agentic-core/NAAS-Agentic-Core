@@ -692,7 +692,10 @@ async def _stream_chat_langgraph(
         except Exception as e:
             error_msg = str(e)
             await websocket.send_json(
-                {"type": "assistant_delta", "payload": {"content": f"\n\n🚨 **SYSTEM DB ERROR:** {error_msg}"}}
+                {
+                    "type": "assistant_delta",
+                    "payload": {"content": f"\n\n🚨 **SYSTEM DB ERROR:** {error_msg}"},
+                }
             )
 
     await websocket.send_json({"type": "complete", "payload": {}})
@@ -1019,9 +1022,7 @@ async def _save_chat_to_db(
 
 
 @router.post("/agent/chat", summary="Chat with Orchestrator Agent")
-async def chat_with_agent_endpoint(
-    request: ChatRequest, fastapi_req: Request
-) -> StreamingResponse:
+async def chat_with_agent_endpoint(request: ChatRequest, fastapi_req: Request) -> StreamingResponse:
     """
     Direct chat endpoint for the Orchestrator Agent (Microservice).
     Streams the response chunk by chunk.

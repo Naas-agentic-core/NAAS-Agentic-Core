@@ -1,6 +1,9 @@
 import logging
+import os
+import ssl
 from collections.abc import AsyncGenerator
 
+from sqlalchemy.engine.url import make_url
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
     AsyncSession,
@@ -15,11 +18,41 @@ logger = logging.getLogger(__name__)
 
 
 def create_engine() -> AsyncEngine:
-    return create_async_engine(
-        settings.DATABASE_URL,
-        echo=False,
-        future=True,
+    db_url = settings.DATABASE_URL
+    url_obj = make_url(db_url)
+
+    engine_args = {
+        "echo": False,
+        "future": True,
+        "connect_args": {},
+    }
+
+    qs = dict(url_obj.query)
+    ssl_mode = qs.pop("sslmode", None) or qs.pop("ssl", None)
+
+    if ssl_mode is not None:
+        url_obj = url_obj.set(query=qs)
+        db_url = url_obj.render_as_string(hide_password=False)
+
+        if ssl_mode in ("require", "verify-ca", "verify-full"):
+            ctx = ssl.create_default_context()
+            if ssl_mode == "require":
+                ctx.check_hostname = False
+                ctx.verify_mode = ssl.CERT_REQUIRED
+                ctx.load_default_certs()
+
+                ca_cert = os.environ.get("DB_CA_CERT_PATH")
+                if ca_cert and os.path.exists(ca_cert):
+                    ctx.load_verify_locations(cafile=ca_cert)
+
+            engine_args["connect_args"]["ssl"] = ctx
+
+    # Supabase / PgBouncer compatibility
+    engine_args["connect_args"].update(
+        {"statement_cache_size": 0, "prepared_statement_cache_size": 0}
     )
+
+    return create_async_engine(db_url, **engine_args)
 
 
 engine = create_engine()
