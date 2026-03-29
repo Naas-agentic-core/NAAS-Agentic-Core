@@ -14,15 +14,13 @@
 
 import inspect
 
-from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect
+import httpx
+
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, WebSocket, WebSocketDisconnect
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.routers.ws_auth import extract_websocket_auth
-from app.api.schemas.admin import (
-    ConversationDetailsResponse,
-    ConversationSummaryResponse,
-)
 from app.core.config import get_settings
 from app.core.database import async_session_factory, get_db
 from app.core.di import get_logger
@@ -31,7 +29,6 @@ from app.deps.auth import CurrentUser, get_current_user, require_roles
 from app.infrastructure.clients.orchestrator_client import orchestrator_client
 from app.infrastructure.clients.user_client import user_client
 from app.services.auth.token_decoder import decode_user_id
-from app.services.boundaries.admin_chat_boundary_service import AdminChatBoundaryService
 from app.services.rbac import ADMIN_ROLE
 from shared.chat_protocol.event_protocol import normalize_streaming_event
 
@@ -117,11 +114,6 @@ async def get_actor_user(
         await expunge_result
 
     return user
-
-
-def get_admin_service(db: AsyncSession = Depends(get_db)) -> AdminChatBoundaryService:
-    """تبعية للحصول على خدمة حدود محادثة المسؤول."""
-    return AdminChatBoundaryService(db)
 
 
 # -----------------------------------------------------------------------------
@@ -274,54 +266,77 @@ async def chat_stream_ws(
 @router.get(
     "/api/chat/latest",
     summary="استرجاع آخر محادثة (Get Latest Conversation)",
-    response_model=ConversationDetailsResponse | None,
 )
 async def get_latest_chat(
-    actor: User = Depends(get_actor_user),
-    service: AdminChatBoundaryService = Depends(get_admin_service),
-) -> ConversationDetailsResponse | None:
-    """
-    استرجاع تفاصيل آخر محادثة للمستخدم الحالي.
-    مفيد لاستعادة الحالة عند إعادة تحميل الصفحة.
-    """
-    if not actor.is_admin:
-        raise HTTPException(status_code=403, detail="Admin access required")
-    conversation_data = await service.get_latest_conversation_details(actor)
-    if not conversation_data:
-        return None
-    return ConversationDetailsResponse.model_validate(conversation_data)
+    request: Request,
+    _current: CurrentUser = Depends(get_chat_actor),
+) -> Response:
+    """وكيل قراءة صارم: تمرير آخر محادثة إدارية إلى خدمة المنسّق."""
+    settings = get_settings()
+    orchestrator_url = f"{settings.ORCHESTRATOR_SERVICE_URL}{request.url.path}"
+    auth_header = request.headers.get("authorization")
+    headers = {"authorization": auth_header} if auth_header else {}
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        upstream_response = await client.get(
+            orchestrator_url,
+            params=request.query_params,
+            headers=headers,
+        )
+    return Response(
+        content=upstream_response.content,
+        status_code=upstream_response.status_code,
+        media_type=upstream_response.headers.get("content-type", "application/json"),
+    )
 
 
 @router.get(
     "/api/conversations",
     summary="سرد المحادثات (List Conversations)",
-    response_model=list[ConversationSummaryResponse],
 )
 async def list_conversations(
-    actor: User = Depends(get_actor_user),
-    service: AdminChatBoundaryService = Depends(get_admin_service),
-) -> list[ConversationSummaryResponse]:
-    """
-    استرجاع قائمة بجميع محادثات المستخدم.
-
-    الخدمة تعيد البيانات متوافقة مع Schema مباشرة.
-    """
-    results = await service.list_user_conversations(actor)
-    return [ConversationSummaryResponse.model_validate(r) for r in results]
+    request: Request,
+    _current: CurrentUser = Depends(get_chat_actor),
+) -> Response:
+    """وكيل قراءة صارم: تمرير قائمة المحادثات الإدارية إلى خدمة المنسّق."""
+    settings = get_settings()
+    orchestrator_url = f"{settings.ORCHESTRATOR_SERVICE_URL}{request.url.path}"
+    auth_header = request.headers.get("authorization")
+    headers = {"authorization": auth_header} if auth_header else {}
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        upstream_response = await client.get(
+            orchestrator_url,
+            params=request.query_params,
+            headers=headers,
+        )
+    return Response(
+        content=upstream_response.content,
+        status_code=upstream_response.status_code,
+        media_type=upstream_response.headers.get("content-type", "application/json"),
+    )
 
 
 @router.get(
     "/api/conversations/{conversation_id}",
     summary="تفاصيل المحادثة (Conversation Details)",
-    response_model=ConversationDetailsResponse,
 )
 async def get_conversation(
     conversation_id: int,
-    actor: User = Depends(get_actor_user),
-    service: AdminChatBoundaryService = Depends(get_admin_service),
-) -> ConversationDetailsResponse:
-    """
-    استرجاع الرسائل والتفاصيل لمحادثة محددة.
-    """
-    data = await service.get_conversation_details(actor, conversation_id)
-    return ConversationDetailsResponse.model_validate(data)
+    request: Request,
+    _current: CurrentUser = Depends(get_chat_actor),
+) -> Response:
+    """وكيل قراءة صارم: تمرير تفاصيل المحادثة الإدارية إلى خدمة المنسّق."""
+    settings = get_settings()
+    orchestrator_url = f"{settings.ORCHESTRATOR_SERVICE_URL}{request.url.path}"
+    auth_header = request.headers.get("authorization")
+    headers = {"authorization": auth_header} if auth_header else {}
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        upstream_response = await client.get(
+            orchestrator_url,
+            params=request.query_params,
+            headers=headers,
+        )
+    return Response(
+        content=upstream_response.content,
+        status_code=upstream_response.status_code,
+        media_type=upstream_response.headers.get("content-type", "application/json"),
+    )

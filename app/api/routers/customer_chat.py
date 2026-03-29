@@ -5,14 +5,12 @@
 مع فرض سياسات الأمان والملكية.
 """
 
-from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect
+import httpx
+
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, WebSocket, WebSocketDisconnect
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.routers.ws_auth import extract_websocket_auth
-from app.api.schemas.customer_chat import (
-    CustomerConversationDetails,
-    CustomerConversationSummary,
-)
 from app.core.config import get_settings
 from app.core.database import async_session_factory, get_db
 from app.core.di import get_logger
@@ -20,9 +18,6 @@ from app.core.domain.user import User
 from app.deps.auth import CurrentUser, require_permissions
 from app.infrastructure.clients.orchestrator_client import orchestrator_client
 from app.services.auth.token_decoder import decode_user_id
-from app.services.boundaries.customer_chat_boundary_service import (
-    CustomerChatBoundaryService,
-)
 from app.services.rbac import QA_SUBMIT
 from shared.chat_protocol.event_protocol import normalize_streaming_event
 
@@ -66,13 +61,6 @@ async def get_actor_user(
     await db.refresh(user)
     db.expunge(user)
     return user
-
-
-def get_customer_service(
-    db: AsyncSession = Depends(get_db),
-) -> CustomerChatBoundaryService:
-    """تبعية للحصول على خدمة حدود محادثة العملاء."""
-    return CustomerChatBoundaryService(db)
 
 
 @router.websocket("/ws")
@@ -205,42 +193,79 @@ async def chat_stream_ws(
 @router.get(
     "/latest",
     summary="استرجاع آخر محادثة",
-    response_model=CustomerConversationDetails | None,
 )
 async def get_latest_chat(
-    actor: User = Depends(get_actor_user),
-    service: CustomerChatBoundaryService = Depends(get_customer_service),
-) -> CustomerConversationDetails | None:
-    conversation_data = await service.get_latest_conversation_details(actor)
-    if not conversation_data:
-        return None
-    return CustomerConversationDetails.model_validate(conversation_data)
+    request: Request,
+    _current: CurrentUser = Depends(get_chat_actor),
+) -> Response:
+    """وكيل قراءة صارم: تمرير استعلام آخر محادثة إلى خدمة المنسّق."""
+    settings = get_settings()
+    orchestrator_url = f"{settings.ORCHESTRATOR_SERVICE_URL}{request.url.path}"
+    auth_header = request.headers.get("authorization")
+    headers = {"authorization": auth_header} if auth_header else {}
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        upstream_response = await client.get(
+            orchestrator_url,
+            params=request.query_params,
+            headers=headers,
+        )
+    return Response(
+        content=upstream_response.content,
+        status_code=upstream_response.status_code,
+        media_type=upstream_response.headers.get("content-type", "application/json"),
+    )
 
 
 @router.get(
     "/conversations",
     summary="سرد المحادثات",
-    response_model=list[CustomerConversationSummary],
 )
 async def list_conversations(
-    actor: User = Depends(get_actor_user),
-    service: CustomerChatBoundaryService = Depends(get_customer_service),
-) -> list[CustomerConversationSummary]:
-    results = await service.list_user_conversations(actor)
-    return [CustomerConversationSummary.model_validate(r) for r in results]
+    request: Request,
+    _current: CurrentUser = Depends(get_chat_actor),
+) -> Response:
+    """وكيل قراءة صارم: تمرير قائمة المحادثات إلى خدمة المنسّق."""
+    settings = get_settings()
+    orchestrator_url = f"{settings.ORCHESTRATOR_SERVICE_URL}{request.url.path}"
+    auth_header = request.headers.get("authorization")
+    headers = {"authorization": auth_header} if auth_header else {}
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        upstream_response = await client.get(
+            orchestrator_url,
+            params=request.query_params,
+            headers=headers,
+        )
+    return Response(
+        content=upstream_response.content,
+        status_code=upstream_response.status_code,
+        media_type=upstream_response.headers.get("content-type", "application/json"),
+    )
 
 
 @router.get(
     "/conversations/{conversation_id}",
     summary="تفاصيل محادثة",
-    response_model=CustomerConversationDetails,
     description="استرجاع تفاصيل محادثة محددة.",
     operation_id="chatConversationGet",
 )
 async def get_conversation(
     conversation_id: int,
-    actor: User = Depends(get_actor_user),
-    service: CustomerChatBoundaryService = Depends(get_customer_service),
-) -> CustomerConversationDetails:
-    data = await service.get_conversation_details(actor, conversation_id)
-    return CustomerConversationDetails.model_validate(data)
+    request: Request,
+    _current: CurrentUser = Depends(get_chat_actor),
+) -> Response:
+    """وكيل قراءة صارم: تمرير تفاصيل محادثة محددة إلى خدمة المنسّق."""
+    settings = get_settings()
+    orchestrator_url = f"{settings.ORCHESTRATOR_SERVICE_URL}{request.url.path}"
+    auth_header = request.headers.get("authorization")
+    headers = {"authorization": auth_header} if auth_header else {}
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        upstream_response = await client.get(
+            orchestrator_url,
+            params=request.query_params,
+            headers=headers,
+        )
+    return Response(
+        content=upstream_response.content,
+        status_code=upstream_response.status_code,
+        media_type=upstream_response.headers.get("content-type", "application/json"),
+    )
