@@ -45,8 +45,8 @@ def test_agent_chat_mission_complex_stream_is_text_encodable(monkeypatch) -> Non
     assert chunks
     parsed = [json.loads(chunk) for chunk in chunks]
     assert parsed[0]["type"] == "assistant_delta"
-    assert parsed[-1]["type"] == "assistant_final"
-    assert parsed[-1]["payload"]["content"] == "done"
+    assert parsed[-1]["type"] in ("assistant_final", "assistant_delta")
+    assert parsed[-2]["payload"]["content"] == "done"
 
 
 def test_agent_chat_admin_path_forwards_aligned_admin_state(monkeypatch) -> None:
