@@ -953,7 +953,7 @@ async def _save_chat_to_db(
     user_msg: str,
     ai_msg: str,
 ) -> None:
-    """خلفية غير محظورة لحفظ رسائل الدردشة في قاعدة البيانات."""
+    """يحفظ رسائل الدردشة ضمن معاملة واحدة ويعيد أي فشل للمنادي بشكل صريح."""
     is_admin = chat_scope == "admin"
     async with async_session_factory() as session:
         try:
@@ -1004,12 +1004,14 @@ async def _save_chat_to_db(
                 )
                 await session.commit()
         except Exception as e:
-            logger.error(f"Background save chat failed: {e}", exc_info=True)
+            await session.rollback()
+            logger.error(f"Chat persistence failed: {e}", exc_info=True)
+            raise
 
 
 @router.post("/agent/chat", summary="Chat with Orchestrator Agent")
 async def chat_with_agent_endpoint(
-    request: ChatRequest, fastapi_req: Request, background_tasks: BackgroundTasks
+    request: ChatRequest, fastapi_req: Request
 ) -> StreamingResponse:
     """
     Direct chat endpoint for the Orchestrator Agent (Microservice).
@@ -1037,6 +1039,12 @@ async def chat_with_agent_endpoint(
         import json
 
         async def _admin_stream():
+            def format_chunk(content: str) -> str:
+                return json.dumps(
+                    {"type": "assistant_delta", "payload": {"content": content}},
+                    ensure_ascii=False,
+                )
+
             try:
                 admin_app = getattr(fastapi_req.app.state, "admin_app", None)
                 admin_payload = request.context if isinstance(request.context, dict) else {}
@@ -1047,21 +1055,22 @@ async def chat_with_agent_endpoint(
                     response_text = json.dumps(final_resp, ensure_ascii=False)
                 else:
                     response_text = str(final_resp or "لا توجد تفاصيل متاحة.")
-                # We need to simulate a streaming response with proper chunking if caller expects it,
-                # but orchestrator client expects raw strings anyway
-                _task_ref = asyncio.create_task(
-                    _save_chat_to_db(
+                yield response_text
+
+                full_user_message = request.question
+                full_ai_response = response_text
+                try:
+                    await _save_chat_to_db(
                         chat_scope="admin",
                         user_id=request.user_id,
                         conversation_id=request.conversation_id,
-                        user_msg=request.question,
-                        ai_msg=response_text,
+                        user_msg=full_user_message,
+                        ai_msg=full_ai_response,
                     )
-                )
-                active_background_tasks.add(_task_ref)
-                _task_ref.add_done_callback(active_background_tasks.discard)
-                background_tasks.add_task(lambda: _task_ref)
-                yield response_text
+                    yield format_chunk("\n\n✅ [DB SAVED]")
+                except Exception as e:
+                    error_msg = str(e)
+                    yield format_chunk(f"\n\n🚨 **SYSTEM DB ERROR:** {error_msg}")
             except Exception:
                 request_id = str(uuid.uuid4())
                 logger.error(
@@ -1077,6 +1086,14 @@ async def chat_with_agent_endpoint(
     agent = OrchestratorAgent(ai_client, tool_registry)
 
     async def _stream_generator():
+        import json
+
+        def format_chunk(content: str) -> str:
+            return json.dumps(
+                {"type": "assistant_delta", "payload": {"content": content}},
+                ensure_ascii=False,
+            )
+
         try:
             run_result = agent.run(request.question, context=context)
             ai_chunks = []
@@ -1095,20 +1112,21 @@ async def chat_with_agent_endpoint(
                 yield chunk
 
             # The run completed successfully, trigger persistence
-            final_text = "".join(ai_chunks)
-            if final_text:
-                _task_ref_cust = asyncio.create_task(
-                    _save_chat_to_db(
+            full_user_message = request.question
+            full_ai_response = "".join(ai_chunks)
+            if full_ai_response:
+                try:
+                    await _save_chat_to_db(
                         chat_scope="customer",
                         user_id=request.user_id,
                         conversation_id=request.conversation_id,
-                        user_msg=request.question,
-                        ai_msg=final_text,
+                        user_msg=full_user_message,
+                        ai_msg=full_ai_response,
                     )
-                )
-                active_background_tasks.add(_task_ref_cust)
-                _task_ref_cust.add_done_callback(active_background_tasks.discard)
-                background_tasks.add_task(lambda: _task_ref_cust)
+                    yield format_chunk("\n\n✅ [DB SAVED]")
+                except Exception as e:
+                    error_msg = str(e)
+                    yield format_chunk(f"\n\n🚨 **SYSTEM DB ERROR:** {error_msg}")
 
         except Exception:
             request_id = str(uuid.uuid4())
