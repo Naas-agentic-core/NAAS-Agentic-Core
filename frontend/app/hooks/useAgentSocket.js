@@ -81,6 +81,17 @@ export const useAgentSocket = (endpoint, token, onConversationUpdate) => {
         onConversationUpdateRef.current = onConversationUpdate;
     }, [onConversationUpdate]);
 
+    const refreshConversationHistory = useCallback(() => {
+        if (!onConversationUpdateRef.current) return;
+        onConversationUpdateRef.current();
+        // Safety second-pass refresh to avoid race with backend final persistence.
+        window.setTimeout(() => {
+            if (onConversationUpdateRef.current) {
+                onConversationUpdateRef.current();
+            }
+        }, 350);
+    }, []);
+
     const addMessage = useCallback((msg) => {
         setMessages(prev => [...prev, msg]);
     }, []);
@@ -94,7 +105,7 @@ export const useAgentSocket = (endpoint, token, onConversationUpdate) => {
                 if (payload?.conversation_id) {
                     setConversationId(payload.conversation_id);
                 }
-                if (onConversationUpdateRef.current) onConversationUpdateRef.current();
+                refreshConversationHistory();
             } else if (type === 'delta' || type === 'assistant_delta') {
                 const content = payload?.content || '';
                 if (!content) return;
@@ -116,6 +127,7 @@ export const useAgentSocket = (endpoint, token, onConversationUpdate) => {
                     }
                     return prev;
                 });
+                refreshConversationHistory();
             } else if (type === 'assistant_final') {
                 const content = payload?.content || '';
                 setMessages(prev => {
@@ -128,23 +140,27 @@ export const useAgentSocket = (endpoint, token, onConversationUpdate) => {
                     }
                     return prev;
                 });
+                refreshConversationHistory();
             } else if (type === 'assistant_fallback') {
                  const content = payload?.content || '';
                  if (content) {
                     addMessage({ id: generateId(), role: 'assistant', content: content, isComplete: true });
                  }
+                 refreshConversationHistory();
             } else if (type === 'error') {
                 const details = payload?.details || 'Unknown error';
                 addMessage({ id: generateId(), role: 'assistant', content: `Error: ${details}`, isError: true });
+                refreshConversationHistory();
             } else if (type === 'assistant_error') {
                 const content = payload?.content || 'Unknown assistant error';
                 addMessage({ id: generateId(), role: 'assistant', content: `Error: ${content}`, isError: true });
+                refreshConversationHistory();
             }
         };
 
         window.addEventListener('agent:event', handler);
         return () => window.removeEventListener('agent:event', handler);
-    }, [addMessage]);
+    }, [addMessage, refreshConversationHistory]);
 
     const sendMessage = useCallback((text, metadata = {}) => {
         if (!text.trim()) return;
