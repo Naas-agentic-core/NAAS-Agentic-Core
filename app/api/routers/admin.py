@@ -212,18 +212,37 @@ async def chat_stream_ws(
             if mission_type:
                 metadata["mission_type"] = mission_type
 
+            original_conversation_id = payload.get("conversation_id")
+
             try:
                 async for event in orchestrator_client.chat_with_agent(
                     question=question,
                     user_id=actor.id,
-                    conversation_id=payload.get("conversation_id"),
+                    conversation_id=original_conversation_id,
                     context={
                         "chat_scope": "admin",
                         "metadata": metadata,
                         "compatibility_facade": True,
                     },
                 ):
-                    await websocket.send_json(normalize_streaming_event(event))
+                    normalized_event = normalize_streaming_event(event)
+
+                    # Prevent "Split-Brain" DB FK violation:
+                    # Intercept Orchestrator's conversation_init and rewrite/strip conversation_id
+                    # so the local frontend doesn't overwrite its local sequence with Orchestrator's sequence.
+                    if normalized_event.get("type") == "conversation_init" and isinstance(
+                        normalized_event.get("payload"), dict
+                    ):
+                        if original_conversation_id:
+                            # Rewrite to the established local sequence
+                            normalized_event["payload"]["conversation_id"] = (
+                                original_conversation_id
+                            )
+                        else:
+                            # Strip it to avoid overwriting local state with a foreign ID
+                            normalized_event["payload"].pop("conversation_id", None)
+
+                    await websocket.send_json(normalized_event)
             except HTTPException as http_exc:
                 await websocket.send_json(
                     normalize_streaming_event(
