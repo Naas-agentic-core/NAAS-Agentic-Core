@@ -12,6 +12,7 @@
 - اعتماد كامل على حقن التبعيات (Dependency Injection).
 """
 
+import asyncio
 import inspect
 
 from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect
@@ -196,7 +197,7 @@ async def chat_stream_ws(
     try:
         while True:
             payload = await websocket.receive_json()
-            question = str(payload.get("question", "")).strip()
+            question = str(payload.get("question", "")).replace("\x00", "").strip()
             if not question:
                 await websocket.send_json(
                     normalize_streaming_event(
@@ -263,63 +264,72 @@ async def chat_stream_ws(
 
             complete_ai_response = ""
             assistant_message_persisted = False
+            pending_terminal_event: dict[str, object] | None = None
+            stream_task: asyncio.Task[None] | None = None
+            stream_error: HTTPException | Exception | None = None
 
             try:
-                async for event in orchestrator_client.chat_with_agent(
-                    question=question,
-                    user_id=actor.id,
-                    conversation_id=local_conversation_id,
-                    context={
-                        "chat_scope": "admin",
-                        "metadata": metadata,
-                        "compatibility_facade": True,
-                    },
-                ):
-                    normalized_event = normalize_streaming_event(event)
-
-                    # Prevent "Split-Brain" DB FK violation:
-                    # Intercept Orchestrator's conversation_init and rewrite/strip conversation_id
-                    # so the local frontend doesn't overwrite its local sequence with Orchestrator's sequence.
-                    if normalized_event.get("type") == "conversation_init" and isinstance(
-                        normalized_event.get("payload"), dict
+                async def stream_and_forward() -> None:
+                    nonlocal pending_terminal_event
+                    nonlocal complete_ai_response
+                    async for event in orchestrator_client.chat_with_agent(
+                        question=question,
+                        user_id=actor.id,
+                        conversation_id=local_conversation_id,
+                        context={
+                            "chat_scope": "admin",
+                            "metadata": metadata,
+                            "compatibility_facade": True,
+                        },
                     ):
-                        if local_conversation_id is not None:
-                            # Rewrite to the established local sequence
-                            normalized_event["payload"]["conversation_id"] = local_conversation_id
+                        normalized_event = normalize_streaming_event(event)
+
+                        # Prevent "Split-Brain" DB FK violation:
+                        # Intercept Orchestrator's conversation_init and rewrite/strip conversation_id
+                        # so the local frontend doesn't overwrite its local sequence with Orchestrator's sequence.
+                        if normalized_event.get("type") == "conversation_init" and isinstance(
+                            normalized_event.get("payload"), dict
+                        ):
+                            if local_conversation_id is not None:
+                                # Rewrite to the established local sequence
+                                normalized_event["payload"]["conversation_id"] = local_conversation_id
+                            else:
+                                # Strip it to avoid overwriting local state with a foreign ID
+                                normalized_event["payload"].pop("conversation_id", None)
+
+                        event_type = normalized_event.get("type")
+                        if event_type in {"complete", "assistant_final"}:
+                            pending_terminal_event = normalized_event
                         else:
-                            # Strip it to avoid overwriting local state with a foreign ID
-                            normalized_event["payload"].pop("conversation_id", None)
+                            await websocket.send_json(normalized_event)
 
-                    await websocket.send_json(normalized_event)
+                        if isinstance(normalized_event.get("payload"), dict):
+                            chunk_text = normalized_event["payload"].get("content")
+                            if isinstance(chunk_text, str) and chunk_text:
+                                complete_ai_response += chunk_text
 
-                    if isinstance(normalized_event.get("payload"), dict):
-                        chunk_text = normalized_event["payload"].get("content")
-                        if isinstance(chunk_text, str) and chunk_text:
-                            complete_ai_response += chunk_text
+                stream_task = asyncio.create_task(stream_and_forward())
+                await stream_task
             except HTTPException as http_exc:
-                await websocket.send_json(
-                    normalize_streaming_event(
-                        {
-                            "type": "error",
-                            "payload": {
-                                "details": str(http_exc.detail),
-                                "status_code": http_exc.status_code,
-                            },
-                        }
-                    )
-                )
-                continue
+                stream_error = http_exc
             except Exception as exc:
-                await websocket.send_json(
-                    normalize_streaming_event(
-                        {
-                            "type": "error",
-                            "payload": {"details": str(exc), "status_code": 500},
-                        }
+                stream_error = exc
+                if not isinstance(exc, WebSocketDisconnect):
+                    await websocket.send_json(
+                        normalize_streaming_event(
+                            {
+                                "type": "error",
+                                "payload": {"details": str(exc), "status_code": 500},
+                            }
+                        )
                     )
-                )
-                continue
             finally:
+                if stream_task is not None and not stream_task.done():
+                    stream_task.cancel()
+                    try:
+                        await stream_task
+                    except asyncio.CancelledError:
+                        logger.info("Cancelled admin stream task after disconnect/finalization")
                 if (
                     not assistant_message_persisted
                     and complete_ai_response
@@ -342,6 +352,39 @@ async def chat_stream_ws(
                             ),
                             exc_info=True,
                         )
+                if assistant_message_persisted:
+                    if pending_terminal_event is not None:
+                        await websocket.send_json(pending_terminal_event)
+                    await websocket.send_json(normalize_streaming_event({"type": "persisted"}))
+                elif pending_terminal_event is not None and stream_error is None:
+                    await websocket.send_json(
+                        normalize_streaming_event(
+                            {
+                                "type": "error",
+                                "payload": {
+                                    "details": (
+                                        "Failed to confirm assistant persistence before completion."
+                                    ),
+                                    "status_code": 500,
+                                },
+                            }
+                        )
+                    )
+                if isinstance(stream_error, HTTPException):
+                    await websocket.send_json(
+                        normalize_streaming_event(
+                            {
+                                "type": "error",
+                                "payload": {
+                                    "details": str(stream_error.detail),
+                                    "status_code": stream_error.status_code,
+                                },
+                            }
+                        )
+                    )
+                    continue
+                if isinstance(stream_error, Exception):
+                    continue
 
     except WebSocketDisconnect:
         logger.info("Admin WebSocket disconnected")

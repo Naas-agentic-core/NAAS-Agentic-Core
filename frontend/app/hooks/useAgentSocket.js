@@ -84,12 +84,6 @@ export const useAgentSocket = (endpoint, token, onConversationUpdate) => {
     const refreshConversationHistory = useCallback(() => {
         if (!onConversationUpdateRef.current) return;
         onConversationUpdateRef.current();
-        // Safety second-pass refresh to avoid race with backend final persistence.
-        window.setTimeout(() => {
-            if (onConversationUpdateRef.current) {
-                onConversationUpdateRef.current();
-            }
-        }, 350);
     }, []);
 
     const addMessage = useCallback((msg) => {
@@ -127,7 +121,6 @@ export const useAgentSocket = (endpoint, token, onConversationUpdate) => {
                     }
                     return prev;
                 });
-                refreshConversationHistory();
             } else if (type === 'assistant_final') {
                 const content = payload?.content || '';
                 setMessages(prev => {
@@ -140,6 +133,7 @@ export const useAgentSocket = (endpoint, token, onConversationUpdate) => {
                     }
                     return prev;
                 });
+            } else if (type === 'persisted') {
                 refreshConversationHistory();
             } else if (type === 'assistant_fallback') {
                  const content = payload?.content || '';
