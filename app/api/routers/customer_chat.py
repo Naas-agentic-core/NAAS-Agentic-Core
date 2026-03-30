@@ -197,16 +197,19 @@ async def chat_stream_ws(
             stream_error: HTTPException | Exception | None = None
 
             try:
-                async def stream_and_forward() -> None:
+
+                async def stream_and_forward(
+                    q=question, lc_id=local_conversation_id, meta=metadata
+                ) -> None:
                     nonlocal pending_terminal_event
                     nonlocal complete_ai_response
                     async for event in orchestrator_client.chat_with_agent(
-                        question=question,
+                        question=q,
                         user_id=actor.id,
-                        conversation_id=local_conversation_id,
+                        conversation_id=lc_id,
                         context={
                             "chat_scope": "customer",
-                            "metadata": metadata,
+                            "metadata": meta,
                             "compatibility_facade": True,
                         },
                     ):
@@ -218,9 +221,9 @@ async def chat_stream_ws(
                         if normalized_event.get("type") == "conversation_init" and isinstance(
                             normalized_event.get("payload"), dict
                         ):
-                            if local_conversation_id is not None:
+                            if lc_id is not None:
                                 # Rewrite to the established local sequence
-                                normalized_event["payload"]["conversation_id"] = local_conversation_id
+                                normalized_event["payload"]["conversation_id"] = lc_id
                             else:
                                 # Strip it to avoid overwriting local state with a foreign ID
                                 normalized_event["payload"].pop("conversation_id", None)
