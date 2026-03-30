@@ -68,6 +68,13 @@ class MissionEventEnvelope(TypedDict):
     data: dict[str, object]
 
 
+class StreamFrame(BaseModel):
+    """يمثل إطارًا موحّدًا لبث الدردشة ويفصل نص المستخدم عن الإشارات التحكمية."""
+
+    type: str
+    payload: dict[str, object] = Field(default_factory=dict)
+
+
 def _canonicalize_mission_event(event: object) -> MissionEventEnvelope | None:
     """يوحّد أشكال الحدث التاريخية إلى غلاف داخلي ثابت مع توافق رجعي عند الحافة."""
 
@@ -183,6 +190,16 @@ def _safe_assistant_error(request_id: str) -> str:
 async def _serialize_json_async(payload: object) -> str:
     """يُسلسل الحمولة إلى JSON داخل خيط منفصل لحماية حلقة الأحداث من الحجب."""
     return await anyio.to_thread.run_sync(json.dumps, payload, ensure_ascii=False)
+
+
+async def _serialize_stream_frame(payload: object) -> str:
+    """يبني NDJSON صارمًا لضمان عدم تسريب dict خام إلى عميل البث النصي."""
+    if isinstance(payload, dict):
+        frame = StreamFrame.model_validate(payload).model_dump()
+    else:
+        frame = StreamFrame(type="assistant_delta", payload={"content": str(payload)}).model_dump()
+    serialized = await _serialize_json_async(frame)
+    return f"{serialized}\n"
 
 
 @router.get(
@@ -1049,15 +1066,7 @@ async def chat_with_agent_endpoint(request: ChatRequest, fastapi_req: Request) -
     )
 
     if is_admin:
-        import json
-
         async def _admin_stream():
-            def format_chunk(content: str) -> str:
-                return json.dumps(
-                    {"type": "assistant_delta", "payload": {"content": content}},
-                    ensure_ascii=False,
-                )
-
             try:
                 admin_app = getattr(fastapi_req.app.state, "admin_app", None)
                 admin_payload = request.context if isinstance(request.context, dict) else {}
@@ -1068,7 +1077,9 @@ async def chat_with_agent_endpoint(request: ChatRequest, fastapi_req: Request) -
                     response_text = await _serialize_json_async(final_resp)
                 else:
                     response_text = str(final_resp or "لا توجد تفاصيل متاحة.")
-                yield response_text
+                yield await _serialize_stream_frame(
+                    {"type": "assistant_final", "payload": {"content": response_text}}
+                )
 
                 full_user_message = request.question
                 full_ai_response = response_text
@@ -1080,10 +1091,17 @@ async def chat_with_agent_endpoint(request: ChatRequest, fastapi_req: Request) -
                         user_msg=full_user_message,
                         ai_msg=full_ai_response,
                     )
-                    yield format_chunk("\n\n✅ [DB SAVED]")
+                    yield await _serialize_stream_frame(
+                        {"type": "assistant_delta", "payload": {"content": "\n\n✅ [DB SAVED]"}}
+                    )
                 except Exception as e:
                     error_msg = str(e)
-                    yield format_chunk(f"\n\n🚨 **SYSTEM DB ERROR:** {error_msg}")
+                    yield await _serialize_stream_frame(
+                        {
+                            "type": "assistant_error",
+                            "payload": {"content": f"\n\n🚨 **SYSTEM DB ERROR:** {error_msg}"},
+                        }
+                    )
             except Exception:
                 request_id = str(uuid.uuid4())
                 logger.error(
@@ -1091,7 +1109,12 @@ async def chat_with_agent_endpoint(request: ChatRequest, fastapi_req: Request) -
                     exc_info=True,
                     extra={"request_id": request_id},
                 )
-                yield _safe_assistant_error(request_id)
+                yield await _serialize_stream_frame(
+                    {
+                        "type": "assistant_error",
+                        "payload": {"content": _safe_assistant_error(request_id)},
+                    }
+                )
 
         return StreamingResponse(_admin_stream(), media_type="text/plain")
 
@@ -1099,14 +1122,6 @@ async def chat_with_agent_endpoint(request: ChatRequest, fastapi_req: Request) -
     agent = OrchestratorAgent(ai_client, tool_registry)
 
     async def _stream_generator():
-        import json
-
-        def format_chunk(content: str) -> str:
-            return json.dumps(
-                {"type": "assistant_delta", "payload": {"content": content}},
-                ensure_ascii=False,
-            )
-
         try:
             run_result = agent.run(request.question, context=context)
             ai_chunks = []
@@ -1122,7 +1137,7 @@ async def chat_with_agent_endpoint(request: ChatRequest, fastapi_req: Request) -
                     if final_content:
                         ai_chunks.append(str(final_content))
 
-                yield chunk
+                yield await _serialize_stream_frame(chunk)
 
             # The run completed successfully, trigger persistence
             full_user_message = request.question
@@ -1136,10 +1151,17 @@ async def chat_with_agent_endpoint(request: ChatRequest, fastapi_req: Request) -
                         user_msg=full_user_message,
                         ai_msg=full_ai_response,
                     )
-                    yield format_chunk("\n\n✅ [DB SAVED]")
+                    yield await _serialize_stream_frame(
+                        {"type": "assistant_delta", "payload": {"content": "\n\n✅ [DB SAVED]"}}
+                    )
                 except Exception as e:
                     error_msg = str(e)
-                    yield format_chunk(f"\n\n🚨 **SYSTEM DB ERROR:** {error_msg}")
+                    yield await _serialize_stream_frame(
+                        {
+                            "type": "assistant_error",
+                            "payload": {"content": f"\n\n🚨 **SYSTEM DB ERROR:** {error_msg}"},
+                        }
+                    )
 
         except Exception:
             request_id = str(uuid.uuid4())
@@ -1148,7 +1170,12 @@ async def chat_with_agent_endpoint(request: ChatRequest, fastapi_req: Request) -
                 exc_info=True,
                 extra={"request_id": request_id},
             )
-            yield _safe_assistant_error(request_id)
+            yield await _serialize_stream_frame(
+                {
+                    "type": "assistant_error",
+                    "payload": {"content": _safe_assistant_error(request_id)},
+                }
+            )
 
     return StreamingResponse(_stream_generator(), media_type="text/plain")
 

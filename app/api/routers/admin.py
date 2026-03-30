@@ -49,12 +49,19 @@ router = APIRouter(
     tags=["Admin"],
 )
 
+TEXT_EVENT_TYPES = {"assistant_delta", "assistant_final"}
+
 
 # -----------------------------------------------------------------------------
 # DTOs
 # -----------------------------------------------------------------------------
 class AdminUserCountResponse(BaseModel):
     count: int
+
+
+def _is_text_event(event: dict[str, object]) -> bool:
+    """يتحقق من أن الحدث نصي ومسموح بتجميعه داخل مخزن النص النهائي."""
+    return str(event.get("type", "")) in TEXT_EVENT_TYPES
 
 
 def get_chat_actor(
@@ -303,7 +310,9 @@ async def chat_stream_ws(
                         else:
                             await websocket.send_json(normalized_event)
 
-                        if isinstance(normalized_event.get("payload"), dict):
+                        if _is_text_event(normalized_event) and isinstance(
+                            normalized_event.get("payload"), dict
+                        ):
                             chunk_text = normalized_event["payload"].get("content")
                             if isinstance(chunk_text, str) and chunk_text:
                                 complete_ai_response += chunk_text

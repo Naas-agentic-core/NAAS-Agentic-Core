@@ -41,6 +41,8 @@ router = APIRouter(
     tags=["Customer Chat"],
 )
 
+TEXT_EVENT_TYPES = {"assistant_delta", "assistant_final"}
+
 
 def get_chat_actor(
     current: CurrentUser = Depends(require_permissions(QA_SUBMIT)),
@@ -76,6 +78,11 @@ def get_customer_service(
 ) -> CustomerChatBoundaryService:
     """تبعية للحصول على خدمة حدود محادثة العملاء."""
     return CustomerChatBoundaryService(db)
+
+
+def _is_text_event(event: dict[str, object]) -> bool:
+    """يتحقق من أن الحدث نصي ومسموح بتجميعه داخل مخزن النص النهائي."""
+    return str(event.get("type", "")) in TEXT_EVENT_TYPES
 
 
 @router.websocket("/ws")
@@ -231,7 +238,9 @@ async def chat_stream_ws(
                         else:
                             await websocket.send_json(normalized_event)
 
-                        if isinstance(normalized_event.get("payload"), dict):
+                        if _is_text_event(normalized_event) and isinstance(
+                            normalized_event.get("payload"), dict
+                        ):
                             chunk_text = normalized_event["payload"].get("content")
                             if isinstance(chunk_text, str) and chunk_text:
                                 complete_ai_response += chunk_text

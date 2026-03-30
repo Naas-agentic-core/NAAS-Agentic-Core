@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 import logging
 import uuid
+from ast import literal_eval
 from collections.abc import AsyncGenerator
 
 import httpx
@@ -345,8 +346,14 @@ class OrchestratorClient:
                             parsed_line = json.loads(line)
                             yield self._normalize_stream_event(parsed_line)
                         except json.JSONDecodeError:
-                            logger.warning(f"Received non-JSON line from agent: {line[:50]}...")
-                            yield self._normalize_stream_event(line)
+                            recovered = self._recover_structured_event(line)
+                            if recovered is not None:
+                                yield self._normalize_stream_event(recovered)
+                            else:
+                                logger.warning(
+                                    f"Received non-JSON line from agent: {line[:50]}..."
+                                )
+                                yield self._normalize_stream_event(line)
                     return
                 finally:
                     await response.aclose()
@@ -384,6 +391,25 @@ class OrchestratorClient:
             yield json.dumps(
                 self._sanitize_error_for_user(request_id=request_id), ensure_ascii=False
             )
+
+    @staticmethod
+    def _recover_structured_event(raw_line: str) -> dict[str, object] | None:
+        """يحاول استعادة حدث هيكلي من تمثيل dict نصي لمنع تسريب البنية إلى الدردشة."""
+        candidate = raw_line.strip()
+        if not (candidate.startswith("{") and candidate.endswith("}")):
+            return None
+        try:
+            parsed = literal_eval(candidate)
+        except (SyntaxError, ValueError):
+            return None
+        if not isinstance(parsed, dict):
+            return None
+        if not isinstance(parsed.get("type"), str):
+            return None
+        payload = parsed.get("payload")
+        if payload is not None and not isinstance(payload, dict):
+            return None
+        return parsed
 
 
 # Singleton
