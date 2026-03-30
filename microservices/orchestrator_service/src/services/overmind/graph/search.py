@@ -1,3 +1,5 @@
+import asyncio
+import os
 import time
 
 import anyio
@@ -43,7 +45,7 @@ class QueryAnalyzerNode:
         # Initializing the actual DSPy module
         self.analyzer = dspy.Predict(AnalyzeQuery)
 
-    def __call__(self, state: dict) -> dict:
+    async def __call__(self, state: dict) -> dict:
         from .telemetry import emit_telemetry
 
         start_time = time.time()
@@ -51,7 +53,10 @@ class QueryAnalyzerNode:
         error = None
 
         try:
-            prediction = self.analyzer(raw_query=query)
+            prediction = await asyncio.wait_for(
+                anyio.to_thread.run_sync(lambda: self.analyzer(raw_query=query)),
+                timeout=10.0,
+            )
             filters = QueryFilters(
                 raw_query=query,
                 year=int(prediction.year) if str(prediction.year).isdigit() else 2024,
@@ -95,8 +100,9 @@ class InternalRetrieverNode:
             "exercise_num": filters.exercise_num,
         }
         try:
-            exact_results = await research_client.semantic_search(
-                query=filters.raw_query, top_k=5, filters=exact_filters
+            exact_results = await asyncio.wait_for(
+                research_client.semantic_search(query=filters.raw_query, top_k=5, filters=exact_filters),
+                timeout=10.0,
             )
 
             if exact_results:
@@ -118,8 +124,9 @@ class InternalRetrieverNode:
                 )
                 return {"retrieved_docs": docs}
 
-            semantic_results = await research_client.semantic_search(
-                query=filters.raw_query, top_k=15, filters={}
+            semantic_results = await asyncio.wait_for(
+                research_client.semantic_search(query=filters.raw_query, top_k=15, filters={}),
+                timeout=10.0,
             )
             docs = [
                 LlamaDocument(
@@ -216,8 +223,17 @@ class WebSearchFallbackNode:
 
         if len(reranked) == 0:
             query_str = f"بكالوريا {filters.subject} {filters.branch} {filters.year} تمرين {filters.exercise_num}"
+            tavily_key = os.environ.get("TAVILY_API_KEY", "").strip()
+            if not tavily_key:
+                emit_telemetry(
+                    node_name="WebSearchFallbackNode",
+                    start_time=start_time,
+                    state=state,
+                    retrieval_source="web_skipped_missing_tavily",
+                )
+                return {"reranked_docs": [], "used_web": False}
             try:
-                report = await research_client.deep_research(query_str)
+                report = await asyncio.wait_for(research_client.deep_research(query_str), timeout=10.0)
                 docs = [LlamaDocument(text=report, metadata={"source": "الإنترنت", "score": 0.85})]
             except Exception as e:
                 error = e
