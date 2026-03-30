@@ -245,7 +245,8 @@ class LangGraphOvermindEngine:
         }
 
         final_state = await self._compiled_graph.ainvoke(
-            initial_state, config={"recursion_limit": 100}
+            initial_state,
+            config={"recursion_limit": max(10, initial_state["max_iterations"] * 2)},
         )
         return LangGraphRunResult(run_id=run_id, state=final_state)
 
@@ -295,7 +296,7 @@ class LangGraphOvermindEngine:
         """
         إنشاء سياق تعاون متوافق مع بروتوكولات الوكلاء.
         """
-        return InMemoryCollaborationContext(state.get("shared_memory", {}))
+        return InMemoryCollaborationContext(dict(state.get("shared_memory", {})))
 
     def _resolve_max_iterations(self, context: dict[str, object]) -> int:
         """
@@ -509,9 +510,34 @@ class LangGraphOvermindEngine:
         """
         عقدة المشرف لتوزيع المهام وفق نمط Supervisor-Worker.
         """
+        next_iteration = int(state.get("iteration", 0)) + 1
+        max_iterations = int(state.get("max_iterations", self.loop_policy.max_iterations))
+
+        if next_iteration >= max_iterations:
+            fallback_answer = (
+                "توقفت دورة التفكير تلقائياً بعد بلوغ الحد الأقصى للتكرار "
+                f"({max_iterations}) لحماية الموارد. يرجى إعادة صياغة الطلب بشكل أكثر تحديداً."
+            )
+            return {
+                "iteration": next_iteration,
+                "next_step": "end",
+                "answer": state.get("answer") or fallback_answer,
+                "timeline": self._append_timeline(
+                    state,
+                    "supervisor",
+                    {
+                        "status": "terminated_due_to_iteration_limit",
+                        "next_step": "end",
+                        "reason": "MAX_ITERATIONS_GUARDRAIL",
+                        "iteration": next_iteration,
+                        "max_iterations": max_iterations,
+                    },
+                ),
+            }
+
         decision = self.supervisor.decide(state)
         return {
-            "iteration": state.get("iteration", 0) + 1,
+            "iteration": next_iteration,
             "next_step": decision.next_step,
             "timeline": self._append_timeline(
                 state,
@@ -588,7 +614,6 @@ class LangGraphOvermindEngine:
         if self._observer:
             await self._observer("phase_start", {"phase": "RE-PLANNING", "agent": "LoopController"})
 
-        next_iteration = state.get("iteration", 0) + 1
         audit = state.get("audit") or {}
         feedback = ""
         if isinstance(audit, dict):
@@ -596,14 +621,14 @@ class LangGraphOvermindEngine:
         shared_memory = {
             **state.get("shared_memory", {}),
             "audit_feedback": feedback,
-            "iteration": next_iteration,
+            "iteration": state.get("iteration", 0),
         }
 
         if self._observer:
             await self._observer(
                 "loop_start",
                 {
-                    "iteration": next_iteration,
+                    "iteration": state.get("iteration", 0),
                     "chief_agent": "Strategist",
                     "graph_mode": "cognitive_loop",
                 },
@@ -616,7 +641,6 @@ class LangGraphOvermindEngine:
             )
 
         return {
-            "iteration": next_iteration,
             "plan": None,
             "design": None,
             "execution": None,
@@ -626,6 +650,6 @@ class LangGraphOvermindEngine:
             "timeline": self._append_timeline(
                 state,
                 "loop_controller",
-                {"status": "replan", "iteration": next_iteration},
+                {"status": "replan", "iteration": state.get("iteration", 0)},
             ),
         }

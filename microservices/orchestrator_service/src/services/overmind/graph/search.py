@@ -1,5 +1,6 @@
 import time
 
+import anyio
 import dspy
 from llama_index.core.schema import Document as LlamaDocument
 from pydantic import BaseModel
@@ -154,7 +155,7 @@ class RerankerNode:
             self.reranker = None
             logger.warning("FlagEmbeddingReranker not installed, falling back to simple sort.")
 
-    def __call__(self, state: dict) -> dict:
+    async def __call__(self, state: dict) -> dict:
         from .telemetry import emit_telemetry
 
         start_time = time.time()
@@ -176,8 +177,10 @@ class RerankerNode:
                 ]
                 from llama_index.core.indices.query.schema import QueryBundle
 
-                reranked_nodes = self.reranker.postprocess_nodes(
-                    nodes=nodes, query_bundle=QueryBundle(filters.raw_query)
+                reranked_nodes = await anyio.to_thread.run_sync(
+                    self.reranker.postprocess_nodes,
+                    nodes,
+                    QueryBundle(filters.raw_query),
                 )
                 reranked = [
                     LlamaDocument(
@@ -191,8 +194,11 @@ class RerankerNode:
                 error = e
                 reranked = docs[:5]
         else:
-            docs.sort(key=lambda x: x.metadata.get("score", 0), reverse=True)
-            reranked = docs[:5]
+            reranked = sorted(
+                docs,
+                key=lambda doc: doc.metadata.get("score", 0),
+                reverse=True,
+            )[:5]
 
         emit_telemetry(node_name="RerankerNode", start_time=start_time, state=state, error=error)
         return {"reranked_docs": reranked}
