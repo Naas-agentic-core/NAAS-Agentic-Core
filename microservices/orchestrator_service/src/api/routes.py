@@ -1,8 +1,10 @@
 import asyncio
+import json
 import logging
 import uuid
 from typing import TypedDict
 
+import anyio
 import httpx
 import jwt
 from fastapi import (
@@ -176,6 +178,11 @@ async def require_internal_admin_access(
 def _safe_assistant_error(request_id: str) -> str:
     """يبني رسالة خطأ آمنة للمستخدم دون أي تسريب تشخيصي داخلي."""
     return f"تعذر معالجة طلب الدردشة حالياً. رقم المتابعة: {request_id}"
+
+
+async def _serialize_json_async(payload: object) -> str:
+    """يُسلسل الحمولة إلى JSON داخل خيط منفصل لحماية حلقة الأحداث من الحجب."""
+    return await anyio.to_thread.run_sync(json.dumps, payload, ensure_ascii=False)
 
 
 @router.get(
@@ -584,9 +591,7 @@ async def _stream_chat_langgraph(
             final_resp = run_data.get("final_response")
 
             if isinstance(final_resp, dict):
-                import json
-
-                response_text = json.dumps(final_resp, ensure_ascii=False)
+                response_text = await _serialize_json_async(final_resp)
             else:
                 response_text = str(final_resp or "لا توجد تفاصيل متاحة.")
 
@@ -718,9 +723,7 @@ async def _run_chat_langgraph(
     final_resp = res.get("final_response")
 
     if isinstance(final_resp, dict):
-        import json
-
-        response_text = json.dumps(final_resp, ensure_ascii=False)
+        response_text = await _serialize_json_async(final_resp)
     else:
         response_text = str(final_resp or "لا توجد تفاصيل متاحة.")
 
@@ -1062,7 +1065,7 @@ async def chat_with_agent_endpoint(request: ChatRequest, fastapi_req: Request) -
                 res = await admin_app.ainvoke(admin_inputs)
                 final_resp = res.get("final_response")
                 if isinstance(final_resp, dict):
-                    response_text = json.dumps(final_resp, ensure_ascii=False)
+                    response_text = await _serialize_json_async(final_resp)
                 else:
                     response_text = str(final_resp or "لا توجد تفاصيل متاحة.")
                 yield response_text
