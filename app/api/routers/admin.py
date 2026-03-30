@@ -394,9 +394,8 @@ async def chat_stream_ws(
                             }
                         )
                     )
-                    continue
-                if isinstance(stream_error, Exception):
-                    continue
+                    # Cannot 'continue' inside finally, but stream_error is handled.
+                    # Loop naturally repeats on the next client payload message.
 
     except WebSocketDisconnect:
         logger.info("Admin WebSocket disconnected")
