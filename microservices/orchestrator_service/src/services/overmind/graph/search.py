@@ -57,6 +57,7 @@ class QueryAnalyzerNode:
         error = None
 
         try:
+
             def _coerce_nullable_int(value: object) -> int | None:
                 text_value = str(value).strip().lower()
                 if text_value in {"", "none", "null"}:
@@ -135,8 +136,14 @@ class InternalRetrieverNode:
                 )
                 return {"retrieved_docs": docs}
 
+            # To prevent 'Ghost Exam' injection, do not default to empty filters for generic queries
+            # if we have no exact match. We should still apply whatever partial filters were extracted.
+            # If the user says "تمرين احتمالات", exact_filters has {'subject': 'احتمالات'}.
+            # We broaden top_k but keep exact_filters to prevent returning a random 2024 exam.
             semantic_results = await asyncio.wait_for(
-                research_client.semantic_search(query=filters.raw_query, top_k=15, filters={}),
+                research_client.semantic_search(
+                    query=filters.raw_query, top_k=15, filters=exact_filters
+                ),
                 timeout=10.0,
             )
             docs = [
