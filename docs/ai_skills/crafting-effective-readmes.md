@@ -7,15 +7,18 @@ description: Use when writing or improving README files. Not all READMEs are the
 
 ## Overview
 
-READMEs answer questions your audience will have. Different audiences need different information - a contributor to an OSS project needs different context than future-you opening a config folder.
+READMEs answer questions your audience will have. Different audiences need different information — a contributor to an OSS project needs different context than a new hire reading an internal service README.
 
 **Always ask:** Who will read this, and what do they need to know?
+
+> **Project note:** README files in this repository must be written in **English**.
+> Arabic is reserved for code docstrings and internal architecture documents.
+
+---
 
 ## Process
 
 ### Step 1: Identify the Task
-
-**Ask:** "What README task are you working on?"
 
 | Task | When |
 |------|------|
@@ -44,35 +47,115 @@ READMEs answer questions your audience will have. Different audiences need diffe
 
 **Reviewing/refreshing:**
 1. Read current README
-2. Check against actual project state (package.json, main files, etc.)
+2. Check against actual project state (`package.json`, `requirements.txt`, main files)
 3. Flag outdated sections
-4. Update "Last reviewed" date if present
 
 ### Step 3: Always Ask
 
-After drafting, ask: **"Anything else to highlight or include that I might have missed?"**
+After drafting: **"Anything else to highlight or include that I might have missed?"**
+
+---
 
 ## Project Types
 
-| Type | Audience | Key Sections | Template |
-|------|----------|--------------|----------|
-| **Open Source** | Contributors, users worldwide | Install, Usage, Contributing, License | `templates/oss.md` |
-| **Personal** | Future you, portfolio viewers | What it does, Tech stack, Learnings | `templates/personal.md` |
-| **Internal** | Teammates, new hires | Setup, Architecture, Runbooks | `templates/internal.md` |
-| **Config** | Future you (confused) | What's here, Why, How to extend, Gotchas | `templates/xdg-config.md` |
+| Type | Audience | Key Sections |
+|------|----------|--------------|
+| **Open Source** | Contributors, users worldwide | Install, Usage, Contributing, License |
+| **Internal service** | Teammates, new hires | Setup, Architecture, API, Runbooks |
+| **Personal / portfolio** | Future you, portfolio viewers | What it does, Tech stack, Learnings |
+| **Config / tooling** | Future you (confused) | What's here, Why, How to extend, Gotchas |
 
-**Ask the user** if unclear. Don't assume OSS defaults for everything.
+---
+
+## Templates
+
+### Open Source / Internal Service (use for microservices in `microservices/`)
+
+```markdown
+# Service Name
+
+One sentence: what this service does and why it exists.
+
+## Requirements
+
+- Python 3.12+
+- PostgreSQL 15+
+- Docker
+
+## Setup
+
+```bash
+cp .env.example .env
+docker compose up service_name
+```
+
+## API
+
+Base URL: `http://localhost:<port>`
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/health` | Health check |
+| POST | `/resource` | Create resource |
+
+Full OpenAPI spec: `docs/contracts/<service_name>.yaml`
+
+## Development
+
+```bash
+# Install dependencies
+pip install -r requirements-dev.txt
+
+# Run tests
+pytest
+
+# Lint
+ruff check .
+```
+
+## Architecture
+
+Brief description of the service's responsibility and its place in the system.
+Link to relevant ADR: `docs/architecture/adr/`.
+```
+
+### Config / Tooling Folder
+
+```markdown
+# Folder Name
+
+What lives here and why.
+
+## Contents
+
+| File | Purpose |
+|------|---------|
+| `file.py` | What it does |
+
+## How to extend
+
+Steps to add a new item.
+
+## Gotchas
+
+Known quirks or non-obvious behaviour.
+```
+
+---
 
 ## Essential Sections (All Types)
 
 Every README needs at minimum:
 
-1. **Name** - Self-explanatory title
-2. **Description** - What + why in 1-2 sentences
-3. **Usage** - How to use it (examples help)
+1. **Name** — self-explanatory title
+2. **Description** — what + why in 1–2 sentences
+3. **Setup** — how to get it running (commands, not prose)
+4. **Usage** — how to use it (examples help)
 
-## References
+## What to Avoid
 
-- `section-checklist.md` - Which sections to include by project type
-- `style-guide.md` - Common README mistakes and prose guidance
-- `using-references.md` - Guide to deeper reference materials
+- Filler phrases: "This is a comprehensive...", "powerful", "robust"
+- Repeating what the code already says
+- Screenshots that go stale — prefer code examples
+- Sections with no content ("Coming soon")
+- Documenting the obvious (`cd into directory`)

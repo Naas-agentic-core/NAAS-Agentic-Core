@@ -5,14 +5,18 @@ description: Create production-ready FastAPI projects with async patterns, depen
 
 # FastAPI Project Templates
 
-Production-ready FastAPI project structures with async patterns, dependency injection, middleware, and best practices for building high-performance APIs.
+> **Project note:** This project uses **PostgreSQL 15+** with `asyncpg` driver
+> (`postgresql+asyncpg://`), **SQLAlchemy 2.x** (`DeclarativeBase`), and
+> **Pydantic v2** (`model_dump()`, `model_config`). All patterns below reflect
+> these versions. Do not use Pydantic v1 (`dict()`) or SQLAlchemy 1.x
+> (`declarative_base()`) patterns.
 
 ## When to Use This Skill
 
 - Starting new FastAPI projects from scratch
 - Implementing async REST APIs with Python
 - Building high-performance web services and microservices
-- Creating async applications with PostgreSQL, MongoDB
+- Creating async applications with PostgreSQL
 - Setting up API projects with proper structure and testing
 
 ## Core Concepts
@@ -35,7 +39,7 @@ app/
 │   ├── config.py
 │   ├── security.py
 │   └── database.py
-├── models/                 # Database models
+├── models/                 # SQLAlchemy ORM models
 │   ├── user.py
 │   └── item.py
 ├── schemas/                # Pydantic schemas
@@ -74,26 +78,29 @@ Proper async/await usage:
 
 ```python
 # main.py
-from fastapi import FastAPI, Depends
-from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+
+from app.core.database import engine, Base
+from app.api.v1.router import api_router
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Application lifespan events."""
-    # Startup
-    await database.connect()
+    """إدارة دورة حياة التطبيق — الإقلاع والإيقاف."""
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
     yield
-    # Shutdown
-    await database.disconnect()
+    await engine.dispose()
+
 
 app = FastAPI(
     title="API Template",
     version="1.0.0",
-    lifespan=lifespan
+    lifespan=lifespan,
 )
 
-# CORS middleware
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -102,52 +109,55 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Include routers
-from app.api.v1.router import api_router
 app.include_router(api_router, prefix="/api/v1")
 
+
 # core/config.py
-from pydantic_settings import BaseSettings
 from functools import lru_cache
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
 
 class Settings(BaseSettings):
-    """Application settings."""
+    """إعدادات التطبيق المحمّلة من متغيرات البيئة."""
+
     DATABASE_URL: str
     SECRET_KEY: str
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     API_V1_STR: str = "/api/v1"
 
-    class Config:
-        env_file = ".env"
+    model_config = SettingsConfigDict(env_file=".env")
 
-@lru_cache()
+
+@lru_cache
 def get_settings() -> Settings:
+    """إرجاع نسخة مخزّنة مؤقتًا من الإعدادات."""
     return Settings()
 
+
 # core/database.py
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.orm import DeclarativeBase
+
 from app.core.config import get_settings
 
 settings = get_settings()
 
-engine = create_async_engine(
-    settings.DATABASE_URL,
-    echo=True,
-    future=True
-)
+engine = create_async_engine(settings.DATABASE_URL, echo=False, future=True)
 
-AsyncSessionLocal = sessionmaker(
+AsyncSessionLocal = async_sessionmaker(
     engine,
     class_=AsyncSession,
-    expire_on_commit=False
+    expire_on_commit=False,
 )
 
-Base = declarative_base()
+
+class Base(DeclarativeBase):
+    """القاعدة المشتركة لجميع نماذج SQLAlchemy."""
+    pass
+
 
 async def get_db() -> AsyncSession:
-    """Dependency for database session."""
+    """تبعية FastAPI لجلسة قاعدة البيانات."""
     async with AsyncSessionLocal() as session:
         try:
             yield session
@@ -155,15 +165,13 @@ async def get_db() -> AsyncSession:
         except Exception:
             await session.rollback()
             raise
-        finally:
-            await session.close()
 ```
 
 ### Pattern 2: CRUD Repository Pattern
 
 ```python
 # repositories/base_repository.py
-from typing import Generic, TypeVar, Type, Optional, List
+from typing import Generic, TypeVar
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from pydantic import BaseModel
@@ -172,38 +180,31 @@ ModelType = TypeVar("ModelType")
 CreateSchemaType = TypeVar("CreateSchemaType", bound=BaseModel)
 UpdateSchemaType = TypeVar("UpdateSchemaType", bound=BaseModel)
 
-class BaseRepository(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
-    """Base repository for CRUD operations."""
 
-    def __init__(self, model: Type[ModelType]):
+class BaseRepository(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
+    """مستودع CRUD الأساسي القابل لإعادة الاستخدام."""
+
+    def __init__(self, model: type[ModelType]) -> None:
         self.model = model
 
-    async def get(self, db: AsyncSession, id: int) -> Optional[ModelType]:
-        """Get by ID."""
-        result = await db.execute(
-            select(self.model).where(self.model.id == id)
-        )
+    async def get(self, db: AsyncSession, id: int) -> ModelType | None:
+        """جلب سجل بمعرّفه."""
+        result = await db.execute(select(self.model).where(self.model.id == id))
         return result.scalars().first()
 
     async def get_multi(
         self,
         db: AsyncSession,
         skip: int = 0,
-        limit: int = 100
-    ) -> List[ModelType]:
-        """Get multiple records."""
-        result = await db.execute(
-            select(self.model).offset(skip).limit(limit)
-        )
-        return result.scalars().all()
+        limit: int = 100,
+    ) -> list[ModelType]:
+        """جلب قائمة من السجلات مع دعم الترقيم."""
+        result = await db.execute(select(self.model).offset(skip).limit(limit))
+        return list(result.scalars().all())
 
-    async def create(
-        self,
-        db: AsyncSession,
-        obj_in: CreateSchemaType
-    ) -> ModelType:
-        """Create new record."""
-        db_obj = self.model(**obj_in.dict())
+    async def create(self, db: AsyncSession, obj_in: CreateSchemaType) -> ModelType:
+        """إنشاء سجل جديد."""
+        db_obj = self.model(**obj_in.model_dump())
         db.add(db_obj)
         await db.flush()
         await db.refresh(db_obj)
@@ -213,10 +214,10 @@ class BaseRepository(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
         self,
         db: AsyncSession,
         db_obj: ModelType,
-        obj_in: UpdateSchemaType
+        obj_in: UpdateSchemaType,
     ) -> ModelType:
-        """Update record."""
-        update_data = obj_in.dict(exclude_unset=True)
+        """تحديث سجل موجود."""
+        update_data = obj_in.model_dump(exclude_unset=True)
         for field, value in update_data.items():
             setattr(db_obj, field, value)
         await db.flush()
@@ -224,32 +225,36 @@ class BaseRepository(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
         return db_obj
 
     async def delete(self, db: AsyncSession, id: int) -> bool:
-        """Delete record."""
+        """حذف سجل بمعرّفه."""
         obj = await self.get(db, id)
         if obj:
             await db.delete(obj)
             return True
         return False
 
+
 # repositories/user_repository.py
-from app.repositories.base_repository import BaseRepository
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
+
 from app.models.user import User
+from app.repositories.base_repository import BaseRepository
 from app.schemas.user import UserCreate, UserUpdate
 
-class UserRepository(BaseRepository[User, UserCreate, UserUpdate]):
-    """User-specific repository."""
 
-    async def get_by_email(self, db: AsyncSession, email: str) -> Optional[User]:
-        """Get user by email."""
-        result = await db.execute(
-            select(User).where(User.email == email)
-        )
+class UserRepository(BaseRepository[User, UserCreate, UserUpdate]):
+    """مستودع المستخدمين مع استعلامات مخصصة."""
+
+    async def get_by_email(self, db: AsyncSession, email: str) -> User | None:
+        """جلب مستخدم بعنوان بريده الإلكتروني."""
+        result = await db.execute(select(User).where(User.email == email))
         return result.scalars().first()
 
     async def is_active(self, db: AsyncSession, user_id: int) -> bool:
-        """Check if user is active."""
+        """التحقق من أن المستخدم نشط."""
         user = await self.get(db, user_id)
         return user.is_active if user else False
+
 
 user_repository = UserRepository(User)
 ```
@@ -258,44 +263,37 @@ user_repository = UserRepository(User)
 
 ```python
 # services/user_service.py
-from typing import Optional
 from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.repositories.user_repository import user_repository
-from app.schemas.user import UserCreate, UserUpdate, User
+from app.schemas.user import UserCreate, UserUpdate, UserRead
 from app.core.security import get_password_hash, verify_password
 
-class UserService:
-    """Business logic for users."""
 
-    def __init__(self):
+class UserService:
+    """طبقة منطق الأعمال للمستخدمين."""
+
+    def __init__(self) -> None:
         self.repository = user_repository
 
-    async def create_user(
-        self,
-        db: AsyncSession,
-        user_in: UserCreate
-    ) -> User:
-        """Create new user with hashed password."""
-        # Check if email exists
+    async def create_user(self, db: AsyncSession, user_in: UserCreate) -> UserRead:
+        """إنشاء مستخدم جديد مع تشفير كلمة المرور."""
         existing = await self.repository.get_by_email(db, user_in.email)
         if existing:
             raise ValueError("Email already registered")
 
-        # Hash password
-        user_in_dict = user_in.dict()
-        user_in_dict["hashed_password"] = get_password_hash(user_in_dict.pop("password"))
-
-        # Create user
-        user = await self.repository.create(db, UserCreate(**user_in_dict))
+        data = user_in.model_dump()
+        data["hashed_password"] = get_password_hash(data.pop("password"))
+        user = await self.repository.create(db, UserCreate(**data))
         return user
 
     async def authenticate(
         self,
         db: AsyncSession,
         email: str,
-        password: str
-    ) -> Optional[User]:
-        """Authenticate user."""
+        password: str,
+    ) -> UserRead | None:
+        """مصادقة المستخدم بالبريد الإلكتروني وكلمة المرور."""
         user = await self.repository.get_by_email(db, email)
         if not user:
             return None
@@ -307,135 +305,161 @@ class UserService:
         self,
         db: AsyncSession,
         user_id: int,
-        user_in: UserUpdate
-    ) -> Optional[User]:
-        """Update user."""
+        user_in: UserUpdate,
+    ) -> UserRead | None:
+        """تحديث بيانات مستخدم موجود."""
         user = await self.repository.get(db, user_id)
         if not user:
             return None
 
         if user_in.password:
-            user_in_dict = user_in.dict(exclude_unset=True)
-            user_in_dict["hashed_password"] = get_password_hash(
-                user_in_dict.pop("password")
-            )
-            user_in = UserUpdate(**user_in_dict)
+            data = user_in.model_dump(exclude_unset=True)
+            data["hashed_password"] = get_password_hash(data.pop("password"))
+            user_in = UserUpdate(**data)
 
         return await self.repository.update(db, user, user_in)
+
 
 user_service = UserService()
 ```
 
-### Pattern 4: API Endpoints with Dependencies
+### Pattern 4: Pydantic v2 Schemas
+
+```python
+# schemas/user.py
+from pydantic import BaseModel, EmailStr, ConfigDict
+
+
+class UserBase(BaseModel):
+    """الحقول المشتركة بين جميع مخططات المستخدم."""
+    email: EmailStr
+    name: str
+
+
+class UserCreate(UserBase):
+    """مخطط إنشاء مستخدم جديد."""
+    password: str
+
+
+class UserUpdate(BaseModel):
+    """مخطط تحديث مستخدم — جميع الحقول اختيارية."""
+    email: EmailStr | None = None
+    name: str | None = None
+    password: str | None = None
+
+
+class UserRead(UserBase):
+    """مخطط القراءة — يُعاد في استجابات API."""
+    id: int
+    is_active: bool
+
+    model_config = ConfigDict(from_attributes=True)
+```
+
+### Pattern 5: API Endpoints with Dependencies
 
 ```python
 # api/v1/endpoints/users.py
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from typing import List
 
 from app.core.database import get_db
-from app.schemas.user import User, UserCreate, UserUpdate
+from app.schemas.user import UserRead, UserCreate, UserUpdate
 from app.services.user_service import user_service
 from app.api.dependencies import get_current_user
 
 router = APIRouter()
 
-@router.post("/", response_model=User, status_code=status.HTTP_201_CREATED)
-async def create_user(
-    user_in: UserCreate,
-    db: AsyncSession = Depends(get_db)
-):
-    """Create new user."""
-    try:
-        user = await user_service.create_user(db, user_in)
-        return user
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
 
-@router.get("/me", response_model=User)
-async def read_current_user(
-    current_user: User = Depends(get_current_user)
-):
-    """Get current user."""
+@router.post("/", response_model=UserRead, status_code=status.HTTP_201_CREATED)
+async def create_user(user_in: UserCreate, db: AsyncSession = Depends(get_db)):
+    """إنشاء مستخدم جديد."""
+    try:
+        return await user_service.create_user(db, user_in)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.get("/me", response_model=UserRead)
+async def read_current_user(current_user: UserRead = Depends(get_current_user)):
+    """جلب بيانات المستخدم الحالي."""
     return current_user
 
-@router.get("/{user_id}", response_model=User)
+
+@router.get("/{user_id}", response_model=UserRead)
 async def read_user(
     user_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: UserRead = Depends(get_current_user),
 ):
-    """Get user by ID."""
+    """جلب مستخدم بمعرّفه."""
     user = await user_service.repository.get(db, user_id)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     return user
 
-@router.patch("/{user_id}", response_model=User)
+
+@router.patch("/{user_id}", response_model=UserRead)
 async def update_user(
     user_id: int,
     user_in: UserUpdate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: UserRead = Depends(get_current_user),
 ):
-    """Update user."""
+    """تحديث بيانات مستخدم."""
     if current_user.id != user_id:
         raise HTTPException(status_code=403, detail="Not authorized")
-
     user = await user_service.update_user(db, user_id, user_in)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     return user
 
+
 @router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_user(
     user_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: UserRead = Depends(get_current_user),
 ):
-    """Delete user."""
+    """حذف مستخدم."""
     if current_user.id != user_id:
         raise HTTPException(status_code=403, detail="Not authorized")
-
     deleted = await user_service.repository.delete(db, user_id)
     if not deleted:
         raise HTTPException(status_code=404, detail="User not found")
 ```
 
-### Pattern 5: Authentication & Authorization
+### Pattern 6: Authentication & Authorization
 
 ```python
 # core/security.py
-from datetime import datetime, timedelta
-from typing import Optional
+from datetime import datetime, timedelta, timezone
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 from app.core.config import get_settings
 
 settings = get_settings()
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
 ALGORITHM = "HS256"
 
-def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
-    """Create JWT access token."""
+
+def create_access_token(data: dict, expires_delta: timedelta | None = None) -> str:
+    """إنشاء رمز JWT للوصول."""
     to_encode = data.copy()
-    if expires_delta:
-        expire = datetime.utcnow() + expires_delta
-    else:
-        expire = datetime.utcnow() + timedelta(minutes=15)
-    to_encode.update({"exp": expire})
-    encoded_jwt = jwt.encode(to_encode, settings.SECRET_KEY, algorithm=ALGORITHM)
-    return encoded_jwt
+    expire = datetime.now(timezone.utc) + (expires_delta or timedelta(minutes=15))
+    to_encode["exp"] = expire
+    return jwt.encode(to_encode, settings.SECRET_KEY, algorithm=ALGORITHM)
+
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    """Verify password against hash."""
+    """التحقق من كلمة المرور مقابل تجزئتها."""
     return pwd_context.verify(plain_password, hashed_password)
 
+
 def get_password_hash(password: str) -> str:
-    """Hash password."""
+    """تجزئة كلمة المرور."""
     return pwd_context.hash(password)
+
 
 # api/dependencies.py
 from fastapi import Depends, HTTPException, status
@@ -448,31 +472,31 @@ from app.core.security import ALGORITHM
 from app.core.config import get_settings
 from app.repositories.user_repository import user_repository
 
+settings = get_settings()
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl=f"{settings.API_V1_STR}/auth/login")
+
 
 async def get_current_user(
     db: AsyncSession = Depends(get_db),
-    token: str = Depends(oauth2_scheme)
+    token: str = Depends(oauth2_scheme),
 ):
-    """Get current authenticated user."""
+    """جلب المستخدم الحالي من رمز JWT."""
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
         headers={"WWW-Authenticate": "Bearer"},
     )
-
     try:
         payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[ALGORITHM])
-        user_id: int = payload.get("sub")
+        user_id: int | None = payload.get("sub")
         if user_id is None:
             raise credentials_exception
-    except JWTError:
-        raise credentials_exception
+    except JWTError as exc:
+        raise credentials_exception from exc
 
     user = await user_repository.get(db, user_id)
     if user is None:
         raise credentials_exception
-
     return user
 ```
 
@@ -481,87 +505,83 @@ async def get_current_user(
 ```python
 # tests/conftest.py
 import pytest
-import asyncio
-from httpx import AsyncClient
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
-from sqlalchemy.orm import sessionmaker
+from httpx import AsyncClient, ASGITransport
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.main import app
 from app.core.database import get_db, Base
 
 TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
 
-@pytest.fixture(scope="session")
-def event_loop():
-    loop = asyncio.get_event_loop_policy().new_event_loop()
-    yield loop
-    loop.close()
 
 @pytest.fixture
 async def db_session():
-    engine = create_async_engine(TEST_DATABASE_URL, echo=True)
+    """جلسة قاعدة بيانات معزولة لكل اختبار."""
+    engine = create_async_engine(TEST_DATABASE_URL, echo=False)
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 
-    AsyncSessionLocal = sessionmaker(
-        engine, class_=AsyncSession, expire_on_commit=False
-    )
-
-    async with AsyncSessionLocal() as session:
+    session_factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+    async with session_factory() as session:
         yield session
 
+    await engine.dispose()
+
+
 @pytest.fixture
-async def client(db_session):
+async def client(db_session: AsyncSession):
+    """عميل HTTP للاختبار مع تجاوز تبعية قاعدة البيانات."""
     async def override_get_db():
         yield db_session
 
     app.dependency_overrides[get_db] = override_get_db
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as ac:
+        yield ac
+    app.dependency_overrides.clear()
 
-    async with AsyncClient(app=app, base_url="http://test") as client:
-        yield client
 
 # tests/test_users.py
 import pytest
 
+
 @pytest.mark.asyncio
-async def test_create_user(client):
+async def test_create_user(client: AsyncClient):
     response = await client.post(
         "/api/v1/users/",
-        json={
-            "email": "test@example.com",
-            "password": "testpass123",
-            "name": "Test User"
-        }
+        json={"email": "test@example.com", "password": "testpass123", "name": "Test User"},
     )
     assert response.status_code == 201
     data = response.json()
     assert data["email"] == "test@example.com"
     assert "id" in data
+
+
+@pytest.mark.asyncio
+async def test_create_user_duplicate_email(client: AsyncClient):
+    payload = {"email": "dup@example.com", "password": "pass", "name": "User"}
+    await client.post("/api/v1/users/", json=payload)
+    response = await client.post("/api/v1/users/", json=payload)
+    assert response.status_code == 400
 ```
-
-## Resources
-
-- **references/fastapi-architecture.md**: Detailed architecture guide
-- **references/async-best-practices.md**: Async/await patterns
-- **references/testing-strategies.md**: Comprehensive testing guide
-- **assets/project-template/**: Complete FastAPI project
-- **assets/docker-compose.yml**: Development environment setup
 
 ## Best Practices
 
-1. **Async All The Way**: Use async for database, external APIs
-2. **Dependency Injection**: Leverage FastAPI's DI system
-3. **Repository Pattern**: Separate data access from business logic
-4. **Service Layer**: Keep business logic out of routes
-5. **Pydantic Schemas**: Strong typing for request/response
-6. **Error Handling**: Consistent error responses
-7. **Testing**: Test all layers independently
+1. **Async all the way** — use async for database and external API calls
+2. **Dependency injection** — leverage FastAPI's `Depends` system
+3. **Repository pattern** — separate data access from business logic
+4. **Service layer** — keep business logic out of route handlers
+5. **Pydantic v2 schemas** — use `model_dump()`, `model_config = ConfigDict(...)`
+6. **SQLAlchemy 2.x** — use `DeclarativeBase`, `async_sessionmaker`, `create_async_engine`
+7. **Consistent error responses** — always raise `HTTPException` with structured `detail`
+8. **Test all layers** — unit-test services, integration-test routes
 
 ## Common Pitfalls
 
-- **Blocking Code in Async**: Using synchronous database drivers
-- **No Service Layer**: Business logic in route handlers
-- **Missing Type Hints**: Loses FastAPI's benefits
-- **Ignoring Sessions**: Not properly managing database sessions
-- **No Testing**: Skipping integration tests
-- **Tight Coupling**: Direct database access in routes
+- **`obj_in.dict()`** — Pydantic v1 API; use `obj_in.model_dump()` instead
+- **`declarative_base()`** — SQLAlchemy 1.x; use `class Base(DeclarativeBase): pass`
+- **`typing.List` / `typing.Optional`** — use `list[...]` and `... | None` (Python 3.10+)
+- **Blocking code in async handlers** — use `asyncio.to_thread()` for CPU-bound work
+- **Business logic in routes** — always delegate to the service layer
+- **Missing `from_attributes=True`** — required in `model_config` for ORM to Pydantic conversion
+- **`datetime.utcnow()`** — deprecated; use `datetime.now(timezone.utc)`
