@@ -1066,6 +1066,7 @@ async def chat_with_agent_endpoint(request: ChatRequest, fastapi_req: Request) -
     )
 
     if is_admin:
+
         async def _admin_stream():
             try:
                 admin_app = getattr(fastapi_req.app.state, "admin_app", None)

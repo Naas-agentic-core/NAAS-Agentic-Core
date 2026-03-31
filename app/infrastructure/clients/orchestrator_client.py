@@ -350,9 +350,7 @@ class OrchestratorClient:
                             if recovered is not None:
                                 yield self._normalize_stream_event(recovered)
                             else:
-                                logger.warning(
-                                    f"Received non-JSON line from agent: {line[:50]}..."
-                                )
+                                logger.warning(f"Received non-JSON line from agent: {line[:50]}...")
                                 yield self._normalize_stream_event(line)
                     return
                 finally:
