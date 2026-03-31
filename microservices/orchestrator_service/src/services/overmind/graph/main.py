@@ -121,18 +121,21 @@ ADMIN_PATTERNS = [
 ]
 
 
-class AdminIntentClassifier(dspy.Signature):
-    """Classify if query needs admin system metrics"""
+class IntentClassifier(dspy.Signature):
+    """Classify if query needs admin system metrics, general chat/greetings, or educational search. If the user says a greeting (السلام عليكم, hello) or general chat, output is_chat=True."""
 
     query: str = dspy.InputField()
     is_admin: bool = dspy.OutputField(desc="True if query needs real system counts/metrics")
+    is_chat: bool = dspy.OutputField(
+        desc="True if query is a greeting, small talk, or general conversational chat (e.g. السلام عليكم, شكرا, مرحبا)"
+    )
     confidence: float = dspy.OutputField()
     tool_needed: str = dspy.OutputField(desc="Which admin tool is needed")
 
 
 class SupervisorNode:
     def __init__(self):
-        self.dspy_classifier = dspy.ChainOfThought(AdminIntentClassifier)
+        self.dspy_classifier = dspy.ChainOfThought(IntentClassifier)
 
     async def __call__(self, state: AgentState) -> dict:
         """يوجّه النية بشكل غير حاجب للحلقة الحدثية مع أولوية للحراس الحتمية."""
@@ -160,14 +163,23 @@ class SupervisorNode:
 
         try:
             result = await asyncio.to_thread(self.dspy_classifier, query=query)
-            if hasattr(result, "is_admin") and str(result.is_admin).lower() == "true":
-                try:
-                    conf = float(result.confidence)
-                except (ValueError, TypeError):
-                    conf = 0.0
-                if conf > 0.75:
-                    emit_telemetry(node_name="SupervisorNode", start_time=start_time, state=state)
-                    return {"intent": "admin"}
+            try:
+                conf = float(result.confidence)
+            except (ValueError, TypeError):
+                conf = 0.0
+
+            if (
+                hasattr(result, "is_admin")
+                and str(result.is_admin).lower() == "true"
+                and conf > 0.75
+            ):
+                emit_telemetry(node_name="SupervisorNode", start_time=start_time, state=state)
+                return {"intent": "admin"}
+            if (
+                hasattr(result, "is_chat") and str(result.is_chat).lower() == "true" and conf > 0.70
+            ):
+                emit_telemetry(node_name="SupervisorNode", start_time=start_time, state=state)
+                return {"intent": "chat"}
         except Exception:
             pass
 
@@ -207,7 +219,9 @@ class ChatFallbackNode:
                 recent_messages.append(content.strip())
 
         conversation = "\n".join(recent_messages) if recent_messages else query
-        fallback_response = "وعليكم السلام! أنا هنا للمساعدة. أخبرني بما تحتاجه وسأتابع معك خطوة بخطوة."
+        fallback_response = (
+            "وعليكم السلام! أنا هنا للمساعدة. أخبرني بما تحتاجه وسأتابع معك خطوة بخطوة."
+        )
         try:
             prediction = await asyncio.to_thread(self.generator, conversation=conversation)
             model_response = getattr(prediction, "response", "")
