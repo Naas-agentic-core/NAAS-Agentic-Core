@@ -50,14 +50,17 @@ def _extract_token_from_protocols(protocols: list[str]) -> str | None:
 
 
 def extract_websocket_auth(websocket: WebSocket) -> tuple[str | None, str | None]:
+    # 1. Try to extract from Authorization header (Injected by Gateway)
+    auth_header = websocket.headers.get("authorization")
+    if auth_header and auth_header.lower().startswith("bearer "):
+        return auth_header[7:].strip(), "jwt"
+
+    # 2. Fallback to extracting from subprotocols (if direct connection)
     protocols = _parse_protocol_header(websocket.headers.get("sec-websocket-protocol"))
     token = _extract_token_from_protocols(protocols)
     if token:
-        # selected_protocol = "jwt" if "jwt" in protocols else None
-        # Actually protocol selection is tricky, usually you return 'jwt' if supported
         return token, "jwt"
 
+    # 3. Fallback to query param
     fallback_token = websocket.query_params.get("token")
-    # Simplify: Allow query param in dev only or if not strict
-    # In microservice context, assuming strict security is handled by Gateway but WS might bypass
     return fallback_token, None

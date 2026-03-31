@@ -59,9 +59,9 @@ def extract_websocket_auth(websocket: WebSocket) -> tuple[str | None, str | None
     """
     استخراج رمز الدخول والبروتوكول المختار من طلب WebSocket.
 
-    نحاول أولاً قراءة الرمز من ترويسة البروتوكول (أكثر أماناً من الـ query).
-    وعند الفشل نستخدم معامل الاستعلام `token` لأجل التوافق،
-    لكن هذا المسار يُعطّل تلقائياً في بيئات الإنتاج والتهيئة المرحلية.
+    نحاول أولاً قراءة الرمز من ترويسة Authorization (التي يحقنها Gateway).
+    إذا لم نجدها، نحاول قراءتها من ترويسة sec-websocket-protocol (اتصال مباشر).
+    وعند الفشل نستخدم معامل الاستعلام `token` لأجل التوافق.
 
     Args:
         websocket: كائن WebSocket الوارد من FastAPI.
@@ -69,13 +69,19 @@ def extract_websocket_auth(websocket: WebSocket) -> tuple[str | None, str | None
     Returns:
         زوج (token, selected_protocol) حيث يمكن أن تكون القيم `None`.
     """
+    # 1. Try to extract from Authorization header (Injected by Gateway)
+    auth_header = websocket.headers.get("authorization")
+    if auth_header and auth_header.lower().startswith("bearer "):
+        return auth_header[7:].strip(), "jwt"
 
+    # 2. Fallback to extracting from subprotocols (if direct connection)
     protocols = _parse_protocol_header(websocket.headers.get("sec-websocket-protocol"))
     token = _extract_token_from_protocols(protocols)
     if token:
         selected_protocol = "jwt" if "jwt" in protocols else None
         return token, selected_protocol
 
+    # 3. Fallback to query param
     fallback_token = websocket.query_params.get("token")
     if not fallback_token:
         return None, None
