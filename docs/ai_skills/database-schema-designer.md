@@ -8,6 +8,91 @@ license: MIT
 
 Design production-ready database schemas with best practices built-in.
 
+> **Project note:** This project uses **PostgreSQL 15+** with **SQLAlchemy 2.x** and **SQLModel**.
+> Use PostgreSQL-native syntax: `BIGSERIAL` (not `AUTO_INCREMENT`), `BOOLEAN` (not `TINYINT(1)`),
+> `SERIAL`/`BIGSERIAL` or `GENERATED ALWAYS AS IDENTITY` for auto-increment primary keys.
+> ORM examples use SQLModel. Raw SQL examples use PostgreSQL syntax.
+
+---
+
+## Project ORM Pattern (SQLModel + SQLAlchemy 2.x)
+
+```python
+# models/user.py
+from datetime import datetime, timezone
+from sqlmodel import Field, SQLModel
+
+
+class UserBase(SQLModel):
+    """الحقول المشتركة لنموذج المستخدم."""
+    email: str = Field(unique=True, index=True, max_length=255)
+    name: str = Field(max_length=100)
+    is_active: bool = Field(default=True)
+
+
+class User(UserBase, table=True):
+    """جدول المستخدمين في قاعدة البيانات."""
+    __tablename__ = "users"
+
+    id: int | None = Field(default=None, primary_key=True)
+    hashed_password: str
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class UserCreate(UserBase):
+    """مخطط إنشاء مستخدم جديد."""
+    password: str
+
+
+class UserRead(UserBase):
+    """مخطط قراءة المستخدم — يُعاد في استجابات API."""
+    id: int
+    created_at: datetime
+```
+
+## Alembic Migration Template (PostgreSQL)
+
+```python
+# migrations/versions/YYYYMMDD_description.py
+"""Add users table
+
+Revision ID: abc123
+Revises: 
+Create Date: 2025-01-01 00:00:00
+"""
+from alembic import op
+import sqlalchemy as sa
+
+revision = "abc123"
+down_revision = None
+branch_labels = None
+depends_on = None
+
+
+def upgrade() -> None:
+    op.create_table(
+        "users",
+        sa.Column("id", sa.BigInteger(), autoincrement=True, nullable=False),
+        sa.Column("email", sa.String(length=255), nullable=False),
+        sa.Column("name", sa.String(length=100), nullable=False),
+        sa.Column("hashed_password", sa.String(), nullable=False),
+        sa.Column("is_active", sa.Boolean(), nullable=False, server_default="true"),
+        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False,
+                  server_default=sa.text("now()")),
+        sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False,
+                  server_default=sa.text("now()")),
+        sa.PrimaryKeyConstraint("id"),
+        sa.UniqueConstraint("email"),
+    )
+    op.create_index("ix_users_email", "users", ["email"])
+
+
+def downgrade() -> None:
+    op.drop_index("ix_users_email", table_name="users")
+    op.drop_table("users")
+```
+
 ---
 
 ## Quick Start
@@ -21,18 +106,20 @@ design a schema for an e-commerce platform with users, products, orders
 You'll get a complete SQL schema like:
 
 ```sql
+-- PostgreSQL syntax
 CREATE TABLE users (
-  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  id BIGSERIAL PRIMARY KEY,
   email VARCHAR(255) UNIQUE NOT NULL,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  created_at TIMESTAMPTZ DEFAULT now()
 );
 
 CREATE TABLE orders (
-  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  id BIGSERIAL PRIMARY KEY,
   user_id BIGINT NOT NULL REFERENCES users(id),
-  total DECIMAL(10,2) NOT NULL,
-  INDEX idx_orders_user (user_id)
+  total DECIMAL(10,2) NOT NULL
 );
+
+CREATE INDEX idx_orders_user ON orders(user_id);
 ```
 
 **What to include in your request:**
@@ -294,46 +381,44 @@ phone VARCHAR(20)
 country_code CHAR(2)
 ```
 
-### Numeric Types
+### Numeric Types (PostgreSQL)
 
 | Type | Range | Use Case |
 |------|-------|----------|
-| TINYINT | -128 to 127 | Age, status codes |
-| SMALLINT | -32K to 32K | Quantities |
-| INT | -2.1B to 2.1B | IDs, counts |
-| BIGINT | Very large | Large IDs, timestamps |
-| DECIMAL(p,s) | Exact precision | Money |
-| FLOAT/DOUBLE | Approximate | Scientific data |
+| SMALLINT | -32K to 32K | Quantities, small counts |
+| INTEGER | -2.1B to 2.1B | General IDs, counts |
+| BIGINT | Very large | Large IDs, high-volume tables |
+| BIGSERIAL | Auto-increment BIGINT | Primary keys (preferred) |
+| NUMERIC(p,s) / DECIMAL(p,s) | Exact precision | Money |
+| REAL / DOUBLE PRECISION | Approximate | Scientific data |
 
 ```sql
--- ALWAYS use DECIMAL for money
-price DECIMAL(10, 2)  -- $99,999,999.99
+-- ALWAYS use NUMERIC/DECIMAL for money
+price NUMERIC(10, 2)  -- $99,999,999.99
 
--- NEVER use FLOAT for money
-price FLOAT  -- Rounding errors!
+-- NEVER use FLOAT/REAL for money
+price REAL  -- Rounding errors!
 ```
 
-### Date/Time Types
+### Date/Time Types (PostgreSQL)
 
 ```sql
-DATE        -- 2025-10-31
-TIME        -- 14:30:00
-DATETIME    -- 2025-10-31 14:30:00
-TIMESTAMP   -- Auto timezone conversion
+DATE          -- 2025-10-31
+TIME          -- 14:30:00
+TIMESTAMP     -- No timezone (avoid for new schemas)
+TIMESTAMPTZ   -- With timezone (preferred — always use this)
 
--- Always store in UTC
-created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+-- Always store timezone-aware timestamps
+created_at TIMESTAMPTZ DEFAULT now()
+updated_at TIMESTAMPTZ DEFAULT now()
 ```
 
-### Boolean
+### Boolean (PostgreSQL)
 
 ```sql
--- PostgreSQL
+-- PostgreSQL native BOOLEAN — no TINYINT(1)
 is_active BOOLEAN DEFAULT TRUE
-
--- MySQL
-is_active TINYINT(1) DEFAULT 1
+is_deleted BOOLEAN DEFAULT FALSE NOT NULL
 ```
 
 </details>
@@ -395,14 +480,17 @@ SELECT * FROM orders WHERE status = 'pending';
 <details>
 <summary><strong>Deep Dive: Constraints</strong></summary>
 
-### Primary Keys
+### Primary Keys (PostgreSQL)
 
 ```sql
--- Auto-increment (simple)
-id INT AUTO_INCREMENT PRIMARY KEY
+-- Auto-increment integer (simple, preferred for single-node)
+id BIGSERIAL PRIMARY KEY
 
--- UUID (distributed systems)
-id CHAR(36) PRIMARY KEY DEFAULT (UUID())
+-- Identity column (SQL standard, PostgreSQL 10+)
+id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY
+
+-- UUID (distributed systems / cross-service references)
+id UUID PRIMARY KEY DEFAULT gen_random_uuid()
 
 -- Composite (junction tables)
 PRIMARY KEY (student_id, course_id)
@@ -580,22 +668,22 @@ db.stores.createIndex({ location: "2dsphere" });
 | Schema before data | Separate concerns |
 | Test on staging | Catch issues early |
 
-### Adding a Column (Zero-Downtime)
+### Adding a Column (Zero-Downtime, PostgreSQL)
 
 ```sql
--- Step 1: Add nullable column
+-- Step 1: Add nullable column (instant in PostgreSQL — no table rewrite)
 ALTER TABLE users ADD COLUMN phone VARCHAR(20);
 
 -- Step 2: Deploy code that writes to new column
 
--- Step 3: Backfill existing rows
+-- Step 3: Backfill existing rows in batches
 UPDATE users SET phone = '' WHERE phone IS NULL;
 
--- Step 4: Make required (if needed)
-ALTER TABLE users MODIFY phone VARCHAR(20) NOT NULL;
+-- Step 4: Add NOT NULL constraint (PostgreSQL validates without lock if default exists)
+ALTER TABLE users ALTER COLUMN phone SET NOT NULL;
 ```
 
-### Renaming a Column (Zero-Downtime)
+### Renaming a Column (Zero-Downtime, PostgreSQL)
 
 ```sql
 -- Step 1: Add new column
@@ -611,10 +699,13 @@ UPDATE users SET email_address = email;
 ALTER TABLE users DROP COLUMN email;
 ```
 
-### Migration Template
+### Migration Template (Alembic — this project's standard)
+
+Use the Alembic Python template (see "Project ORM Pattern" section above).
+For raw SQL migrations in PostgreSQL, DDL is transactional — wrap in a transaction:
 
 ```sql
--- Migration: YYYYMMDDHHMMSS_description.sql
+-- Migration: YYYYMMDDHHMMSS_description.sql (PostgreSQL)
 
 -- UP
 BEGIN;
@@ -624,7 +715,7 @@ COMMIT;
 
 -- DOWN
 BEGIN;
-DROP INDEX idx_users_phone ON users;
+DROP INDEX idx_users_phone;
 ALTER TABLE users DROP COLUMN phone;
 COMMIT;
 ```
@@ -634,19 +725,22 @@ COMMIT;
 <details>
 <summary><strong>Deep Dive: Performance Optimization</strong></summary>
 
-### Query Analysis
+### Query Analysis (PostgreSQL)
 
 ```sql
-EXPLAIN SELECT * FROM orders
+-- Use EXPLAIN ANALYZE for actual execution stats
+EXPLAIN (ANALYZE, BUFFERS, FORMAT TEXT)
+SELECT * FROM orders
 WHERE customer_id = 123 AND status = 'pending';
 ```
 
 | Look For | Meaning |
 |----------|---------|
-| type: ALL | Full table scan (bad) |
-| type: ref | Index used (good) |
-| key: NULL | No index used |
-| rows: high | Many rows scanned |
+| Seq Scan | Full table scan — consider an index |
+| Index Scan | Index used — good |
+| Bitmap Heap Scan | Index + heap fetch — acceptable for range queries |
+| rows= (estimated vs actual large gap) | Stale statistics — run `ANALYZE table_name` |
+| Buffers: read (high) | Data not in cache — may need more `shared_buffers` |
 
 ### N+1 Query Problem
 
