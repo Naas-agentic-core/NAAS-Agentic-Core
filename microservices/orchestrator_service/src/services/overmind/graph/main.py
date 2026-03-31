@@ -222,7 +222,12 @@ class ChatFallbackNode:
             )
 
         emit_telemetry(node_name="ChatFallbackNode", start_time=start_time, state=state)
-        return {"final_response": fallback_response}
+        return {
+            "final_response": {
+                "الإجابة": fallback_response,
+                "المصدر": "chat_fallback",
+            }
+        }
 
 
 class ToolExecutorNode:
