@@ -55,7 +55,9 @@ async def _get_terminal_event_from_persistence(mission_id: int) -> dict[str, obj
                     if isinstance(error_text, str) and error_text.strip():
                         return {
                             "type": "assistant_final",
-                            "payload": {"content": f"{MISSION_FAILURE_FALLBACK_MESSAGE}\n\nالتفاصيل: {error_text}"},
+                            "payload": {
+                                "content": f"{MISSION_FAILURE_FALLBACK_MESSAGE}\n\nالتفاصيل: {error_text}"
+                            },
                         }
             return {
                 "type": "assistant_final",
@@ -282,7 +284,9 @@ async def handle_mission_complex_stream(
         logger.error(f"Error in mission complex handler: {e}", exc_info=True)
         yield {
             "type": "assistant_final",
-            "payload": {"content": "\n⚠️ **حدث خطأ أثناء تنفيذ البحث الخارجي، سأعتمد على المعرفة الداخلية.**\n"},
+            "payload": {
+                "content": "\n⚠️ **حدث خطأ أثناء تنفيذ البحث الخارجي، سأعتمد على المعرفة الداخلية.**\n"
+            },
         }
     finally:
         pump_task_instance = locals().get("pump_task")

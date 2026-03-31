@@ -108,7 +108,9 @@ class InternalRetrieverNode:
             exact_filters["exercise_num"] = filters.exercise_num
         try:
             exact_results = await asyncio.wait_for(
-                research_client.semantic_search(query=filters.raw_query, top_k=5, filters=exact_filters),
+                research_client.semantic_search(
+                    query=filters.raw_query, top_k=5, filters=exact_filters
+                ),
                 timeout=10.0,
             )
 
@@ -240,7 +242,9 @@ class WebSearchFallbackNode:
                 )
                 return {"reranked_docs": [], "used_web": False}
             try:
-                report = await asyncio.wait_for(research_client.deep_research(query_str), timeout=10.0)
+                report = await asyncio.wait_for(
+                    research_client.deep_research(query_str), timeout=10.0
+                )
                 docs = [LlamaDocument(text=report, metadata={"source": "الإنترنت", "score": 0.85})]
             except Exception as e:
                 error = e
