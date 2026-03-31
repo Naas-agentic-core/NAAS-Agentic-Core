@@ -30,6 +30,18 @@ class SearchOrchestrator:
             KeywordStrategy(),
         ]
 
+    @staticmethod
+    def _is_generic_query(request: SearchRequest) -> bool:
+        """يتحقق من كون الاستعلام عامًا جدًا بدون قيود دلالية واضحة."""
+        if not request.q:
+            return False
+        tokens = [token for token in request.q.split() if token.strip()]
+        has_structured_filters = any(
+            value is not None and value != ""
+            for value in request.filters.model_dump(exclude_none=True).values()
+        )
+        return len(tokens) <= 2 and not has_structured_filters
+
     async def search(self, request: SearchRequest) -> list[SearchResult]:
         original_q = request.q
         refined_q = original_q
@@ -63,6 +75,35 @@ class SearchOrchestrator:
         # Update request with refined query for Vector Search
         # We prefer the refined query for semantic search as it likely contains English translation/normalization
         request.q = refined_q
+        generic_query_mode = self._is_generic_query(request)
+
+        if generic_query_mode:
+            logger.info("🧭 Generic query mode active: aggregating relaxed + keyword strategies.")
+            aggregated_results: list[SearchResult] = []
+            seen_ids: set[str] = set()
+            for strategy in self.strategies:
+                if isinstance(strategy, StrictVectorStrategy):
+                    continue
+                req_copy = request.model_copy(deep=True)
+                if isinstance(strategy, KeywordStrategy):
+                    variations = FallbackQueryExpander.generate_variations(original_q)
+                    req_copy.q = variations[-1] if variations else original_q
+                try:
+                    strategy_results = await strategy.execute(req_copy)
+                except Exception as error:
+                    logger.warning(f"Generic mode strategy {strategy.name} failed: {error}")
+                    continue
+                for result in strategy_results:
+                    if result.id in seen_ids:
+                        continue
+                    seen_ids.add(result.id)
+                    aggregated_results.append(result)
+                    if len(aggregated_results) >= request.limit:
+                        break
+                if len(aggregated_results) >= request.limit:
+                    break
+            if aggregated_results:
+                return aggregated_results
 
         # 2. Execute Strategies
         for strategy in self.strategies:

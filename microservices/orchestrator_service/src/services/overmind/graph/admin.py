@@ -91,23 +91,35 @@ class ValidateAccessNode:
         return {**state, "access": "granted"}
 
 
-QUERY_TO_TOOL_MAP = [
-    (r"python|بايثون|\.py|ملفات", "admin.count_python_files"),
-    (r"جدول|table|database|db", "admin.count_database_tables"),
-    (r"مستخدم|user|أعضاء|member", "admin.get_user_count"),
-    (r"خدمة|service|container", "admin.list_microservices"),
-    (r"إحصائيات|stats|كل|full", "admin.calculate_full_stats"),
-]
-
-
 def resolve_tool_deterministic(query: str) -> str:
-    """Rule-first. Zero LLM involvement. Always returns a tool."""
+    """محلل حتمي يحدد أداة الإدارة بدقة اعتماداً على كلمات الهدف الفعلي."""
     query_lower = query.lower()
-    for pattern, tool_name in QUERY_TO_TOOL_MAP:
-        if re.search(pattern, query_lower):
-            validate_tool_name(tool_name)  # contract check
-            return tool_name
-    return "admin.calculate_full_stats"  # safe default
+
+    wants_python = bool(re.search(r"python|بايثون|\.py", query_lower))
+    wants_tables = bool(re.search(r"جدول|جداول|table|tables|database|db", query_lower))
+    wants_users = bool(re.search(r"مستخدم|مستخدمين|user|users|أعضاء|member", query_lower))
+    wants_services = bool(re.search(r"خدمة|خدمات|service|services|container", query_lower))
+    wants_full_stats = bool(re.search(r"إحصائيات|stats|metrics|ملخص|overview|كل", query_lower))
+
+    if wants_python:
+        validate_tool_name("admin.count_python_files")
+        return "admin.count_python_files"
+    if wants_tables:
+        validate_tool_name("admin.count_database_tables")
+        return "admin.count_database_tables"
+    if wants_users:
+        validate_tool_name("admin.get_user_count")
+        return "admin.get_user_count"
+    if wants_services:
+        validate_tool_name("admin.list_microservices")
+        return "admin.list_microservices"
+    if wants_full_stats:
+        validate_tool_name("admin.calculate_full_stats")
+        return "admin.calculate_full_stats"
+
+    # Queries containing only generic words like "عدد" / "ملفات" should not collapse to Python files.
+    validate_tool_name("admin.calculate_full_stats")
+    return "admin.calculate_full_stats"
 
 
 class ResolveToolNode:
