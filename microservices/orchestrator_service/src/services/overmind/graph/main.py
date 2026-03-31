@@ -80,6 +80,23 @@ ADMIN_METRIC_TRIGGERS = {
     "python",
 }
 
+CHAT_INTENT_TRIGGERS = {
+    "السلام عليكم",
+    "مرحبا",
+    "اهلا",
+    "أهلا",
+    "هلا",
+    "hello",
+    "hi",
+    "hey",
+    "good morning",
+    "good evening",
+    "كيف حالك",
+    "من أنت",
+    "شكرا",
+    "شكراً",
+}
+
 
 def emergency_intent_guard(query: str) -> bool:
     """
@@ -131,6 +148,11 @@ class SupervisorNode:
             emit_telemetry(node_name="SupervisorNode", start_time=start_time, state=state)
             return {"intent": intent}
 
+        query_normalized = query.strip().lower()
+        if any(trigger in query_normalized for trigger in CHAT_INTENT_TRIGGERS):
+            emit_telemetry(node_name="SupervisorNode", start_time=start_time, state=state)
+            return {"intent": "chat"}
+
         for pattern in ADMIN_PATTERNS:
             if re.search(pattern, query, re.IGNORECASE):
                 emit_telemetry(node_name="SupervisorNode", start_time=start_time, state=state)
@@ -149,9 +171,58 @@ class SupervisorNode:
         except Exception:
             pass
 
+        if len(query_normalized.split()) <= 3 and "?" not in query_normalized and "؟" not in query:
+            emit_telemetry(node_name="SupervisorNode", start_time=start_time, state=state)
+            return {"intent": "chat"}
+
         intent = "search"
         emit_telemetry(node_name="SupervisorNode", start_time=start_time, state=state)
         return {"intent": intent}
+
+
+class ChatFallbackSignature(dspy.Signature):
+    """صياغة رد محادثي طبيعي ومدروس للمحادثات العامة خارج مسارات البحث."""
+
+    conversation: str = dspy.InputField()
+    response: str = dspy.OutputField(desc="رد عربي طبيعي ومفيد للمستخدم")
+
+
+class ChatFallbackNode:
+    def __init__(self) -> None:
+        self.generator = dspy.Predict(ChatFallbackSignature)
+
+    async def __call__(self, state: AgentState) -> dict:
+        import time
+
+        from .telemetry import emit_telemetry
+
+        start_time = time.time()
+        query = state.get("query", "")
+        messages = state.get("messages", [])
+
+        recent_messages: list[str] = []
+        for msg in messages[-6:]:
+            content = getattr(msg, "content", None)
+            if isinstance(content, str) and content.strip():
+                recent_messages.append(content.strip())
+
+        conversation = "\n".join(recent_messages) if recent_messages else query
+        fallback_response = "وعليكم السلام! أنا هنا للمساعدة. أخبرني بما تحتاجه وسأتابع معك خطوة بخطوة."
+        try:
+            prediction = await asyncio.to_thread(self.generator, conversation=conversation)
+            model_response = getattr(prediction, "response", "")
+            if isinstance(model_response, str) and model_response.strip():
+                fallback_response = model_response.strip()
+        except Exception as error:
+            emit_telemetry(
+                node_name="ChatFallbackNode",
+                start_time=start_time,
+                state=state,
+                error=error,
+            )
+
+        emit_telemetry(node_name="ChatFallbackNode", start_time=start_time, state=state)
+        return {"final_response": fallback_response}
 
 
 class ToolExecutorNode:
@@ -211,9 +282,12 @@ def route_intent(state: AgentState) -> str:
 
     logger = logging.getLogger("graph")
     intent = state.get("intent", "search")
-    node = {"search": "query_analyzer", "admin": "admin_agent", "tool": "tool_executor"}.get(
-        intent, "query_analyzer"
-    )
+    node = {
+        "search": "query_analyzer",
+        "admin": "admin_agent",
+        "tool": "tool_executor",
+        "chat": "chat_fallback",
+    }.get(intent, "query_analyzer")
     logger.info(f"SUPERVISOR_NODE → routing to → {node}")
     return intent
 
@@ -247,13 +321,19 @@ def create_unified_graph(admin_app=None):
     graph.add_node("web_fallback", web_search_fallback_node())
     graph.add_node("admin_agent", AdminAgentNode(admin_app=admin_app))
     graph.add_node("tool_executor", ToolExecutorNode())
+    graph.add_node("chat_fallback", ChatFallbackNode())
     graph.add_node("synthesizer", synthesizer_node())
     graph.add_node("validator", ValidatorNode())
 
     graph.add_conditional_edges(
         "supervisor",
         route_intent,
-        {"search": "query_analyzer", "admin": "admin_agent", "tool": "tool_executor"},
+        {
+            "search": "query_analyzer",
+            "admin": "admin_agent",
+            "tool": "tool_executor",
+            "chat": "chat_fallback",
+        },
     )
 
     graph.add_edge("query_analyzer", "retriever")
@@ -267,6 +347,7 @@ def create_unified_graph(admin_app=None):
     graph.add_edge(
         "tool_executor", "validator"
     )  # tool_executor -> validator directly, bypassing synthesizer to not break admin outputs
+    graph.add_edge("chat_fallback", "validator")
     graph.add_edge("synthesizer", "validator")
 
     graph.add_conditional_edges("validator", check_quality, {"pass": END, "fail": "supervisor"})
