@@ -12,6 +12,8 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+import jwt
+
 os.environ.setdefault("ENVIRONMENT", "testing")
 os.environ.setdefault("LLM_MOCK_MODE", "1")
 os.environ.setdefault("LOG_LEVEL", "DEBUG")
@@ -364,8 +366,6 @@ def test_app(static_dir: Path) -> FastAPI:
 
 
 from datetime import UTC, datetime, timedelta
-
-import jwt
 
 
 @pytest.fixture
