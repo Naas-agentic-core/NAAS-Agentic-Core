@@ -67,19 +67,13 @@ class QueryAnalyzerNode:
                 else None,
             )
         except Exception as e:
-            logger.warning(f"DSPy parsing failed, falling back to heuristics: {e}")
+            logger.warning(f"DSPy parsing failed, returning empty filters: {e}")
             error = e
-            import re
-
-            year_match = re.search(r"20\d\d", query)
-            year = int(year_match.group(0)) if year_match else None
-            branch = "علوم تجريبية" if "تجريبية" in query else ""
-            subject = "احتمالات" if "احتمالات" in query else ""
             filters = QueryFilters(
                 raw_query=query,
-                year=year,
-                subject=subject,
-                branch=branch,
+                year=None,
+                subject="",
+                branch="",
                 exercise_num=None,
             )
 

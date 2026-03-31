@@ -417,18 +417,6 @@ class OrchestratorAgent:
             words = [w for w in question.split() if w not in stop_words and len(w) > 2]
             params["q"] = " ".join(words[:3]) if words else question
 
-        if "2024" in question:
-            params["year"] = 2024
-        elif "2023" in question:
-            params["year"] = 2023
-        elif "2022" in question:
-            params["year"] = 2022
-
-        if any(w in q_lower for w in ["math", "رياضيات", "رياضه"]):
-            params["subject"] = "Mathematics"
-        elif any(w in q_lower for w in ["physics", "فيزياء"]):
-            params["subject"] = "Physics"
-
         logger.info(f"Heuristic extracted params: {params}")
         return params
 
