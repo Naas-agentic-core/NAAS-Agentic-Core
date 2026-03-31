@@ -36,7 +36,11 @@ class LlamaIndexRetriever:
         )
 
     def search(
-        self, query: str, limit: int = 5, filters: dict | None = None
+        self,
+        query: str,
+        limit: int = 5,
+        filters: dict | None = None,
+        similarity_threshold: float | None = None,
     ) -> list[NodeWithScore]:
         """
         Semantic search using LlamaIndex with support for Metadata Filters.
@@ -54,7 +58,14 @@ class LlamaIndexRetriever:
             if match_filters:
                 llama_filters = MetadataFilters(filters=match_filters)
 
-        retriever = self.index.as_retriever(similarity_top_k=limit, filters=llama_filters)
+        retriever_kwargs: dict[str, object] = {
+            "similarity_top_k": limit,
+            "filters": llama_filters,
+        }
+        if similarity_threshold is not None:
+            retriever_kwargs["similarity_cutoff"] = similarity_threshold
+
+        retriever = self.index.as_retriever(**retriever_kwargs)
 
         return retriever.retrieve(query)
 

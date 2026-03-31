@@ -35,6 +35,7 @@ class BaseVectorStrategy(SearchStrategy):
 
     def __init__(self):
         self.db_url = os.environ.get("DATABASE_URL")
+        self.similarity_threshold = float(os.environ.get("SEMANTIC_SIMILARITY_THRESHOLD", "0.72"))
 
     async def _search_vectors(self, query: str, filters: dict, limit: int) -> list[str]:
         """
@@ -50,7 +51,18 @@ class BaseVectorStrategy(SearchStrategy):
             # Fetch more candidates to allow for reranking
             retrieval_limit = max(limit * 3, limit + 20)
 
-            nodes = retriever.search(query, limit=retrieval_limit, filters=filters)
+            nodes = retriever.search(
+                query,
+                limit=retrieval_limit,
+                filters=filters,
+                similarity_threshold=self.similarity_threshold,
+            )
+            nodes = [
+                node
+                for node in nodes
+                if isinstance(getattr(node, "score", None), (int, float))
+                and float(getattr(node, "score", 0.0)) >= self.similarity_threshold
+            ]
 
             if nodes:
                 # Rerank
@@ -89,6 +101,7 @@ class BaseVectorStrategy(SearchStrategy):
             "limit": request.limit,
             "lang": request.filters.lang,
             "type": request.filters.type,
+            "preserve_content_id_order": True,
         }
 
         if apply_filters:

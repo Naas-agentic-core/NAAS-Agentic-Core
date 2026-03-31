@@ -32,6 +32,7 @@ class ContentService:
         type: str | None = None,
         lang: str | None = None,
         content_ids: list[str] | None = None,
+        preserve_content_id_order: bool = False,
         limit: int = 10,
     ) -> list[dict[str, object]]:
         """يبني استعلام بحث هجين مع فلاتر وصفية متوافقة مع الاختبارات."""
@@ -50,6 +51,16 @@ class ContentService:
         builder.add_filter("i.year", year)
         builder.add_filter("i.type", type)
         builder.add_filter("i.lang", lang)
+
+        has_structured_filters = any(
+            value is not None and value != ""
+            for value in (level, norm_subject, norm_branch, norm_set, year, type, lang)
+        )
+        if preserve_content_id_order and content_ids:
+            builder.set_order_by_vector_ids(content_ids)
+        elif q and not has_structured_filters and not content_ids:
+            builder.set_order_by_text_relevance()
+
         builder.set_limit(limit)
 
         query_str, params = builder.build()
