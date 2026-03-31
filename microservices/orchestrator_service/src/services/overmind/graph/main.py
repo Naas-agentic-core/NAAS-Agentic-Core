@@ -99,16 +99,27 @@ CHAT_INTENT_TRIGGERS = {
 }
 
 
+import re
+
+ADMIN_PATTERNS = [
+    r"(كم|عدد|احسب|حساب|كمية)\s*(عدد)?\s*(ملفات|ملف|بايثون)",
+    r"(كم|عدد)\s*(عدد)?\s*(جداول|جدول|قاعدة البيانات)",
+    r"(كم|عدد)\s*(عدد)?\s*(مستخدمين|مستخدم|الأعضاء)",
+    r"(كم|عدد)\s*(عدد)?\s*(خدمات|الخدمات|microservices)",
+    r"(إحصائيات|stats|metrics|system info|معلومات النظام)",
+    r"(count|how many)\s*(files|tables|users|services|python)",
+]
+
+
 def emergency_intent_guard(query: str) -> bool:
     """
     DETERMINISTIC check BEFORE any LLM involvement.
     If True -> FORCE admin tool path, no exceptions.
     """
     query_lower = query.lower()
-    return any(trigger in query_lower for trigger in ADMIN_METRIC_TRIGGERS)
+    # Require at least one exact match from the patterns to avoid trapping generic words
+    return any(re.search(pattern, query_lower) for pattern in ADMIN_PATTERNS)
 
-
-import re
 
 import dspy
 
@@ -140,16 +151,6 @@ def _configure_dspy() -> None:
         logging.getLogger("graph").warning(
             "CRITICAL: DSPy LM configuration failed; proceeding without LM. reason=%s", exc
         )
-
-
-ADMIN_PATTERNS = [
-    r"(كم|عدد|احسب|حساب|كمية)\s*(عدد)?\s*(ملفات|ملف|بايثون)",
-    r"(كم|عدد)\s*(عدد)?\s*(جداول|جدول|قاعدة البيانات)",
-    r"(كم|عدد)\s*(عدد)?\s*(مستخدمين|مستخدم|الأعضاء)",
-    r"(كم|عدد)\s*(عدد)?\s*(خدمات|الخدمات|microservices)",
-    r"(إحصائيات|stats|metrics|system info|معلومات النظام)",
-    r"(count|how many)\s*(files|tables|users|services|python)",
-]
 
 
 class IntentClassifier(dspy.Signature):
@@ -206,9 +207,7 @@ class SupervisorNode:
             ):
                 emit_telemetry(node_name="SupervisorNode", start_time=start_time, state=state)
                 return {"intent": "admin"}
-            if (
-                hasattr(result, "is_chat") and str(result.is_chat).lower() == "true" and conf > 0.70
-            ):
+            if hasattr(result, "is_chat") and str(result.is_chat).lower() == "true" and conf > 0.70:
                 emit_telemetry(node_name="SupervisorNode", start_time=start_time, state=state)
                 return {"intent": "chat"}
         except Exception:

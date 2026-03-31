@@ -83,7 +83,9 @@ class ContentSearchQuery:
             title_key = f"tq_{index}"
             body_key = f"bq_{index}"
             title_relevance_terms.append(f"CASE WHEN i.title LIKE :{title_key} THEN 1 ELSE 0 END")
-            body_relevance_terms.append(f"CASE WHEN cs.plain_text LIKE :{body_key} THEN 1 ELSE 0 END")
+            body_relevance_terms.append(
+                f"CASE WHEN cs.plain_text LIKE :{body_key} THEN 1 ELSE 0 END"
+            )
 
         title_score = " + ".join(title_relevance_terms) if title_relevance_terms else "0"
         body_score = " + ".join(body_relevance_terms) if body_relevance_terms else "0"
