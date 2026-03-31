@@ -3,6 +3,23 @@ import { useEffect, useRef, useState, useCallback } from "react";
 const MAX_BACKOFF = 10000;
 const FATAL_CODES = new Set([4401, 4403]);
 
+const parseAssistantErrorEnvelope = (rawData) => {
+  if (typeof rawData !== "string") return null;
+  const trimmed = rawData.trim();
+  if (!trimmed.startsWith("{")) return null;
+
+  try {
+    const parsed = JSON.parse(trimmed);
+    if (parsed?.type === "assistant_error") {
+      return parsed?.payload?.content || "Unknown assistant error";
+    }
+  } catch (_error) {
+    return null;
+  }
+
+  return null;
+};
+
 /**
  * Hook to manage a robust WebSocket connection.
  * @param {string} wsUrl - The WebSocket URL.
@@ -45,6 +62,17 @@ export function useRealtimeConnection(wsUrl, token) {
 
         ws.onmessage = (event) => {
           if (!mountedRef.current) return;
+
+          const directAssistantError = parseAssistantErrorEnvelope(event.data);
+          if (directAssistantError) {
+            window.dispatchEvent(
+              new CustomEvent("agent:notification", {
+                detail: { level: "error", message: String(directAssistantError) },
+              })
+            );
+            return;
+          }
+
           try {
             const data = JSON.parse(event.data);
             // Broadcast agent events

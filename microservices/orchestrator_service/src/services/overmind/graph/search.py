@@ -32,10 +32,10 @@ class AnalyzeQuery(dspy.Signature):
 
 class QueryFilters(BaseModel):
     raw_query: str
-    year: int = 0
+    year: int | None = None
     subject: str = ""
     branch: str = ""
-    exercise_num: int = 0
+    exercise_num: int | None = None
     language: str = "ar"
     needs_web: bool = False
 
@@ -59,12 +59,12 @@ class QueryAnalyzerNode:
             )
             filters = QueryFilters(
                 raw_query=query,
-                year=int(prediction.year) if str(prediction.year).isdigit() else 2024,
+                year=int(prediction.year) if str(prediction.year).isdigit() else None,
                 subject=str(prediction.subject),
                 branch=str(prediction.branch),
                 exercise_num=int(prediction.exercise_num)
                 if str(prediction.exercise_num).isdigit()
-                else 1,
+                else None,
             )
         except Exception as e:
             logger.warning(f"DSPy parsing failed, falling back to heuristics: {e}")
@@ -72,11 +72,15 @@ class QueryAnalyzerNode:
             import re
 
             year_match = re.search(r"20\d\d", query)
-            year = int(year_match.group(0)) if year_match else 2024
+            year = int(year_match.group(0)) if year_match else None
             branch = "علوم تجريبية" if "تجريبية" in query else ""
             subject = "احتمالات" if "احتمالات" in query else ""
             filters = QueryFilters(
-                raw_query=query, year=year, subject=subject, branch=branch, exercise_num=1
+                raw_query=query,
+                year=year,
+                subject=subject,
+                branch=branch,
+                exercise_num=None,
             )
 
         emit_telemetry(
@@ -93,12 +97,15 @@ class InternalRetrieverNode:
         start_time = time.time()
         filters: QueryFilters = state.get("filters")
 
-        exact_filters = {
-            "year": filters.year,
-            "branch": filters.branch,
-            "subject": filters.subject,
-            "exercise_num": filters.exercise_num,
-        }
+        exact_filters: dict[str, int | str] = {}
+        if filters.year is not None:
+            exact_filters["year"] = filters.year
+        if filters.branch:
+            exact_filters["branch"] = filters.branch
+        if filters.subject:
+            exact_filters["subject"] = filters.subject
+        if filters.exercise_num is not None:
+            exact_filters["exercise_num"] = filters.exercise_num
         try:
             exact_results = await asyncio.wait_for(
                 research_client.semantic_search(query=filters.raw_query, top_k=5, filters=exact_filters),
