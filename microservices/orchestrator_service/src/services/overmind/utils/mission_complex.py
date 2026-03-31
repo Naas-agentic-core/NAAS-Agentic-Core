@@ -20,6 +20,9 @@ from microservices.orchestrator_service.src.services.overmind.entrypoint import 
 from microservices.orchestrator_service.src.services.overmind.state import MissionStateManager
 
 logger = logging.getLogger(__name__)
+MISSION_FAILURE_FALLBACK_MESSAGE = (
+    "⚠️ تعذر إكمال البحث الخارجي حالياً. سأتابع الإجابة بالاعتماد على المعرفة الداخلية المتاحة."
+)
 
 active_background_tasks = set()
 
@@ -51,12 +54,12 @@ async def _get_terminal_event_from_persistence(mission_id: int) -> dict[str, obj
                     error_text = payload.get("error") if isinstance(payload, dict) else None
                     if isinstance(error_text, str) and error_text.strip():
                         return {
-                            "type": "assistant_error",
-                            "payload": {"content": f"❌ فشلت المهمة: {error_text}"},
+                            "type": "assistant_final",
+                            "payload": {"content": f"{MISSION_FAILURE_FALLBACK_MESSAGE}\n\nالتفاصيل: {error_text}"},
                         }
             return {
-                "type": "assistant_error",
-                "payload": {"content": "❌ فشلت المهمة قبل اكتمال البث."},
+                "type": "assistant_final",
+                "payload": {"content": MISSION_FAILURE_FALLBACK_MESSAGE},
             }
 
     return None
@@ -199,9 +202,9 @@ async def handle_mission_complex_stream(
                     idle_cycles = 0
                     continue
                 yield {
-                    "type": "assistant_error",
+                    "type": "assistant_final",
                     "payload": {
-                        "content": "❌ فشل تنفيذ المهمة: انتهت مهلة انتظار أحداث التنفيذ من نظام المهام."
+                        "content": "⚠️ انتهت مهلة تنفيذ البحث الخارجي، سأكمل باستخدام المعرفة الداخلية."
                     },
                 }
                 break
@@ -214,9 +217,9 @@ async def handle_mission_complex_stream(
                     yield terminal_event
                 else:
                     yield {
-                        "type": "assistant_error",
+                        "type": "assistant_final",
                         "payload": {
-                            "content": "❌ توقف بث أحداث المهمة قبل ظهور نتيجة نهائية، ولم نعثر على حالة نهائية محفوظة."
+                            "content": "⚠️ توقف البث قبل النتيجة النهائية. سأكمل الإجابة اعتماداً على المعرفة الداخلية."
                         },
                     }
                 break
@@ -268,9 +271,9 @@ async def handle_mission_complex_stream(
             elif evt_type == "mission_failed":
                 if not processed_final:
                     yield {
-                        "type": "assistant_error",
+                        "type": "assistant_final",
                         "payload": {
-                            "content": f"❌ فشلت المهمة: {payload.get('error') or 'Unknown error'}"
+                            "content": f"{MISSION_FAILURE_FALLBACK_MESSAGE}\n\nالتفاصيل: {payload.get('error') or 'Unknown error'}"
                         },
                     }
                 break
@@ -278,8 +281,8 @@ async def handle_mission_complex_stream(
     except Exception as e:
         logger.error(f"Error in mission complex handler: {e}", exc_info=True)
         yield {
-            "type": "assistant_error",
-            "payload": {"content": "\n🛑 **حدث خطأ حرج أثناء تنفيذ المهمة.**\n"},
+            "type": "assistant_final",
+            "payload": {"content": "\n⚠️ **حدث خطأ أثناء تنفيذ البحث الخارجي، سأعتمد على المعرفة الداخلية.**\n"},
         }
     finally:
         pump_task_instance = locals().get("pump_task")
@@ -398,8 +401,13 @@ def _format_event_to_message(event_data: dict) -> dict | None:
         # 2. Handle Failure
         if event_type in (MissionEventType.MISSION_FAILED, "mission_failed"):
             return {
-                "type": "assistant_error",
-                "payload": {"content": f"💀 **فشل:** {payload.get('error')}"},
+                "type": "assistant_final",
+                "payload": {
+                    "content": (
+                        f"{MISSION_FAILURE_FALLBACK_MESSAGE}\n\n"
+                        f"التفاصيل: {payload.get('error') or 'Unknown error'}"
+                    )
+                },
             }
 
         # 3. Handle Status/Progress (Assistant Delta)

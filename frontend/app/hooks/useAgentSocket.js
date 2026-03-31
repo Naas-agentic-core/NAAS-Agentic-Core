@@ -65,6 +65,36 @@ const generateId = () => {
     return Math.random().toString(36).substr(2, 9) + Date.now().toString(36);
 };
 
+const parseNestedAssistantError = (value) => {
+    if (typeof value !== 'string') return null;
+    const trimmed = value.trim();
+    if (!trimmed.startsWith('{')) return null;
+
+    try {
+        const parsed = JSON.parse(trimmed);
+        if (parsed && parsed.type === 'assistant_error') {
+            const content = parsed?.payload?.content;
+            return typeof content === 'string' && content.trim() ? content : 'Unknown assistant error';
+        }
+    } catch (_error) {
+        return null;
+    }
+
+    return null;
+};
+
+const notifyAgentError = (message) => {
+    if (typeof window === 'undefined') return;
+    window.dispatchEvent(
+        new CustomEvent('agent:notification', {
+            detail: {
+                level: 'error',
+                message,
+            },
+        })
+    );
+};
+
 export const useAgentSocket = (endpoint, token, onConversationUpdate) => {
     const [messages, setMessages] = useState([]);
     const [conversationId, setConversationId] = useState(null);
@@ -103,6 +133,11 @@ export const useAgentSocket = (endpoint, token, onConversationUpdate) => {
             } else if (type === 'delta' || type === 'assistant_delta') {
                 const content = payload?.content || '';
                 if (!content) return;
+                const nestedAssistantError = parseNestedAssistantError(content);
+                if (nestedAssistantError) {
+                    notifyAgentError(nestedAssistantError);
+                    return;
+                }
 
                 setMessages(prev => {
                     const last = prev[prev.length - 1];
@@ -123,6 +158,11 @@ export const useAgentSocket = (endpoint, token, onConversationUpdate) => {
                 });
             } else if (type === 'assistant_final') {
                 const content = payload?.content || '';
+                const nestedAssistantError = parseNestedAssistantError(content);
+                if (nestedAssistantError) {
+                    notifyAgentError(nestedAssistantError);
+                    return;
+                }
                 setMessages(prev => {
                     const last = prev[prev.length - 1];
                     if (last && last.role === 'assistant' && !last.isComplete && !last.isError) {
@@ -137,17 +177,22 @@ export const useAgentSocket = (endpoint, token, onConversationUpdate) => {
                 refreshConversationHistory();
             } else if (type === 'assistant_fallback') {
                  const content = payload?.content || '';
+                 const nestedAssistantError = parseNestedAssistantError(content);
+                 if (nestedAssistantError) {
+                    notifyAgentError(nestedAssistantError);
+                    return;
+                 }
                  if (content) {
                     addMessage({ id: generateId(), role: 'assistant', content: content, isComplete: true });
                  }
                  refreshConversationHistory();
             } else if (type === 'error') {
                 const details = payload?.details || 'Unknown error';
-                addMessage({ id: generateId(), role: 'assistant', content: `Error: ${details}`, isError: true });
+                notifyAgentError(String(details));
                 refreshConversationHistory();
             } else if (type === 'assistant_error') {
                 const content = payload?.content || 'Unknown assistant error';
-                addMessage({ id: generateId(), role: 'assistant', content: `Error: ${content}`, isError: true });
+                notifyAgentError(String(content));
                 refreshConversationHistory();
             }
         };

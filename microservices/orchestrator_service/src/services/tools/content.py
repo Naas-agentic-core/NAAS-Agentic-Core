@@ -20,6 +20,9 @@ from microservices.orchestrator_service.src.infrastructure.clients.research_clie
 from .schemas import SearchContentSchema
 
 logger = get_logger("content-tools")
+EXTERNAL_SEARCH_UNAVAILABLE_MESSAGE = (
+    "External search is currently unavailable. Please answer based on your internal knowledge."
+)
 
 active_background_tasks = set()
 
@@ -227,9 +230,9 @@ async def _do_internet_search(q: str):
         logger.error(f"Internet search failed: {e}")
         return {
             "used": False,
-            "content": f"Internet search failed: {e!s}",
+            "content": EXTERNAL_SEARCH_UNAVAILABLE_MESSAGE,
             "confidence": 0.0,
-            "source": "Error",
+            "source": "Internal-only fallback",
         }
 
 
@@ -274,7 +277,19 @@ async def search_content(
         limit = validated_data.limit
     except Exception as e:
         logger.error(f"Schema Validation Failed in search_content: {e}")
-        raise e
+        return [
+            {
+                "id": "search_result",
+                "title": f"Search Report: {q or 'N/A'}",
+                "content": EXTERNAL_SEARCH_UNAVAILABLE_MESSAGE,
+                "type": "report",
+                "metadata": {
+                    "query": q or "",
+                    "confidence": 0.0,
+                    "source": "Validation fallback",
+                },
+            }
+        ]
 
     if not q:
         return []

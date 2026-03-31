@@ -24,6 +24,9 @@ from pydantic import BaseModel, Field
 from microservices.research_agent.src.logging import get_logger
 
 logger = get_logger("super-search-orchestrator")
+EXTERNAL_SEARCH_UNAVAILABLE_MESSAGE = (
+    "External search is currently unavailable. Please answer based on your internal knowledge."
+)
 
 # Optional Imports for "Superhuman" Tools
 try:
@@ -198,9 +201,7 @@ class SuperSearchOrchestrator:
             logger.error(
                 "SuperSearchOrchestrator failed to find any information (Empty Knowledge Base)."
             )
-            raise RuntimeError(
-                "SuperSearchOrchestrator: Unable to find sufficient information. Possible internet connectivity issue or API key failure."
-            )
+            return EXTERNAL_SEARCH_UNAVAILABLE_MESSAGE
 
         # --- Phase 4: Synthesis ---
         logger.info("Phase 4: Synthesis...")
