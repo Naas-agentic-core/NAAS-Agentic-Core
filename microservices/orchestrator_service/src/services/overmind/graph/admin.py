@@ -1,4 +1,5 @@
 import re
+import uuid
 from datetime import datetime
 from typing import TypedDict
 
@@ -242,7 +243,7 @@ class AdminAgentNode:
     async def __call__(self, state: AgentState) -> dict[str, object]:
         if not self.admin_app:
             raise RuntimeError("AdminAgentNode missing compiled admin_app")
-        config = {"configurable": {"thread_id": "admin_run"}}
+        config = {"configurable": {"thread_id": str(uuid.uuid4())}}
 
         # Merge state into dict for admin_app
         inputs = dict(state)

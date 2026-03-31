@@ -19,13 +19,17 @@ logger = get_logger("search-graph")
 
 # --- NODE 1: QueryAnalyzerNode ---
 class AnalyzeQuery(dspy.Signature):
-    """Extract structured filters from Arabic query"""
+    """Extract structured filters from Arabic query.
+
+    Do NOT guess or infer the year or exercise number.
+    If it is not explicitly stated in the prompt, you MUST output None.
+    """
 
     raw_query: str = dspy.InputField()
-    year: int = dspy.OutputField()
+    year: int | None = dspy.OutputField()
     subject: str = dspy.OutputField()
     branch: str = dspy.OutputField()
-    exercise_num: int = dspy.OutputField()
+    exercise_num: int | None = dspy.OutputField()
     language: str = dspy.OutputField()
     needs_web: bool = dspy.OutputField()
 
@@ -53,18 +57,22 @@ class QueryAnalyzerNode:
         error = None
 
         try:
+            def _coerce_nullable_int(value: object) -> int | None:
+                text_value = str(value).strip().lower()
+                if text_value in {"", "none", "null"}:
+                    return None
+                return int(text_value) if text_value.isdigit() else None
+
             prediction = await asyncio.wait_for(
                 anyio.to_thread.run_sync(lambda: self.analyzer(raw_query=query)),
                 timeout=10.0,
             )
             filters = QueryFilters(
                 raw_query=query,
-                year=int(prediction.year) if str(prediction.year).isdigit() else None,
+                year=_coerce_nullable_int(getattr(prediction, "year", None)),
                 subject=str(prediction.subject),
                 branch=str(prediction.branch),
-                exercise_num=int(prediction.exercise_num)
-                if str(prediction.exercise_num).isdigit()
-                else None,
+                exercise_num=_coerce_nullable_int(getattr(prediction, "exercise_num", None)),
             )
         except Exception as e:
             logger.warning(f"DSPy parsing failed, returning empty filters: {e}")

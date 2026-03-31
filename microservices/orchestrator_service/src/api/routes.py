@@ -557,9 +557,9 @@ async def _stream_chat_langgraph(
 
     async def _runner():
         try:
-            app_graph = getattr(websocket.app.state, "app_graph", None)
-            if not app_graph:
-                app_graph = create_unified_graph()
+            _graph = app_graph or getattr(websocket.app.state, "app_graph", None)
+            if not _graph:
+                _graph = create_unified_graph()
             config = {"configurable": {"thread_id": str(conversation_id)}}
             inputs: dict[str, object] = {
                 "query": objective,
@@ -567,7 +567,7 @@ async def _stream_chat_langgraph(
             }
             inputs = _merge_admin_inputs(inputs, admin_payload if chat_scope == "admin" else None)
 
-            res = await app_graph.ainvoke(inputs, config=config)
+            res = await _graph.ainvoke(inputs, config=config)
 
             if queue.full():
                 await queue.get()
@@ -732,7 +732,7 @@ async def _run_chat_langgraph(
     """يشغّل LangGraph كعمود فقري لرحلة chat ويعيد حمولة موحدة قابلة للبث (HTTP legacy fallback)."""
     if not app_graph:
         app_graph = create_unified_graph()
-    config = {"configurable": {"thread_id": "http_run"}}
+    config = {"configurable": {"thread_id": str(uuid.uuid4())}}
     inputs: dict[str, object] = {"query": objective, "messages": [HumanMessage(content=objective)]}
     inputs = _merge_admin_inputs(inputs, admin_payload)
 
@@ -1070,9 +1070,16 @@ async def chat_with_agent_endpoint(request: ChatRequest, fastapi_req: Request) -
         async def _admin_stream():
             try:
                 admin_app = getattr(fastapi_req.app.state, "admin_app", None)
-                admin_payload = request.context if isinstance(request.context, dict) else {}
+                if isinstance(request.context, dict):
+                    request.context["is_admin"] = True
+                    request.context["role"] = "admin"
+                    admin_payload = request.context
+                else:
+                    admin_payload = {"is_admin": True, "role": "admin"}
                 admin_inputs = _merge_admin_inputs({"query": request.question}, admin_payload)
-                res = await admin_app.ainvoke(admin_inputs)
+                res = await admin_app.ainvoke(
+                    admin_inputs, config={"configurable": {"thread_id": str(uuid.uuid4())}}
+                )
                 final_resp = res.get("final_response")
                 if isinstance(final_resp, dict):
                     response_text = await _serialize_json_async(final_resp)

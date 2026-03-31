@@ -1,4 +1,5 @@
 import asyncio
+import os
 from operator import add
 from typing import Annotated, TypedDict
 
@@ -110,6 +111,36 @@ def emergency_intent_guard(query: str) -> bool:
 import re
 
 import dspy
+
+
+def _configure_dspy() -> None:
+    """يضبط نموذج DSPy عالميًا في مرحلة الإقلاع باستخدام مفاتيح البيئة المتاحة."""
+    if dspy.settings.lm is not None:
+        return
+
+    openrouter_key = os.getenv("OPENROUTER_API_KEY", "").strip()
+    if not openrouter_key:
+        import logging
+
+        logging.getLogger("graph").warning(
+            "CRITICAL: DSPy LM configuration skipped because OPENROUTER_API_KEY is missing."
+        )
+        return
+
+    try:
+        lm = dspy.OpenAI(
+            api_base="https://openrouter.ai/api/v1",
+            api_key=openrouter_key,
+            model="nvidia/nemotron-3-nano-30b-a3b:free",
+        )
+        dspy.settings.configure(lm=lm)
+    except Exception as exc:
+        import logging
+
+        logging.getLogger("graph").warning(
+            "CRITICAL: DSPy LM configuration failed; proceeding without LM. reason=%s", exc
+        )
+
 
 ADMIN_PATTERNS = [
     r"(كم|عدد|احسب|حساب|كمية)\s*(عدد)?\s*(ملفات|ملف|بايثون)",
@@ -321,6 +352,7 @@ def check_quality(state: AgentState) -> str:
 
 
 def create_unified_graph(admin_app=None):
+    _configure_dspy()
     graph = StateGraph(AgentState)
 
     (
