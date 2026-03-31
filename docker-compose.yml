@@ -43,6 +43,7 @@ services:
       - cogniforge-network
     volumes:
       - ./infra/postgres/init-planning-db.sh:/docker-entrypoint-initdb.d/init.sh
+      - postgres-planning-data:/var/lib/postgresql/data
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password}
@@ -63,6 +64,7 @@ services:
       - cogniforge-network
     volumes:
       - ./infra/postgres/init-memory-db.sh:/docker-entrypoint-initdb.d/init.sh
+      - postgres-memory-data:/var/lib/postgresql/data
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password}
@@ -83,6 +85,7 @@ services:
       - cogniforge-network
     volumes:
       - ./infra/postgres/init-user-db.sh:/docker-entrypoint-initdb.d/init.sh
+      - postgres-user-data:/var/lib/postgresql/data
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password}
@@ -103,6 +106,7 @@ services:
       - cogniforge-network
     volumes:
       - ./infra/postgres/init-research-db.sh:/docker-entrypoint-initdb.d/init.sh
+      - postgres-research-data:/var/lib/postgresql/data
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password}
@@ -123,6 +127,7 @@ services:
       - cogniforge-network
     volumes:
       - ./infra/postgres/init-reasoning-db.sh:/docker-entrypoint-initdb.d/init.sh
+      - postgres-reasoning-data:/var/lib/postgresql/data
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password}
@@ -143,6 +148,7 @@ services:
       - cogniforge-network
     volumes:
       - ./infra/postgres/init-observability-db.sh:/docker-entrypoint-initdb.d/init.sh
+      - postgres-observability-data:/var/lib/postgresql/data
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password}
@@ -163,6 +169,7 @@ services:
       - cogniforge-network
     volumes:
       - ./infra/postgres/init-orchestrator-db.sh:/docker-entrypoint-initdb.d/init.sh
+      - postgres-orchestrator-data:/var/lib/postgresql/data
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password}
@@ -346,6 +353,7 @@ services:
     environment:
       - SERVICE_NAME=orchestrator-service
       - SECRET_KEY=${SECRET_KEY:-super_secret_key_change_in_production}
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
       - ORCHESTRATOR_DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-password}@postgres-orchestrator:5432/orchestrator_db
       - REDIS_URL=redis://redis-orchestrator:6379
       - PLANNING_AGENT_URL=http://planning-agent:8001
@@ -457,3 +465,12 @@ services:
 networks:
   cogniforge-network:
     external: true
+
+volumes:
+  postgres-planning-data:
+  postgres-memory-data:
+  postgres-user-data:
+  postgres-research-data:
+  postgres-reasoning-data:
+  postgres-observability-data:
+  postgres-orchestrator-data:
