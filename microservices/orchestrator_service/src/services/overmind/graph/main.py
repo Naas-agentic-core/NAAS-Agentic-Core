@@ -128,10 +128,10 @@ def _configure_dspy() -> None:
         return
 
     try:
-        lm = dspy.OpenAI(
+        lm = dspy.LM(
+            model="openai/nvidia/nemotron-3-nano-30b-a3b:free",
             api_base="https://openrouter.ai/api/v1",
             api_key=openrouter_key,
-            model="nvidia/nemotron-3-nano-30b-a3b:free",
         )
         dspy.settings.configure(lm=lm)
     except Exception as exc:
