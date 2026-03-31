@@ -25,10 +25,7 @@ services:
     restart: unless-stopped
 
     # Reverted to Bridge Mode for better VS Code integration
-    # network_mode: host  # <-- CAUSE OF ISSUE
-
-    ports:
-      - "8000:8000"
+    network_mode: host  # <-- CAUSE OF ISSUE
 
     environment:
       <<: *common-environment
@@ -51,10 +48,6 @@ services:
       # CACHE VOLUMES: Persist package caches between rebuilds to save bandwidth
       - pip-cache:/root/.cache/pip
       - npm-cache:/root/.npm
-
-networks:
-  default:
-    driver: bridge
 
 volumes:
   pip-cache:
