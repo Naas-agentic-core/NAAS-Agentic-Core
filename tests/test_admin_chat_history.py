@@ -79,27 +79,9 @@ async def test_admin_websocket_persists_and_history_reads_same_records(
     """يتحقق من اتساق حفظ محادثة الأدمن عبر WebSocket مع واجهة التاريخ."""
 
     async def mock_chat(self, **kwargs: object) -> AsyncGenerator[dict[str, object], None]:
-        # Simulate creating a conversation to satisfy the tests reading from db_session
-        from app.core.domain.chat import AdminConversation, AdminMessage, MessageRole
-
-        user_email = "admin-history@example.com"
-        user_res = await db_session.execute(select(User).where(User.email == user_email))
-        user = user_res.scalars().one()
-
-        conv = AdminConversation(user_id=user.id, title="حلّل هذه المهمة")
-        db_session.add(conv)
-        await db_session.flush()
-
-        msg_user = AdminMessage(
-            conversation_id=conv.id, role=MessageRole.USER, content="حلّل هذه المهمة"
-        )
-        msg_assist = AdminMessage(
-            conversation_id=conv.id, role=MessageRole.ASSISTANT, content="Admin persisted answer"
-        )
-        db_session.add_all([msg_user, msg_assist])
-        await db_session.commit()
-
-        yield {"type": "conversation_init", "payload": {"conversation_id": conv.id}}
+        conversation_id = kwargs.get("conversation_id")
+        assert isinstance(conversation_id, int)
+        yield {"type": "conversation_init", "payload": {"conversation_id": conversation_id}}
         yield {"type": "status", "payload": {"message": "Processing..."}}
         yield {"type": "delta", "payload": {"content": "Admin persisted answer"}}
         yield {"type": "complete", "payload": {"status": "done"}}
@@ -129,15 +111,18 @@ async def test_admin_websocket_persists_and_history_reads_same_records(
                 .scalars()
                 .one()
             )
-            conversation = (
+            conversations = (
                 (
                     await db_session.execute(
-                        select(AdminConversation).where(AdminConversation.user_id == user.id)
+                        select(AdminConversation)
+                        .where(AdminConversation.user_id == user.id)
+                        .order_by(AdminConversation.id)
                     )
                 )
                 .scalars()
-                .one()
+                .all()
             )
+            conversation = conversations[-1]
             messages = (
                 (
                     await db_session.execute(
