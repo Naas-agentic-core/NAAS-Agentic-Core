@@ -45,19 +45,16 @@ jobs:
           python -m pip install --upgrade pip
           # Keep lint setup resilient when an exact pinned Ruff build is unavailable
           pip install "ruff>=0.6,<1"
-          exit 0
       - name: Ruff lint
         shell: bash
         run: |
           set -euo pipefail
           ruff check .
-          exit 0
       - name: Ruff format check
         shell: bash
         run: |
           set -euo pipefail
           ruff format --check .
-          exit 0
 
   contracts:
     name: contracts
@@ -83,14 +80,12 @@ jobs:
           set -euo pipefail
           python -m pip install --upgrade pip
           pip install "pytest==7.4.4" SQLAlchemy pydantic PyJWT
-          exit 0
       - name: Validate contracts and provider parity
         shell: bash
         run: |
           set -euo pipefail
           python scripts/fitness/check_gateway_provider_contracts.py
           python -m pytest -q tests/contracts/test_gateway_provider_contracts.py
-          exit 0
 
   guardrails:
     name: guardrails
@@ -118,7 +113,6 @@ jobs:
           set -euo pipefail
           python -m pip install --upgrade pip
           pip install -r requirements-ci.txt
-          exit 0
       - name: Run architectural guardrails
         shell: bash
         run: |
@@ -127,7 +121,6 @@ jobs:
           python scripts/fitness/check_no_app_imports_in_microservices.py --strict
           python scripts/fitness/check_route_registry_parity.py
           python scripts/fitness/check_tracing_gate.py
-          exit 0
 
   test:
     name: test
@@ -158,7 +151,6 @@ jobs:
         run: |
           set -euo pipefail
           python -m pytest -v --cov=app --cov-report=xml:coverage.xml --cov-report=term-missing --durations=10 --tb=short
-          exit 0
       - name: Upload coverage artifact
         if: always()
         uses: actions/upload-artifact@v4
@@ -196,4 +188,3 @@ jobs:
           fi
 
           echo "✅ All required checks passed"
-          exit 0
