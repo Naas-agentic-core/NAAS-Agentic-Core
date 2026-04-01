@@ -18,7 +18,7 @@ from fastapi import (
     WebSocketDisconnect,
 )
 from fastapi.responses import StreamingResponse
-from langchain_core.messages import HumanMessage
+from langchain_core.messages import AIMessage, HumanMessage
 from pydantic import BaseModel, Field
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -356,7 +356,7 @@ async def _ensure_conversation(
     user_id: int,
     question: str,
     requested_conversation_id: int | None,
-) -> int:
+) -> tuple[int, list[dict[str, str]]]:
     """ينشئ أو يتحقق من المحادثة ويحفظ رسالة المستخدم لضمان اتساق التاريخ."""
     is_admin_scope = chat_scope == "admin"
     check_query = (
@@ -391,6 +391,7 @@ async def _ensure_conversation(
     )
 
     async with async_session_factory() as session:
+        messages: list[dict[str, str]] = []
         conversation_id = requested_conversation_id
         if conversation_id is not None:
             try:
@@ -479,7 +480,7 @@ async def _ensure_conversation(
             raise HTTPException(status_code=504, detail="Database timeout inserting message") from e
         await session.commit()
 
-    return int(conversation_id)
+    return int(conversation_id), messages
 
 
 async def _persist_assistant_message(
@@ -551,6 +552,7 @@ async def _stream_chat_langgraph(
     conversation_id: int,
     app_graph: object = None,
     admin_payload: dict[str, object] | None = None,
+    history_messages: list[dict[str, str]] | None = None,
 ) -> None:
     """يشغّل LangGraph الموحد لمسارات البحث والإدارة ويبث الأحداث."""
     queue: asyncio.Queue[dict[str, object]] = asyncio.Queue(maxsize=64)
@@ -561,9 +563,27 @@ async def _stream_chat_langgraph(
             if not _graph:
                 _graph = create_unified_graph()
             config = {"configurable": {"thread_id": str(conversation_id)}}
+
+            langchain_msgs = []
+            if history_messages:
+                for msg in history_messages:
+                    if msg.get("role") == "user":
+                        langchain_msgs.append(HumanMessage(content=msg.get("content", "")))
+                    elif msg.get("role") == "assistant":
+                        langchain_msgs.append(AIMessage(content=msg.get("content", "")))
+
+            # The newly received objective is already appended in DB inside _ensure_conversation,
+            # but if it isn't (or just to be safe), we ensure the last message is the current objective.
+            # To avoid duplicate last user message from DB, check if the last message matches the objective.
+            if not langchain_msgs or (
+                langchain_msgs[-1].content != objective
+                or getattr(langchain_msgs[-1], "type", "") != "human"
+            ):
+                langchain_msgs.append(HumanMessage(content=objective))
+
             inputs: dict[str, object] = {
                 "query": objective,
-                "messages": [HumanMessage(content=objective)],
+                "messages": langchain_msgs,
             }
             inputs = _merge_admin_inputs(inputs, admin_payload if chat_scope == "admin" else None)
 
@@ -728,12 +748,28 @@ async def _run_chat_langgraph(
     context: ChatRunContext,
     app_graph: object = None,
     admin_payload: dict[str, object] | None = None,
+    history_messages: list[dict[str, str]] | None = None,
 ) -> dict[str, object]:
     """يشغّل LangGraph كعمود فقري لرحلة chat ويعيد حمولة موحدة قابلة للبث (HTTP legacy fallback)."""
     if not app_graph:
         app_graph = create_unified_graph()
     config = {"configurable": {"thread_id": str(uuid.uuid4())}}
-    inputs: dict[str, object] = {"query": objective, "messages": [HumanMessage(content=objective)]}
+
+    langchain_msgs = []
+    if history_messages:
+        for msg in history_messages:
+            if msg.get("role") == "user":
+                langchain_msgs.append(HumanMessage(content=msg.get("content", "")))
+            elif msg.get("role") == "assistant":
+                langchain_msgs.append(AIMessage(content=msg.get("content", "")))
+
+    if not langchain_msgs or (
+        langchain_msgs[-1].content != objective
+        or getattr(langchain_msgs[-1], "type", "") != "human"
+    ):
+        langchain_msgs.append(HumanMessage(content=objective))
+
+    inputs: dict[str, object] = {"query": objective, "messages": langchain_msgs}
     inputs = _merge_admin_inputs(inputs, admin_payload)
 
     res = await app_graph.ainvoke(inputs, config=config)
@@ -820,7 +856,7 @@ async def chat_ws_stategraph(websocket: WebSocket) -> None:
             )
             try:
                 logger.info(f"ORCHESTRATOR received | chat_scope=customer | role={user_id}")
-                conversation_id = await _ensure_conversation(
+                conversation_id, history_messages = await _ensure_conversation(
                     chat_scope="customer",
                     user_id=user_id,
                     question=objective,
@@ -863,6 +899,7 @@ async def chat_ws_stategraph(websocket: WebSocket) -> None:
                 chat_scope="customer",
                 conversation_id=conversation_id,
                 app_graph=getattr(websocket.app.state, "app_graph", None),
+                history_messages=history_messages,
             )
 
     except WebSocketDisconnect:
@@ -908,7 +945,7 @@ async def admin_chat_ws_stategraph(websocket: WebSocket) -> None:
             )
             try:
                 logger.info(f"ORCHESTRATOR received | chat_scope=admin | role={user_id}")
-                conversation_id = await _ensure_conversation(
+                conversation_id, history_messages = await _ensure_conversation(
                     chat_scope="admin",
                     user_id=user_id,
                     question=objective,
@@ -952,6 +989,7 @@ async def admin_chat_ws_stategraph(websocket: WebSocket) -> None:
                 conversation_id=conversation_id,
                 app_graph=getattr(websocket.app.state, "app_graph", None),
                 admin_payload=auth_payload,
+                history_messages=history_messages,
             )
 
     except WebSocketDisconnect:

@@ -54,7 +54,16 @@ class QueryAnalyzerNode:
 
         start_time = time.time()
         query = state.get("query", "")
+        messages = state.get("messages", [])
         error = None
+
+        recent_messages: list[str] = []
+        for msg in messages[-6:]:
+            content = getattr(msg, "content", None)
+            if isinstance(content, str) and content.strip():
+                recent_messages.append(content.strip())
+
+        context_query = "\n".join(recent_messages) if recent_messages else query
 
         try:
 
@@ -65,7 +74,7 @@ class QueryAnalyzerNode:
                 return int(text_value) if text_value.isdigit() else None
 
             prediction = await asyncio.wait_for(
-                anyio.to_thread.run_sync(lambda: self.analyzer(raw_query=query)),
+                anyio.to_thread.run_sync(lambda: self.analyzer(raw_query=context_query)),
                 timeout=10.0,
             )
             filters = QueryFilters(
