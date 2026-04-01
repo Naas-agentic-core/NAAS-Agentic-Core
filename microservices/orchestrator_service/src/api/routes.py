@@ -189,7 +189,7 @@ def _safe_assistant_error(request_id: str) -> str:
 
 async def _serialize_json_async(payload: object) -> str:
     """يُسلسل الحمولة إلى JSON داخل خيط منفصل لحماية حلقة الأحداث من الحجب."""
-    return await anyio.to_thread.run_sync(json.dumps, payload, ensure_ascii=False)
+    return await anyio.to_thread.run_sync(lambda p: json.dumps(p, ensure_ascii=False), payload)
 
 
 async def _serialize_stream_frame(payload: object) -> str:

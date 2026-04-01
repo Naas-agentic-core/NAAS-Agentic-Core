@@ -56,7 +56,7 @@ def test_agent_chat_admin_path_forwards_aligned_admin_state(monkeypatch) -> None
         def __init__(self) -> None:
             self.last_inputs: dict[str, object] | None = None
 
-        async def ainvoke(self, inputs: dict[str, object]):
+        async def ainvoke(self, inputs: dict[str, object], config: dict | None = None):
             self.last_inputs = inputs
             return {"final_response": {"ok": True}}
 
@@ -95,7 +95,7 @@ def test_agent_chat_admin_path_is_fail_closed_without_admin_identity(monkeypatch
         def __init__(self) -> None:
             self.last_inputs: dict[str, object] | None = None
 
-        async def ainvoke(self, inputs: dict[str, object]):
+        async def ainvoke(self, inputs: dict[str, object], config: dict | None = None):
             self.last_inputs = inputs
             return {"final_response": {"ok": True}}
 
