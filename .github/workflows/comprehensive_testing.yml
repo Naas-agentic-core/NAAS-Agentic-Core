@@ -71,7 +71,6 @@ jobs:
           set -euo pipefail
           python -m pip install --upgrade pip
           pip install -r requirements-ci.txt
-          exit 0
 
       - name: Execute ${{ matrix.suite.name }} suite
         shell: bash
@@ -91,7 +90,6 @@ jobs:
           command+=("${extra_args[@]}")
 
           "${command[@]}"
-          exit 0
 
       - name: Upload suite artifacts
         if: always()
@@ -121,4 +119,3 @@ jobs:
             exit 1
           fi
           echo "✅ Comprehensive quality gate passed"
-          exit 0

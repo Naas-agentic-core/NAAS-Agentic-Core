@@ -1,12 +1,9 @@
-import re
+from pathlib import Path
 
-with open("tests/microservices/test_agent_chat_contract.py", "r") as f:
-    code = f.read()
+TEST_FILE_PATH = Path("tests/microservices/test_agent_chat_contract.py")
+OLD_SIGNATURE = "async def ainvoke(self, inputs: dict[str, object]):"
+NEW_SIGNATURE = "async def ainvoke(self, inputs: dict[str, object], config: dict | None = None):"
 
-code = code.replace(
-    "async def ainvoke(self, inputs: dict[str, object]):",
-    "async def ainvoke(self, inputs: dict[str, object], config: dict | None = None):"
-)
-
-with open("tests/microservices/test_agent_chat_contract.py", "w") as f:
-    f.write(code)
+code = TEST_FILE_PATH.read_text()
+updated_code = code.replace(OLD_SIGNATURE, NEW_SIGNATURE)
+TEST_FILE_PATH.write_text(updated_code)

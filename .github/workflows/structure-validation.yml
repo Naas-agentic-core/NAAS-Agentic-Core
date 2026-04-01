@@ -54,7 +54,6 @@ jobs:
         run: |
           set -euo pipefail
           python scripts/validate_structure.py
-          exit 0
 
   validate-integration:
     name: Integration Tests (E2E Chat)
@@ -98,7 +97,6 @@ jobs:
           set -euo pipefail
           python -m pip install --upgrade pip
           pip install -r requirements-ci.txt
-          exit 0
 
       - name: Run integration tests (best effort)
         env:
@@ -123,7 +121,6 @@ jobs:
             echo "ℹ️ tests/integration/test_chat_e2e.py not found, skipping targeted E2E suite."
             echo "INTEGRATION_STATUS=skipped" >> "$GITHUB_ENV"
           fi
-          exit 0
 
       - name: Integration suite summary
         if: always()
@@ -132,4 +129,3 @@ jobs:
           set -euo pipefail
           echo "### Integration smoke status: ${INTEGRATION_STATUS:-unknown}" >> "$GITHUB_STEP_SUMMARY"
           echo "ℹ️ Integration smoke is best-effort and does not block merge in this workflow." >> "$GITHUB_STEP_SUMMARY"
-          exit 0

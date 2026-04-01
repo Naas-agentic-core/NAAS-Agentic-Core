@@ -39,7 +39,6 @@ jobs:
           set -euo pipefail
           sudo apt-get update
           sudo apt-get install -y tesseract-ocr libtesseract-dev
-          exit 0
 
       - name: Install Python dependencies
         shell: bash
@@ -48,7 +47,6 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
           pip install pypdf python-docx openpyxl pandas pillow pytesseract httpx
-          exit 0
 
       - name: Get changed files
         id: changed-files
@@ -103,7 +101,6 @@ jobs:
                   print(f'❌ Failed to ingest {file_path}')
                   sys.exit(1)
           "
-          exit 0
 
       - name: No changes summary
         if: steps.changed-files.outputs.any_changed != 'true'
@@ -111,4 +108,3 @@ jobs:
         run: |
           set -euo pipefail
           echo "ℹ️ No changes detected under knowledge_base/."
-          exit 0
