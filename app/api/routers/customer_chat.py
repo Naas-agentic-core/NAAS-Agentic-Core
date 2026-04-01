@@ -41,7 +41,7 @@ router = APIRouter(
     tags=["Customer Chat"],
 )
 
-TEXT_EVENT_TYPES = {"assistant_delta", "assistant_final"}
+TEXT_EVENT_TYPES = {"delta", "assistant_delta", "assistant_final"}
 
 
 def get_chat_actor(
@@ -166,6 +166,14 @@ async def chat_stream_ws(
                         MessageRole.USER,
                         question,
                     )
+                await websocket.send_json(
+                    normalize_streaming_event(
+                        {
+                            "type": "conversation_init",
+                            "payload": {"conversation_id": local_conversation_id},
+                        }
+                    )
+                )
             except HTTPException as http_exc:
                 await websocket.send_json(
                     normalize_streaming_event(
