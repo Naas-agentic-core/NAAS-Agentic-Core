@@ -16,6 +16,7 @@ import httpx
 from pydantic import BaseModel
 from tenacity import AsyncRetrying, retry_if_exception_type, stop_after_attempt, wait_exponential
 
+from app.core.ai_gateway import get_ai_client
 from app.core.http_client_factory import HTTPClientConfig, get_http_client
 from app.core.settings.base import get_settings
 from app.infrastructure.clients.routing_policy import ChatRoutingPolicy
@@ -140,6 +141,34 @@ class OrchestratorClient:
         except Exception:
             logger.warning("local_retrieval_fallback_failed", exc_info=True)
             return None
+
+    async def _build_local_general_chat_response(self, question: str) -> str | None:
+        """
+        يولد إجابة محلية عامة عبر بوابة الذكاء عند تعطل orchestrator.
+
+        هذا المسار يُستخدم فقط كملاذ أخير بعد فشل مسارات fallback المتخصصة
+        (عدّ الملفات والاسترجاع التعليمي)، بهدف إبقاء الدردشة الأساسية متاحة
+        في بيئات التطوير مثل Codespaces.
+        """
+        sanitized_question = question.replace("\x00", "").strip()
+        if not sanitized_question:
+            return None
+
+        local_system_prompt = (
+            "أنت مساعد عربي احترافي داخل بيئة تطوير. "
+            "قدّم إجابة مباشرة ومفيدة باختصار ووضوح دون الإشارة إلى تفاصيل داخلية."
+        )
+        ai_client = get_ai_client()
+        try:
+            response_text = await ai_client.send_message(local_system_prompt, sanitized_question)
+        except Exception:
+            logger.warning("local_general_chat_fallback_failed", exc_info=True)
+            return None
+
+        clean_response = response_text.replace("\x00", "").strip()
+        if not clean_response:
+            return None
+        return clean_response
 
     @staticmethod
     def _sanitize_text_for_user(content: str) -> str:
@@ -379,6 +408,16 @@ class OrchestratorClient:
             if local_retrieval_response:
                 yield local_retrieval_response
                 return
+
+            is_file_intelligence = self._file_intelligence_decision(question)[0]
+            is_exercise_retrieval = self._exercise_retrieval_decision(question)
+            if not is_file_intelligence and not is_exercise_retrieval:
+                local_general_chat_response = await self._build_local_general_chat_response(
+                    question
+                )
+                if local_general_chat_response:
+                    yield local_general_chat_response
+                    return
 
         try:
             yield json.dumps(
