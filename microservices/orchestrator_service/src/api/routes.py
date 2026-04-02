@@ -697,7 +697,17 @@ async def _stream_chat_langgraph(
 
     task = asyncio.create_task(_runner())
     active_background_tasks.add(task)
-    task.add_done_callback(active_background_tasks.discard)
+
+    def _cleanup_task(t: asyncio.Task) -> None:
+        active_background_tasks.discard(t)
+        try:
+            t.result()
+        except asyncio.CancelledError:
+            pass
+        except Exception:
+            logger.error("LangGraph task failed", exc_info=True)
+
+    task.add_done_callback(_cleanup_task)
     _task_ref = task  # store reference to avoid GC
 
     from datetime import UTC, datetime
@@ -717,126 +727,130 @@ async def _stream_chat_langgraph(
     )
 
     final_content = ""
-    while True:
-        evt = await queue.get()
-        if evt["type"] == "__DONE__":
-            run_data = evt["result"]
+    try:
+        while True:
+            evt = await queue.get()
+            if evt["type"] == "__DONE__":
+                run_data = evt["result"]
 
-            # Extract the final response from our custom Unified Graph output
-            final_resp = run_data.get("final_response")
+                # Extract the final response from our custom Unified Graph output
+                final_resp = run_data.get("final_response")
 
-            if isinstance(final_resp, dict):
-                response_text = await _serialize_json_async(final_resp)
+                if isinstance(final_resp, dict):
+                    response_text = await _serialize_json_async(final_resp)
+                else:
+                    response_text = str(final_resp or "لا توجد تفاصيل متاحة.")
+
+                final_content = response_text
+                logger.info(f"FINAL RESPONSE → {response_text[:100]}")
+                await websocket.send_json(
+                    {
+                        "type": "assistant_final",
+                        "payload": {
+                            "content": response_text,
+                            "status": "ok",
+                            "run_id": "sync-run",
+                            "timeline": [],
+                            "graph_mode": "unified_stategraph",
+                            "route_id": f"chat_ws_{chat_scope}",
+                        },
+                    }
+                )
+                break
+            if evt["type"] == "__ERROR__":
+                request_id = str(uuid.uuid4())
+                logger.error(
+                    "LangGraph streaming failure",
+                    exc_info=True,
+                    extra={"request_id": request_id, "chat_scope": chat_scope},
+                )
+                final_content = _safe_assistant_error(request_id)
+                await websocket.send_json(
+                    {"type": "assistant_error", "payload": {"content": final_content}}
+                )
+                break
+            if evt["type"] == "phase_start":
+                phase_name = evt["payload"].get("phase", "") if isinstance(evt["payload"], dict) else ""
+                agent_name = evt["payload"].get("agent", "") if isinstance(evt["payload"], dict) else ""
+                await websocket.send_json(
+                    {
+                        "type": "PHASE_STARTED",
+                        "payload": {
+                            "run_id": "sync-run",
+                            "seq": 2,
+                            "phase": phase_name,
+                            "agent": agent_name,
+                            "timestamp": datetime.now(UTC).isoformat(),
+                        },
+                    }
+                )
+                await websocket.send_json(
+                    {
+                        "type": "assistant_delta",
+                        "payload": {"content": f"🔄 جاري التنفيذ: {phase_name}\n"},
+                    }
+                )
+            elif evt["type"] == "phase_completed":
+                phase_name = evt["payload"].get("phase", "") if isinstance(evt["payload"], dict) else ""
+                agent_name = evt["payload"].get("agent", "") if isinstance(evt["payload"], dict) else ""
+                await websocket.send_json(
+                    {
+                        "type": "PHASE_COMPLETED",
+                        "payload": {
+                            "run_id": "sync-run",
+                            "seq": 3,
+                            "phase": phase_name,
+                            "agent": agent_name,
+                            "timestamp": datetime.now(UTC).isoformat(),
+                        },
+                    }
+                )
+            elif evt["type"] == "loop_start":
+                iteration = (
+                    evt["payload"].get("iteration", 0) if isinstance(evt["payload"], dict) else 0
+                )
+                mode = (
+                    evt["payload"].get("graph_mode", "standard")
+                    if isinstance(evt["payload"], dict)
+                    else "standard"
+                )
+                await websocket.send_json(
+                    {
+                        "type": "RUN_STARTED",
+                        "payload": {
+                            "run_id": f"sync-run:{iteration}",
+                            "seq": 4,
+                            "timestamp": datetime.now(UTC).isoformat(),
+                            "iteration": iteration,
+                            "mode": mode,
+                        },
+                    }
+                )
             else:
-                response_text = str(final_resp or "لا توجد تفاصيل متاحة.")
+                await websocket.send_json(evt)
 
-            final_content = response_text
-            logger.info(f"FINAL RESPONSE → {response_text[:100]}")
-            await websocket.send_json(
-                {
-                    "type": "assistant_final",
-                    "payload": {
-                        "content": response_text,
-                        "status": "ok",
-                        "run_id": "sync-run",
-                        "timeline": [],
-                        "graph_mode": "unified_stategraph",
-                        "route_id": f"chat_ws_{chat_scope}",
-                    },
-                }
-            )
-            break
-        if evt["type"] == "__ERROR__":
-            request_id = str(uuid.uuid4())
-            logger.error(
-                "LangGraph streaming failure",
-                exc_info=True,
-                extra={"request_id": request_id, "chat_scope": chat_scope},
-            )
-            final_content = _safe_assistant_error(request_id)
-            await websocket.send_json(
-                {"type": "assistant_error", "payload": {"content": final_content}}
-            )
-            break
-        if evt["type"] == "phase_start":
-            phase_name = evt["payload"].get("phase", "") if isinstance(evt["payload"], dict) else ""
-            agent_name = evt["payload"].get("agent", "") if isinstance(evt["payload"], dict) else ""
-            await websocket.send_json(
-                {
-                    "type": "PHASE_STARTED",
-                    "payload": {
-                        "run_id": "sync-run",
-                        "seq": 2,
-                        "phase": phase_name,
-                        "agent": agent_name,
-                        "timestamp": datetime.now(UTC).isoformat(),
-                    },
-                }
-            )
-            await websocket.send_json(
-                {
-                    "type": "assistant_delta",
-                    "payload": {"content": f"🔄 جاري التنفيذ: {phase_name}\n"},
-                }
-            )
-        elif evt["type"] == "phase_completed":
-            phase_name = evt["payload"].get("phase", "") if isinstance(evt["payload"], dict) else ""
-            agent_name = evt["payload"].get("agent", "") if isinstance(evt["payload"], dict) else ""
-            await websocket.send_json(
-                {
-                    "type": "PHASE_COMPLETED",
-                    "payload": {
-                        "run_id": "sync-run",
-                        "seq": 3,
-                        "phase": phase_name,
-                        "agent": agent_name,
-                        "timestamp": datetime.now(UTC).isoformat(),
-                    },
-                }
-            )
-        elif evt["type"] == "loop_start":
-            iteration = (
-                evt["payload"].get("iteration", 0) if isinstance(evt["payload"], dict) else 0
-            )
-            mode = (
-                evt["payload"].get("graph_mode", "standard")
-                if isinstance(evt["payload"], dict)
-                else "standard"
-            )
-            await websocket.send_json(
-                {
-                    "type": "RUN_STARTED",
-                    "payload": {
-                        "run_id": f"sync-run:{iteration}",
-                        "seq": 4,
-                        "timestamp": datetime.now(UTC).isoformat(),
-                        "iteration": iteration,
-                        "mode": mode,
-                    },
-                }
-            )
-        else:
-            await websocket.send_json(evt)
-
-    if final_content.strip():
-        try:
-            await _persist_assistant_message(
-                chat_scope=chat_scope,
-                conversation_id=conversation_id,
-                content=final_content,
-                mission_id=None,
-            )
-            await websocket.send_json(
-                {"type": "assistant_delta", "payload": {"content": "\n\n✅ [DB SAVED]"}}
-            )
-        except Exception as e:
-            error_msg = str(e)
-            await websocket.send_json(
-                {
-                    "type": "assistant_delta",
-                    "payload": {"content": f"\n\n🚨 **SYSTEM DB ERROR:** {error_msg}"},
-                }
-            )
+        if final_content.strip():
+            try:
+                await _persist_assistant_message(
+                    chat_scope=chat_scope,
+                    conversation_id=conversation_id,
+                    content=final_content,
+                    mission_id=None,
+                )
+                await websocket.send_json(
+                    {"type": "assistant_delta", "payload": {"content": "\n\n✅ [DB SAVED]"}}
+                )
+            except Exception as e:
+                error_msg = str(e)
+                await websocket.send_json(
+                    {
+                        "type": "assistant_delta",
+                        "payload": {"content": f"\n\n🚨 **SYSTEM DB ERROR:** {error_msg}"},
+                    }
+                )
+    finally:
+        if not task.done():
+            task.cancel()
 
     await websocket.send_json({"type": "complete", "payload": {}})
 
