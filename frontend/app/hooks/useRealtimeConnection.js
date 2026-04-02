@@ -26,13 +26,18 @@ const parseAssistantErrorEnvelope = (rawData) => {
  * @param {string} token - The authentication token.
  * @returns {{ state: string, sendMessage: (data: any) => void }}
  */
-export function useRealtimeConnection(wsUrl, token) {
+export function useRealtimeConnection(wsUrl, token, eventNamespace = "default") {
   const wsRef = useRef(null);
   const retries = useRef(0);
   const [state, setState] = useState("idle");
   const mountedRef = useRef(true);
   const reconnectTimeoutRef = useRef(null);
   const pendingQueue = useRef([]);
+  const connectionIdRef = useRef(
+    typeof crypto !== "undefined" && crypto.randomUUID
+      ? crypto.randomUUID()
+      : `${Date.now()}-${Math.random().toString(36).slice(2)}`
+  );
 
   const connect = useCallback(() => {
     if (!wsUrl || !token) return;
@@ -75,10 +80,20 @@ export function useRealtimeConnection(wsUrl, token) {
 
           try {
             const data = JSON.parse(event.data);
+            const enrichedData = {
+              ...data,
+              _connection_id: connectionIdRef.current,
+              _event_namespace: eventNamespace,
+            };
             // Broadcast agent events
             window.dispatchEvent(
               new CustomEvent("agent:event", {
-                detail: data,
+                detail: enrichedData,
+              })
+            );
+            window.dispatchEvent(
+              new CustomEvent(`agent:event:${eventNamespace}`, {
+                detail: enrichedData,
               })
             );
           } catch (e) {
@@ -141,7 +156,7 @@ export function useRealtimeConnection(wsUrl, token) {
         clearTimeout(reconnectTimeoutRef.current);
         reconnectTimeoutRef.current = setTimeout(connect, delay);
     }
-  }, [wsUrl, token]);
+  }, [wsUrl, token, eventNamespace]);
 
   const sendMessage = useCallback((data) => {
     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {

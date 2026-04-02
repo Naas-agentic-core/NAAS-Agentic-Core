@@ -99,17 +99,24 @@ export const useAgentSocket = (endpoint, token, onConversationUpdate) => {
     const [messages, setMessages] = useState([]);
     const [conversationId, setConversationId] = useState(null);
     const onConversationUpdateRef = useRef(onConversationUpdate);
+    const activeConversationIdRef = useRef(null);
+    const activeRequestIdRef = useRef(null);
 
     // Construct WebSocket URL
     const wsBase = getWsBase();
     const wsUrl = wsBase && endpoint ? buildWebSocketUrlSafe(wsBase, endpoint, token) : null;
 
     // Use the robust connection hook
-    const { state: status, sendMessage: sendSocketMessage } = useRealtimeConnection(wsUrl, token);
+    const eventNamespace = endpoint || 'default';
+    const { state: status, sendMessage: sendSocketMessage } = useRealtimeConnection(wsUrl, token, eventNamespace);
 
     useEffect(() => {
         onConversationUpdateRef.current = onConversationUpdate;
     }, [onConversationUpdate]);
+
+    useEffect(() => {
+        activeConversationIdRef.current = conversationId;
+    }, [conversationId]);
 
     const refreshConversationHistory = useCallback(() => {
         if (!onConversationUpdateRef.current) return;
@@ -124,6 +131,26 @@ export const useAgentSocket = (endpoint, token, onConversationUpdate) => {
     useEffect(() => {
         const handler = (e) => {
             const { type, payload } = e.detail || {};
+            const incomingConversationId = payload?.conversation_id;
+            const incomingRequestId = payload?.request_id;
+            const activeConversationId = activeConversationIdRef.current;
+            const activeRequestId = activeRequestIdRef.current;
+            const hasActiveConversation = activeConversationId !== null && activeConversationId !== undefined;
+            const hasIncomingConversation = incomingConversationId !== null && incomingConversationId !== undefined;
+            if (hasActiveConversation && hasIncomingConversation) {
+                const normalizedActive = Number.parseInt(String(activeConversationId), 10);
+                const normalizedIncoming = Number.parseInt(String(incomingConversationId), 10);
+                if (
+                    !Number.isNaN(normalizedActive) &&
+                    !Number.isNaN(normalizedIncoming) &&
+                    normalizedActive !== normalizedIncoming
+                ) {
+                    return;
+                }
+            }
+            if (activeRequestId && String(activeRequestId) !== String(incomingRequestId || '')) {
+                return;
+            }
 
             if (type === 'conversation_init') {
                 if (payload?.conversation_id) {
@@ -197,9 +224,10 @@ export const useAgentSocket = (endpoint, token, onConversationUpdate) => {
             }
         };
 
-        window.addEventListener('agent:event', handler);
-        return () => window.removeEventListener('agent:event', handler);
-    }, [addMessage, refreshConversationHistory]);
+        const eventName = `agent:event:${eventNamespace}`;
+        window.addEventListener(eventName, handler);
+        return () => window.removeEventListener(eventName, handler);
+    }, [addMessage, refreshConversationHistory, eventNamespace]);
 
     const sendMessage = useCallback((text, metadata = {}) => {
         if (!text.trim()) return;
@@ -207,7 +235,10 @@ export const useAgentSocket = (endpoint, token, onConversationUpdate) => {
         // Optimistic UI update
         addMessage({ id: generateId(), role: 'user', content: text });
 
-        const payload = { question: text, ...metadata };
+        const clientRequestId = generateId();
+        activeRequestIdRef.current = clientRequestId;
+
+        const payload = { question: text, client_request_id: clientRequestId, ...metadata };
         if (conversationId !== null && conversationId !== undefined) {
             const normalizedConversationId = Number.parseInt(String(conversationId), 10);
             payload.conversation_id = Number.isNaN(normalizedConversationId)
@@ -220,7 +251,10 @@ export const useAgentSocket = (endpoint, token, onConversationUpdate) => {
 
     }, [conversationId, addMessage, sendSocketMessage]);
 
-    const clearMessages = () => setMessages([]);
+    const clearMessages = () => {
+        activeRequestIdRef.current = null;
+        setMessages([]);
+    };
     const setMessagesSafe = (msgs) => setMessages(msgs);
 
     return {
