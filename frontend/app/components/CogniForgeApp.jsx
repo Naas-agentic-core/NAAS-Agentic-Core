@@ -147,7 +147,7 @@ const DashboardLayout = ({ user, onLogout }) => {
                         uniqueMap.set(key, item);
                     }
                 });
-                setConversations(Array.from(uniqueMap.values()));
+                setConversations(Array.from(uniqueMap.values()).slice(0, 50));
              }
          } catch (e) { errorTracker.reportError(e); }
     }, [convEndpoint]);
@@ -302,7 +302,7 @@ const DashboardLayout = ({ user, onLogout }) => {
                                  onClick={() => loadConversation(conv.conversation_id)}
                              >
                                  <i className="fas fa-comment-alt"></i>
-                                 {conv.title || `محادثة ${conv.conversation_id.substr(0,8)}...`}
+                                 {conv.title || `محادثة ${String(conv.conversation_id).slice(0, 8)}...`}
                              </div>
                          ))}
                      </div>

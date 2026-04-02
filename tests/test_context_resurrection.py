@@ -34,7 +34,13 @@ def test_frontend_fetches_limited_conversations_and_dedupes() -> None:
     source = Path("frontend/app/components/CogniForgeApp.jsx").read_text(encoding="utf-8")
     assert "?limit=50" in source
     assert "const uniqueMap = new Map();" in source
-    assert "setConversations(Array.from(uniqueMap.values()));" in source
+    assert "setConversations(Array.from(uniqueMap.values()).slice(0, 50));" in source
+
+
+def test_frontend_stream_filter_is_request_id_compatible_and_stray_safe() -> None:
+    source = Path("frontend/app/hooks/useAgentSocket.js").read_text(encoding="utf-8")
+    assert "activeRequestId &&\n                incomingRequestId" in source
+    assert "if (!activeRequestId && type !== 'conversation_init' && isStreamLifecycleEvent(type))" in source
 
 
 def test_orchestrator_conversation_list_endpoints_are_limited() -> None:
@@ -43,3 +49,14 @@ def test_orchestrator_conversation_list_endpoints_are_limited() -> None:
     )
     assert "limit: int = Query(default=50, ge=1, le=200)" in source
     assert "LIMIT :limit" in source
+
+
+def test_compatibility_facade_forwards_recent_history_to_orchestrator() -> None:
+    customer_source = Path("app/api/routers/customer_chat.py").read_text(encoding="utf-8")
+    admin_source = Path("app/api/routers/admin.py").read_text(encoding="utf-8")
+
+    assert "history_messages = await persistence_service.get_chat_history(" in customer_source
+    assert "history_messages=history," in customer_source
+
+    assert "history_messages = await persistence_service.get_chat_history(" in admin_source
+    assert "history_messages=history," in admin_source
