@@ -541,6 +541,38 @@ async def admin_ai_config_proxy(request: Request) -> StreamingResponse:
 
 
 @app.api_route(
+    "/admin/api/conversations",
+    methods=["GET", "OPTIONS", "HEAD"],
+    include_in_schema=False,
+)
+async def admin_conversations_proxy(request: Request) -> StreamingResponse:
+    """توجيه صريح لتاريخ محادثات الأدمن نحو orchestrator-service قبل مسار admin الشامل."""
+    return await proxy_handler.forward(
+        request,
+        settings.ORCHESTRATOR_SERVICE_URL,
+        "admin/api/conversations",
+        service_token=create_service_token(),
+    )
+
+
+@app.api_route(
+    "/admin/api/conversations/{conversation_id}",
+    methods=["GET", "OPTIONS", "HEAD"],
+    include_in_schema=False,
+)
+async def admin_conversation_details_proxy(
+    conversation_id: int, request: Request
+) -> StreamingResponse:
+    """توجيه صريح لتفاصيل محادثة الأدمن نحو orchestrator-service."""
+    return await proxy_handler.forward(
+        request,
+        settings.ORCHESTRATOR_SERVICE_URL,
+        f"admin/api/conversations/{conversation_id}",
+        service_token=create_service_token(),
+    )
+
+
+@app.api_route(
     "/admin/{path:path}",
     methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS", "HEAD"],
     include_in_schema=False,
