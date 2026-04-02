@@ -304,6 +304,7 @@ def emergency_intent_guard(query: str) -> bool:
     # Require at least one exact match from the patterns to avoid trapping generic words
     return any(re.search(pattern, query_lower) for pattern in ADMIN_PATTERNS)
 
+
 def _configure_dspy() -> None:
     """يضبط نموذج DSPy عالميًا في مرحلة الإقلاع باستخدام مفاتيح البيئة المتاحة."""
     if dspy.settings.lm is not None:
@@ -469,9 +470,7 @@ class QueryRewriterSignature(dspy.Signature):
     conversation_history: str = dspy.InputField(
         desc="Recent turns formatted as User/Assistant transcript"
     )
-    current_query: str = dspy.InputField(
-        desc="Current possibly ambiguous user query"
-    )
+    current_query: str = dspy.InputField(desc="Current possibly ambiguous user query")
     rewritten_query: str = dspy.OutputField(
         desc="Self-contained rewritten query or unchanged original query"
     )
@@ -600,10 +599,14 @@ class QueryRewriterNode:
                 state=state,
                 error=error,
             )
-            return {"query": self._build_contextual_fallback_rewrite(query=query, messages=messages)}
+            return {
+                "query": self._build_contextual_fallback_rewrite(query=query, messages=messages)
+            }
 
         if rewritten_query == query:
-            rewritten_query = self._build_contextual_fallback_rewrite(query=query, messages=messages)
+            rewritten_query = self._build_contextual_fallback_rewrite(
+                query=query, messages=messages
+            )
 
         emit_telemetry(node_name="QueryRewriterNode", start_time=start_time, state=state)
         return {"query": rewritten_query}
