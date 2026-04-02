@@ -176,6 +176,12 @@ SHORT_QUERY_THRESHOLD = 6
 ELLIPTICAL_STARTERS = {
     "ما",
     "ماذا",
+    "أي",
+    "اي",
+    "من",
+    "أين",
+    "متى",
+    "كم",
     "كيف",
     "لماذا",
     "هل",
@@ -285,9 +291,8 @@ def _looks_elliptical_followup(query: str, history: str) -> bool:
         return False
 
     first_token = tokens[0]
-    has_question_mark = "?" in query or "؟" in query
     contains_elliptical_term = bool(set(tokens).intersection(ELLIPTICAL_TERMS))
-    return (first_token in ELLIPTICAL_STARTERS and has_question_mark) or contains_elliptical_term
+    return (first_token in ELLIPTICAL_STARTERS) or contains_elliptical_term
 
 
 def emergency_intent_guard(query: str) -> bool:
@@ -391,8 +396,9 @@ class SupervisorNode:
             pass
 
         if len(query_normalized.split()) <= 3 and "?" not in query_normalized and "؟" not in query:
-            emit_telemetry(node_name="SupervisorNode", start_time=start_time, state=state)
-            return {"intent": "chat"}
+            if not _looks_elliptical_followup(query, conversation_text):
+                emit_telemetry(node_name="SupervisorNode", start_time=start_time, state=state)
+                return {"intent": "chat"}
 
         intent = "search"
         emit_telemetry(node_name="SupervisorNode", start_time=start_time, state=state)
