@@ -53,6 +53,8 @@ class QueryAnalyzerNode:
         from .telemetry import emit_telemetry
 
         start_time = time.time()
+        import json
+
         query = state.get("query", "")
         messages = state.get("messages", [])
         error = None
@@ -60,8 +62,20 @@ class QueryAnalyzerNode:
         recent_messages: list[str] = []
         for msg in messages[-6:]:
             content = getattr(msg, "content", None)
-            if isinstance(content, str) and content.strip():
-                recent_messages.append(content.strip())
+            if not isinstance(content, str) or not content.strip():
+                continue
+            role = getattr(msg, "type", getattr(msg, "role", "user"))
+            prefix = "User: " if role in ("human", "user") else "Assistant: "
+            text = content.strip()
+            if text.startswith("{") and role in ("ai", "assistant"):
+                try:
+                    data = json.loads(text)
+                    if isinstance(data, dict):
+                        extracted = data.get("الإجابة") or data.get("التمرين") or text
+                        text = str(extracted)
+                except Exception:
+                    pass
+            recent_messages.append(f"{prefix}{text}")
 
         context_query = "\n".join(recent_messages) if recent_messages else query
 
@@ -282,22 +296,75 @@ class WebSearchFallbackNode:
 
 
 # --- NODE 5: SynthesizerNode ---
+class EducationalSynthesizer(dspy.Signature):
+    """Synthesize an educational response from retrieved documents.
+    You MUST obey any constraints specified in the conversation (e.g., 'question 1 only', 'no solution').
+    Write your output clearly in Arabic."""
+
+    context: str = dspy.InputField(desc="The raw retrieved exercise or document text.")
+    conversation: str = dspy.InputField(
+        desc="The recent conversation history including the user's active constraints."
+    )
+    query: str = dspy.InputField(desc="The user's original query.")
+    response: str = dspy.OutputField(
+        desc="The final synthesized response in Arabic obeying all constraints."
+    )
+
+
 class SynthesizerNode:
-    def __call__(self, state: dict) -> dict:
+    def __init__(self):
+        self.generator = dspy.Predict(EducationalSynthesizer)
+
+    async def __call__(self, state: dict) -> dict:
+        import json
+
         from .telemetry import emit_telemetry
 
         start_time = time.time()
         reranked = state.get("reranked_docs", [])
         filters: QueryFilters = state.get("filters")
+        query = state.get("query", "")
+        messages = state.get("messages", [])
+
+        recent_messages: list[str] = []
+        for msg in messages[-6:]:
+            content = getattr(msg, "content", None)
+            if not isinstance(content, str) or not content.strip():
+                continue
+            role = getattr(msg, "type", getattr(msg, "role", "user"))
+            prefix = "User: " if role in ("human", "user") else "Assistant: "
+            text = content.strip()
+            if text.startswith("{") and role in ("ai", "assistant"):
+                try:
+                    data = json.loads(text)
+                    if isinstance(data, dict):
+                        extracted = data.get("الإجابة") or data.get("التمرين") or text
+                        text = str(extracted)
+                except Exception:
+                    pass
+            recent_messages.append(f"{prefix}{text}")
+
+        conversation_text = "\n".join(recent_messages) if recent_messages else query
 
         if not reranked:
             text_val = "لا توجد تفاصيل متاحة."
             source = "لا يوجد"
             confidence = "0.00"
         else:
-            text_val = reranked[0].text
+            raw_doc_text = reranked[0].text
             source = reranked[0].metadata.get("source", "الإنترنت")
             confidence = str(reranked[0].metadata.get("score", 0.85))
+
+            try:
+                prediction = await anyio.to_thread.run_sync(
+                    lambda: self.generator(
+                        context=raw_doc_text, conversation=conversation_text, query=query
+                    )
+                )
+                text_val = getattr(prediction, "response", raw_doc_text).strip()
+            except Exception as e:
+                logger.error(f"Synthesizer LLM generation failed: {e}")
+                text_val = raw_doc_text
 
         response_json = {
             "المصدر": source,

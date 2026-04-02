@@ -177,13 +177,27 @@ class SupervisorNode:
 
         start_time = time.time()
         query = state.get("query", "")
+        import json
+
         messages = state.get("messages", [])
 
         recent_messages: list[str] = []
         for msg in messages[-6:]:
             content = getattr(msg, "content", None)
-            if isinstance(content, str) and content.strip():
-                recent_messages.append(content.strip())
+            if not isinstance(content, str) or not content.strip():
+                continue
+            role = getattr(msg, "type", getattr(msg, "role", "user"))
+            prefix = "User: " if role in ("human", "user") else "Assistant: "
+            text = content.strip()
+            if text.startswith("{") and role in ("ai", "assistant"):
+                try:
+                    data = json.loads(text)
+                    if isinstance(data, dict):
+                        extracted = data.get("الإجابة") or data.get("التمرين") or text
+                        text = str(extracted)
+                except Exception:
+                    pass
+            recent_messages.append(f"{prefix}{text}")
 
         conversation_text = "\n".join(recent_messages) if recent_messages else query
 
@@ -248,14 +262,28 @@ class ChatFallbackNode:
         from .telemetry import emit_telemetry
 
         start_time = time.time()
+        import json
+
         query = state.get("query", "")
         messages = state.get("messages", [])
 
         recent_messages: list[str] = []
         for msg in messages[-6:]:
             content = getattr(msg, "content", None)
-            if isinstance(content, str) and content.strip():
-                recent_messages.append(content.strip())
+            if not isinstance(content, str) or not content.strip():
+                continue
+            role = getattr(msg, "type", getattr(msg, "role", "user"))
+            prefix = "User: " if role in ("human", "user") else "Assistant: "
+            text = content.strip()
+            if text.startswith("{") and role in ("ai", "assistant"):
+                try:
+                    data = json.loads(text)
+                    if isinstance(data, dict):
+                        extracted = data.get("الإجابة") or data.get("التمرين") or text
+                        text = str(extracted)
+                except Exception:
+                    pass
+            recent_messages.append(f"{prefix}{text}")
 
         conversation = "\n".join(recent_messages) if recent_messages else query
         fallback_response = (
