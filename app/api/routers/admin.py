@@ -14,6 +14,7 @@
 
 import asyncio
 import inspect
+import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect
 from pydantic import BaseModel
@@ -62,6 +63,37 @@ class AdminUserCountResponse(BaseModel):
 def _is_text_event(event: dict[str, object]) -> bool:
     """يتحقق من أن الحدث نصي ومسموح بتجميعه داخل مخزن النص النهائي."""
     return str(event.get("type", "")) in TEXT_EVENT_TYPES
+
+
+def _bind_local_conversation_id(
+    event: dict[str, object], conversation_id: int | None
+) -> dict[str, object]:
+    """يربط معرف المحادثة المحلي بأحداث البث لحماية سياق المسؤول من التلوث."""
+    if conversation_id is None:
+        return event
+    payload = event.get("payload")
+    if isinstance(payload, dict):
+        payload["conversation_id"] = conversation_id
+    else:
+        event["payload"] = {"conversation_id": conversation_id}
+    return event
+
+
+def _bind_stream_metadata(
+    event: dict[str, object],
+    conversation_id: int | None,
+    request_id: str | None,
+) -> dict[str, object]:
+    """يربط معرف المحادثة ومعرف الطلب في الحدث لعزل الدفق الإداري."""
+    bound_event = _bind_local_conversation_id(event, conversation_id)
+    if not request_id:
+        return bound_event
+    payload = bound_event.get("payload")
+    if isinstance(payload, dict):
+        payload["request_id"] = request_id
+    else:
+        bound_event["payload"] = {"request_id": request_id}
+    return bound_event
 
 
 def get_chat_actor(
@@ -204,14 +236,26 @@ async def chat_stream_ws(
     try:
         while True:
             payload = await websocket.receive_json()
+            request_id_value = payload.get("client_request_id")
+            client_request_id = (
+                str(request_id_value).strip() if request_id_value is not None else None
+            )
+            if client_request_id == "":
+                client_request_id = None
+            stream_request_id = client_request_id or str(uuid.uuid4())
+
             question = str(payload.get("question", "")).replace("\x00", "").strip()
             if not question:
                 await websocket.send_json(
-                    normalize_streaming_event(
-                        {
-                            "type": "error",
-                            "payload": {"details": "Question is required."},
-                        }
+                    _bind_stream_metadata(
+                        normalize_streaming_event(
+                            {
+                                "type": "error",
+                                "payload": {"details": "Question is required."},
+                            }
+                        ),
+                        None,
+                        stream_request_id,
                     )
                 )
                 continue
@@ -242,20 +286,27 @@ async def chat_stream_ws(
                     normalize_streaming_event(
                         {
                             "type": "conversation_init",
-                            "payload": {"conversation_id": local_conversation_id},
+                            "payload": {
+                                "conversation_id": local_conversation_id,
+                                "request_id": stream_request_id,
+                            },
                         }
                     )
                 )
             except HTTPException as http_exc:
                 await websocket.send_json(
-                    normalize_streaming_event(
-                        {
-                            "type": "error",
-                            "payload": {
-                                "details": str(http_exc.detail),
-                                "status_code": http_exc.status_code,
-                            },
-                        }
+                    _bind_stream_metadata(
+                        normalize_streaming_event(
+                            {
+                                "type": "error",
+                                "payload": {
+                                    "details": str(http_exc.detail),
+                                    "status_code": http_exc.status_code,
+                                },
+                            }
+                        ),
+                        local_conversation_id,
+                        stream_request_id,
                     )
                 )
                 continue
@@ -265,14 +316,18 @@ async def chat_stream_ws(
                     exc_info=True,
                 )
                 await websocket.send_json(
-                    normalize_streaming_event(
-                        {
-                            "type": "error",
-                            "payload": {
-                                "details": "Failed to save your message locally.",
-                                "status_code": 500,
-                            },
-                        }
+                    _bind_stream_metadata(
+                        normalize_streaming_event(
+                            {
+                                "type": "error",
+                                "payload": {
+                                    "details": "Failed to save your message locally.",
+                                    "status_code": 500,
+                                },
+                            }
+                        ),
+                        local_conversation_id,
+                        stream_request_id,
                     )
                 )
                 continue
@@ -286,7 +341,10 @@ async def chat_stream_ws(
             try:
 
                 async def stream_and_forward(
-                    q=question, lc_id=local_conversation_id, meta=metadata
+                    q=question,
+                    lc_id=local_conversation_id,
+                    meta=metadata,
+                    request_id=stream_request_id,
                 ) -> None:
                     nonlocal pending_terminal_event
                     nonlocal complete_ai_response
@@ -317,9 +375,15 @@ async def chat_stream_ws(
 
                         event_type = normalized_event.get("type")
                         if event_type in {"complete", "assistant_final"}:
-                            pending_terminal_event = normalized_event
+                            pending_terminal_event = _bind_stream_metadata(
+                                normalized_event, lc_id, request_id
+                            )
                         else:
-                            await websocket.send_json(normalized_event)
+                            await websocket.send_json(
+                                _bind_stream_metadata(
+                                    normalized_event, lc_id, request_id
+                                )
+                            )
 
                         if _is_text_event(normalized_event) and isinstance(
                             normalized_event.get("payload"), dict
@@ -375,31 +439,41 @@ async def chat_stream_ws(
                 if assistant_message_persisted:
                     if pending_terminal_event is not None:
                         await websocket.send_json(pending_terminal_event)
-                    await websocket.send_json(normalize_streaming_event({"type": "persisted"}))
+                    await websocket.send_json(
+                        _bind_stream_metadata(normalize_streaming_event({"type": "persisted"}), local_conversation_id, stream_request_id)
+                    )
                 elif pending_terminal_event is not None and stream_error is None:
                     await websocket.send_json(
-                        normalize_streaming_event(
-                            {
-                                "type": "error",
-                                "payload": {
-                                    "details": (
-                                        "Failed to confirm assistant persistence before completion."
-                                    ),
-                                    "status_code": 500,
-                                },
-                            }
+                        _bind_stream_metadata(
+                            normalize_streaming_event(
+                                {
+                                    "type": "error",
+                                    "payload": {
+                                        "details": (
+                                            "Failed to confirm assistant persistence before completion."
+                                        ),
+                                        "status_code": 500,
+                                    },
+                                }
+                            ),
+                            local_conversation_id,
+                            stream_request_id,
                         )
                     )
                 if isinstance(stream_error, HTTPException):
                     await websocket.send_json(
-                        normalize_streaming_event(
-                            {
-                                "type": "error",
-                                "payload": {
-                                    "details": str(stream_error.detail),
-                                    "status_code": stream_error.status_code,
-                                },
-                            }
+                        _bind_stream_metadata(
+                            normalize_streaming_event(
+                                {
+                                    "type": "error",
+                                    "payload": {
+                                        "details": str(stream_error.detail),
+                                        "status_code": stream_error.status_code,
+                                    },
+                                }
+                            ),
+                            local_conversation_id,
+                            stream_request_id,
                         )
                     )
                     # Cannot 'continue' inside finally, but stream_error is handled.
