@@ -1,8 +1,11 @@
 import asyncio
+import json
 import os
+import re
 from operator import add
 from typing import Annotated, TypedDict
 
+import dspy
 from langgraph.graph import END, StateGraph
 
 
@@ -97,9 +100,6 @@ CHAT_INTENT_TRIGGERS = {
     "شكراً",
 }
 
-
-import re
-
 ADMIN_PATTERNS = [
     r"(كم|عدد|احسب|حساب|كمية)\s*(عدد)?\s*(ملفات|ملف|بايثون)",
     r"(كم|عدد)\s*(عدد)?\s*(جداول|جدول|قاعدة البيانات)",
@@ -110,6 +110,171 @@ ADMIN_PATTERNS = [
 ]
 
 
+ARABIC_ANAPHORA = [
+    "ها",
+    "ه",
+    "هم",
+    "هن",
+    "هذا",
+    "هذه",
+    "ذلك",
+    "تلك",
+    "فيها",
+    "منها",
+    "عنها",
+    "لها",
+    "بها",
+    "عليها",
+    "إليها",
+    "فيه",
+    "منه",
+    "عنه",
+    "له",
+    "به",
+    "عليه",
+    "إليه",
+    "السابق",
+    "السابقة",
+    "نفس",
+    "أيضاً",
+    "أيضا",
+    "كذلك",
+    "المذكور",
+    "المذكورة",
+    "أكثر",
+    "المزيد",
+    "آخر",
+    "أخرى",
+    "وماذا عن",
+    "اشرح أكثر",
+]
+ENGLISH_ANAPHORA = [
+    "it",
+    "its",
+    "they",
+    "them",
+    "their",
+    "this",
+    "that",
+    "those",
+    "these",
+    "the same",
+    "previous",
+    "above",
+    "more",
+    "another",
+    "also",
+    "further",
+    "what about",
+    "tell me more",
+    "explain further",
+]
+SHORT_QUERY_THRESHOLD = 6
+ELLIPTICAL_STARTERS = {
+    "ما",
+    "ماذا",
+    "كيف",
+    "لماذا",
+    "هل",
+    "where",
+    "what",
+    "how",
+    "why",
+    "which",
+}
+ELLIPTICAL_TERMS = {
+    "العاصمة",
+    "تمرين",
+    "تمرينًا",
+    "تمرينا",
+    "شرح",
+    "exercise",
+    "capital",
+    "example",
+    "details",
+}
+
+
+def build_conversation_context(messages: list[object], max_turns: int = 6) -> str:
+    # CONTEXT_FIX: توحيد بناء سياق المحادثة للاستخدام عبر العقد المختلفة.
+    """يبني سياقًا منسقًا لآخر الرسائل ليُستهلك بأمان بواسطة نماذج اللغة."""
+    recent_messages: list[str] = []
+    for msg in messages[-max_turns:]:
+        content = getattr(msg, "content", None)
+        if not isinstance(content, str) or not content.strip():
+            continue
+        role = getattr(msg, "type", getattr(msg, "role", "user"))
+        prefix = "User: " if role in ("human", "user") else "Assistant: "
+        text = content.strip()
+        if text.startswith("{") and role in ("ai", "assistant"):
+            try:
+                data = json.loads(text)
+                if isinstance(data, dict):
+                    extracted = data.get("الإجابة") or data.get("التمرين") or text
+                    text = str(extracted)
+            except Exception:
+                pass
+        recent_messages.append(f"{prefix}{text}")
+
+    return "\n".join(recent_messages)
+
+
+def _tokenize_query(query: str) -> list[str]:
+    # CONTEXT_FIX: توحيد تقسيم النص لتفادي المطابقة الجزئية الخاطئة.
+    """يقسّم النص إلى كلمات/رموز دلالية منخفضة المخاطر للمطابقة القاموسية."""
+    normalized = query.casefold()
+    tokens = re.findall(r"[^\W_]+", normalized, flags=re.UNICODE)
+    return [token for token in tokens if token]
+
+
+def _contains_compound_indicator(query: str, indicators: list[str]) -> bool:
+    # CONTEXT_FIX: كشف العبارات متعددة الكلمات مع حدود كلمة صريحة.
+    """يتحقق من وجود عبارات كاملة مع حدود كلمة لتجنّب الإيجابيات الكاذبة."""
+    normalized = query.casefold()
+    for indicator in indicators:
+        if " " not in indicator and "\t" not in indicator:
+            continue
+        escaped_indicator = re.escape(indicator.casefold())
+        if re.search(rf"(?<!\w){escaped_indicator}(?!\w)", normalized):
+            return True
+    return False
+
+
+def _contains_anaphora_indicator(query: str) -> bool:
+    # CONTEXT_FIX: كشف الضمائر والإشارات دون الاعتماد على احتواء جزئي خطِر.
+    """يكشف مؤشرات الإحالة المرجعية العربية والإنجليزية بشكل حذر ودقيق."""
+    tokens = _tokenize_query(query)
+    if not tokens:
+        return False
+
+    token_set = set(tokens)
+    arabic_token_indicators = {item for item in ARABIC_ANAPHORA if " " not in item}
+    english_token_indicators = {item for item in ENGLISH_ANAPHORA if " " not in item}
+
+    if token_set.intersection(arabic_token_indicators):
+        return True
+    if token_set.intersection(english_token_indicators):
+        return True
+    if _contains_compound_indicator(query=query, indicators=ARABIC_ANAPHORA):
+        return True
+    return _contains_compound_indicator(query=query, indicators=ENGLISH_ANAPHORA)
+
+
+def _looks_elliptical_followup(query: str, history: str) -> bool:
+    # CONTEXT_FIX: تقليل إعادة الصياغة العدوانية للاستعلامات القصيرة غير الغامضة.
+    """يكتشف الأسئلة القصيرة المرجّح اعتمادها على سياق سابق دون إفراط في التحفيز."""
+    if not history.strip():
+        return False
+    tokens = _tokenize_query(query)
+    if not tokens or len(tokens) > SHORT_QUERY_THRESHOLD:
+        return False
+
+    first_token = tokens[0]
+    has_question_mark = "?" in query or "؟" in query
+    contains_elliptical_term = bool(set(tokens).intersection(ELLIPTICAL_TERMS))
+    return (first_token in ELLIPTICAL_STARTERS and has_question_mark) or contains_elliptical_term
+
+
 def emergency_intent_guard(query: str) -> bool:
     """
     DETERMINISTIC check BEFORE any LLM involvement.
@@ -118,10 +283,6 @@ def emergency_intent_guard(query: str) -> bool:
     query_lower = query.lower()
     # Require at least one exact match from the patterns to avoid trapping generic words
     return any(re.search(pattern, query_lower) for pattern in ADMIN_PATTERNS)
-
-
-import dspy
-
 
 def _configure_dspy() -> None:
     """يضبط نموذج DSPy عالميًا في مرحلة الإقلاع باستخدام مفاتيح البيئة المتاحة."""
@@ -176,29 +337,8 @@ class SupervisorNode:
 
         start_time = time.time()
         query = state.get("query", "")
-        import json
-
         messages = state.get("messages", [])
-
-        recent_messages: list[str] = []
-        for msg in messages[-6:]:
-            content = getattr(msg, "content", None)
-            if not isinstance(content, str) or not content.strip():
-                continue
-            role = getattr(msg, "type", getattr(msg, "role", "user"))
-            prefix = "User: " if role in ("human", "user") else "Assistant: "
-            text = content.strip()
-            if text.startswith("{") and role in ("ai", "assistant"):
-                try:
-                    data = json.loads(text)
-                    if isinstance(data, dict):
-                        extracted = data.get("الإجابة") or data.get("التمرين") or text
-                        text = str(extracted)
-                except Exception:
-                    pass
-            recent_messages.append(f"{prefix}{text}")
-
-        conversation_text = "\n".join(recent_messages) if recent_messages else query
+        conversation_text = build_conversation_context(messages=messages) or query
 
         if emergency_intent_guard(query):
             intent = "admin"
@@ -261,30 +401,9 @@ class ChatFallbackNode:
         from .telemetry import emit_telemetry
 
         start_time = time.time()
-        import json
-
         query = state.get("query", "")
         messages = state.get("messages", [])
-
-        recent_messages: list[str] = []
-        for msg in messages[-6:]:
-            content = getattr(msg, "content", None)
-            if not isinstance(content, str) or not content.strip():
-                continue
-            role = getattr(msg, "type", getattr(msg, "role", "user"))
-            prefix = "User: " if role in ("human", "user") else "Assistant: "
-            text = content.strip()
-            if text.startswith("{") and role in ("ai", "assistant"):
-                try:
-                    data = json.loads(text)
-                    if isinstance(data, dict):
-                        extracted = data.get("الإجابة") or data.get("التمرين") or text
-                        text = str(extracted)
-                except Exception:
-                    pass
-            recent_messages.append(f"{prefix}{text}")
-
-        conversation = "\n".join(recent_messages) if recent_messages else query
+        conversation = build_conversation_context(messages=messages) or query
         fallback_response = (
             "وعليكم السلام! أنا هنا للمساعدة. أخبرني بما تحتاجه وسأتابع معك خطوة بخطوة."
         )
@@ -308,6 +427,62 @@ class ChatFallbackNode:
                 "المصدر": "chat_fallback",
             }
         }
+
+
+class QueryRewriterSignature(dspy.Signature):
+    # CONTEXT_FIX: توقيع متخصص لإعادة صياغة السؤال ليصبح مستقلًا عن السياق الضمني.
+    """يعيد صياغة السؤال الحالي ليكون واضحًا ومكتفيًا ذاتيًا دون الاعتماد على ضمائر مبهمة."""
+
+    conversation_history: str = dspy.InputField(desc="آخر الرسائل السياقية ذات الصلة")
+    current_query: str = dspy.InputField(desc="سؤال المستخدم الحالي بصيغته الخام")
+    rewritten_query: str = dspy.OutputField(desc="سؤال واضح مستقل خالٍ من الإحالات الضمنية")
+
+
+class QueryRewriterNode:
+    # CONTEXT_FIX: عقدة مخصصة لحل الإحالات الضميرية قبل مسار البحث.
+    def __init__(self) -> None:
+        self.rewriter = dspy.ChainOfThought(QueryRewriterSignature)
+
+    async def __call__(self, state: AgentState) -> dict:
+        import time
+
+        from .telemetry import emit_telemetry
+
+        start_time = time.time()
+        query = str(state.get("query", "")).strip()
+        messages = state.get("messages", [])
+        if not query or len(messages) <= 1:
+            emit_telemetry(node_name="QueryRewriterNode", start_time=start_time, state=state)
+            return {"query": query}
+
+        history = build_conversation_context(messages=messages)
+        if not history.strip():
+            emit_telemetry(node_name="QueryRewriterNode", start_time=start_time, state=state)
+            return {"query": query}
+
+        has_anaphora = _contains_anaphora_indicator(query=query)
+        looks_elliptical = _looks_elliptical_followup(query=query, history=history)
+        needs_rewrite = has_anaphora or looks_elliptical
+
+        if not needs_rewrite:
+            emit_telemetry(node_name="QueryRewriterNode", start_time=start_time, state=state)
+            return {"query": query}
+
+        rewritten_query = query
+        try:
+            result = await asyncio.to_thread(
+                self.rewriter,
+                conversation_history=history,
+                current_query=query,
+            )
+            candidate = getattr(result, "rewritten_query", "")
+            if isinstance(candidate, str) and candidate.strip():
+                rewritten_query = candidate.strip()
+        except Exception:
+            pass
+
+        emit_telemetry(node_name="QueryRewriterNode", start_time=start_time, state=state)
+        return {"query": rewritten_query}
 
 
 class ToolExecutorNode:
@@ -368,11 +543,11 @@ def route_intent(state: AgentState) -> str:
     logger = logging.getLogger("graph")
     intent = state.get("intent", "search")
     node = {
-        "search": "query_analyzer",
+        "search": "query_rewriter",
         "admin": "admin_agent",
         "tool": "tool_executor",
         "chat": "chat_fallback",
-    }.get(intent, "query_analyzer")
+    }.get(intent, "query_rewriter")
     logger.info(f"SUPERVISOR_NODE → routing to → {node}")
     return intent
 
@@ -401,6 +576,7 @@ def create_unified_graph(admin_app=None):
     from .admin import AdminAgentNode
 
     graph.add_node("supervisor", SupervisorNode())
+    graph.add_node("query_rewriter", QueryRewriterNode())
     graph.add_node("query_analyzer", query_analyzer_node())
     graph.add_node("retriever", internal_retriever_node())
     graph.add_node("reranker", reranker_node())
@@ -415,13 +591,14 @@ def create_unified_graph(admin_app=None):
         "supervisor",
         route_intent,
         {
-            "search": "query_analyzer",
+            "search": "query_rewriter",
             "admin": "admin_agent",
             "tool": "tool_executor",
             "chat": "chat_fallback",
         },
     )
 
+    graph.add_edge("query_rewriter", "query_analyzer")
     graph.add_edge("query_analyzer", "retriever")
     graph.add_edge("retriever", "reranker")
     graph.add_conditional_edges(
