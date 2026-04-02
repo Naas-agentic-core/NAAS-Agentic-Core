@@ -577,6 +577,10 @@ body {
     text-align: right;
 }
 
+.markdown-content :is(p, li, h1, h2, h3, h4, h5, h6, blockquote) {
+    unicode-bidi: plaintext;
+}
+
 .markdown-content h1, .markdown-content h2, .markdown-content h3 {
     margin-top: 1rem;
     margin-bottom: 0.5rem;

@@ -3,6 +3,7 @@ import json
 import logging
 import os
 import uuid
+from contextlib import suppress
 from typing import TypedDict
 
 import anyio
@@ -53,6 +54,10 @@ from microservices.orchestrator_service.src.services.tools.registry import get_r
 logger = logging.getLogger(__name__)
 
 active_background_tasks = set()
+MAX_HISTORY_MESSAGES = 24
+MAX_HISTORY_SUMMARY_MESSAGES = 40
+MAX_HISTORY_SUMMARY_CHARS = 2400
+MAX_HISTORY_SUMMARY_ITEMS = 18
 
 type JsonObject = dict[str, object]
 
@@ -75,6 +80,47 @@ class StreamFrame(BaseModel):
 
     type: str
     payload: dict[str, object] = Field(default_factory=dict)
+
+
+def _compress_text_for_context(content: str) -> str:
+    """يضغط النص للسياق عبر إزالة الضوضاء وتوحيد المسافات وتقليص الطول."""
+    collapsed = " ".join(content.replace("\x00", "").split())
+    cleaned = collapsed.replace("```", "").strip()
+    if len(cleaned) <= 260:
+        return cleaned
+    return f"{cleaned[:260]}…"
+
+
+def _build_older_history_digest(rows: list[object]) -> str:
+    """يبني ملخصًا موجزًا للرسائل الأقدم مع إزالة التكرارات البنيوية."""
+    if not rows:
+        return ""
+
+    digest_items: list[str] = []
+    seen: set[str] = set()
+    current_size = 0
+    for old_message in rows:
+        role_value = getattr(old_message, "role", "")
+        content_value = getattr(old_message, "content", "")
+        role_label = "المستخدم" if str(role_value) == "user" else "المساعد"
+        compact = _compress_text_for_context(str(content_value))
+        if not compact:
+            continue
+        item = f"- {role_label}: {compact}"
+        fingerprint = item.casefold()
+        if fingerprint in seen:
+            continue
+        allowed = MAX_HISTORY_SUMMARY_CHARS - current_size
+        if allowed <= 0:
+            break
+        if len(item) > allowed:
+            item = f"{item[:allowed]}…"
+        digest_items.append(item)
+        seen.add(fingerprint)
+        current_size += len(item)
+        if len(digest_items) >= MAX_HISTORY_SUMMARY_ITEMS:
+            break
+    return "\n".join(digest_items)
 
 
 def _canonicalize_mission_event(event: object) -> MissionEventEnvelope | None:
@@ -475,11 +521,54 @@ async def _ensure_conversation(
     )
     get_messages_query = (
         text(
-            "SELECT id, role, content, created_at FROM admin_messages WHERE conversation_id=:conversation_id ORDER BY id ASC"
+            """
+            SELECT id, role, content, created_at
+            FROM (
+                SELECT id, role, content, created_at
+                FROM admin_messages
+                WHERE conversation_id=:conversation_id
+                ORDER BY id DESC
+                LIMIT :history_limit
+            ) recent
+            ORDER BY id ASC
+            """
         )
         if is_admin_scope
         else text(
-            "SELECT id, role, content, created_at FROM customer_messages WHERE conversation_id=:conversation_id ORDER BY id ASC"
+            """
+            SELECT id, role, content, created_at
+            FROM (
+                SELECT id, role, content, created_at
+                FROM customer_messages
+                WHERE conversation_id=:conversation_id
+                ORDER BY id DESC
+                LIMIT :history_limit
+            ) recent
+            ORDER BY id ASC
+            """
+        )
+    )
+    get_older_messages_query = (
+        text(
+            """
+            SELECT id, role, content
+            FROM admin_messages
+            WHERE conversation_id=:conversation_id
+            ORDER BY id DESC
+            OFFSET :history_limit
+            LIMIT :summary_limit
+            """
+        )
+        if is_admin_scope
+        else text(
+            """
+            SELECT id, role, content
+            FROM customer_messages
+            WHERE conversation_id=:conversation_id
+            ORDER BY id DESC
+            OFFSET :history_limit
+            LIMIT :summary_limit
+            """
         )
     )
 
@@ -518,7 +607,13 @@ async def _ensure_conversation(
             try:
                 try:
                     messages_res = await asyncio.wait_for(
-                        session.execute(get_messages_query, {"conversation_id": conversation_id}),
+                        session.execute(
+                            get_messages_query,
+                            {
+                                "conversation_id": conversation_id,
+                                "history_limit": MAX_HISTORY_MESSAGES,
+                            },
+                        ),
                         timeout=5.0,
                     )
                 except TimeoutError as e:
@@ -535,6 +630,29 @@ async def _ensure_conversation(
                     }
                     for m in messages_rows
                 ]
+                older_messages_res = await asyncio.wait_for(
+                    session.execute(
+                        get_older_messages_query,
+                        {
+                            "conversation_id": conversation_id,
+                            "history_limit": MAX_HISTORY_MESSAGES,
+                            "summary_limit": MAX_HISTORY_SUMMARY_MESSAGES,
+                        },
+                    ),
+                    timeout=5.0,
+                )
+                older_messages_rows = list(reversed(older_messages_res.fetchall()))
+                if older_messages_rows:
+                    digest = _build_older_history_digest(older_messages_rows)
+                    if digest:
+                        messages.insert(
+                            0,
+                            {
+                                "role": "assistant",
+                                "content": "ملخص موجز لما سبق في نفس المحادثة:\n" + digest,
+                                "created_at": "",
+                            },
+                        )
                 logger.info(
                     "[CONV_LIFECYCLE] stage=history_loaded role=%s user=%s conv_id=%s msg_count=%s",
                     "admin" if is_admin_scope else "customer",
@@ -657,6 +775,30 @@ async def _stream_chat_langgraph(
     """يشغّل LangGraph الموحد لمسارات البحث والإدارة ويبث الأحداث."""
     queue: asyncio.Queue[dict[str, object]] = asyncio.Queue(maxsize=64)
 
+    def _build_langchain_messages(
+        source_messages: list[dict[str, str]] | None,
+    ) -> list[HumanMessage | AIMessage]:
+        """يبني نافذة سياق محدودة ويزيل التكرارات المتجاورة لتقليل تلوث السياق."""
+        if not source_messages:
+            return []
+
+        normalized_messages: list[HumanMessage | AIMessage] = []
+        last_signature: tuple[str, str] | None = None
+        for message in source_messages[-MAX_HISTORY_MESSAGES:]:
+            role = message.get("role")
+            content = str(message.get("content", "")).strip()
+            if role not in {"user", "assistant"} or not content:
+                continue
+            signature = (role, content)
+            if signature == last_signature:
+                continue
+            if role == "user":
+                normalized_messages.append(HumanMessage(content=content))
+            else:
+                normalized_messages.append(AIMessage(content=content))
+            last_signature = signature
+        return normalized_messages
+
     async def _runner():
         try:
             _graph = app_graph or getattr(websocket.app.state, "app_graph", None)
@@ -664,13 +806,7 @@ async def _stream_chat_langgraph(
                 _graph = create_unified_graph()
             config = {"configurable": {"thread_id": str(conversation_id)}}
 
-            langchain_msgs = []
-            if history_messages:
-                for msg in history_messages:
-                    if msg.get("role") == "user":
-                        langchain_msgs.append(HumanMessage(content=msg.get("content", "")))
-                    elif msg.get("role") == "assistant":
-                        langchain_msgs.append(AIMessage(content=msg.get("content", "")))
+            langchain_msgs = _build_langchain_messages(history_messages)
 
             # The newly received objective is already appended in DB inside _ensure_conversation,
             # but if it isn't (or just to be safe), we ensure the last message is the current objective.
@@ -861,6 +997,8 @@ async def _stream_chat_langgraph(
     finally:
         if not task.done():
             task.cancel()
+            with suppress(asyncio.CancelledError):
+                await task
 
     await websocket.send_json({"type": "complete", "payload": {}})
 
