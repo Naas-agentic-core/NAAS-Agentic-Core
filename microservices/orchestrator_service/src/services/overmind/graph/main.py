@@ -154,12 +154,12 @@ def _configure_dspy() -> None:
 
 
 class IntentClassifier(dspy.Signature):
-    """Classify if query needs admin system metrics, general chat/greetings, or educational search. If the user says a greeting (السلام عليكم, hello) or general chat, output is_chat=True."""
+    """Classify if conversation needs admin system metrics, general chat/greetings, or educational search. If the user says a greeting (السلام عليكم, hello) or general chat, output is_chat=True. Follow-up questions about previous exercises/topics are educational searches, so is_chat=False."""
 
-    query: str = dspy.InputField()
-    is_admin: bool = dspy.OutputField(desc="True if query needs real system counts/metrics")
+    conversation: str = dspy.InputField()
+    is_admin: bool = dspy.OutputField(desc="True if conversation needs real system counts/metrics")
     is_chat: bool = dspy.OutputField(
-        desc="True if query is a greeting, small talk, or general conversational chat (e.g. السلام عليكم, شكرا, مرحبا)"
+        desc="True if conversation is a greeting, small talk, or general conversational chat (e.g. السلام عليكم, شكرا, مرحبا)"
     )
     confidence: float = dspy.OutputField()
     tool_needed: str = dspy.OutputField(desc="Which admin tool is needed")
@@ -177,6 +177,15 @@ class SupervisorNode:
 
         start_time = time.time()
         query = state.get("query", "")
+        messages = state.get("messages", [])
+
+        recent_messages: list[str] = []
+        for msg in messages[-6:]:
+            content = getattr(msg, "content", None)
+            if isinstance(content, str) and content.strip():
+                recent_messages.append(content.strip())
+
+        conversation_text = "\n".join(recent_messages) if recent_messages else query
 
         if emergency_intent_guard(query):
             intent = "admin"
@@ -194,7 +203,7 @@ class SupervisorNode:
                 return {"intent": "admin"}
 
         try:
-            result = await asyncio.to_thread(self.dspy_classifier, query=query)
+            result = await asyncio.to_thread(self.dspy_classifier, conversation=conversation_text)
             try:
                 conf = float(result.confidence)
             except (ValueError, TypeError):

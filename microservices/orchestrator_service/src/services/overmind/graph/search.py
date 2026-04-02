@@ -78,7 +78,7 @@ class QueryAnalyzerNode:
                 timeout=10.0,
             )
             filters = QueryFilters(
-                raw_query=query,
+                raw_query=context_query,
                 year=_coerce_nullable_int(getattr(prediction, "year", None)),
                 subject=str(prediction.subject),
                 branch=str(prediction.branch),
@@ -88,7 +88,7 @@ class QueryAnalyzerNode:
             logger.warning(f"DSPy parsing failed, returning empty filters: {e}")
             error = e
             filters = QueryFilters(
-                raw_query=query,
+                raw_query=context_query,
                 year=None,
                 subject="",
                 branch="",

@@ -98,7 +98,7 @@ def test_chat_ws_customer_uses_stategraph(monkeypatch) -> None:
     monkeypatch.setattr(routes, "create_unified_graph", _fake_create_unified_graph)
 
     async def fake_ensure_conversation(**kwargs):
-        return 123
+        return 123, []
 
     monkeypatch.setattr(routes, "_ensure_conversation", fake_ensure_conversation)
 
@@ -138,7 +138,7 @@ def test_chat_ws_admin_uses_stategraph(monkeypatch) -> None:
     monkeypatch.setattr(routes, "create_unified_graph", _fake_create_unified_graph)
 
     async def fake_ensure_conversation(**kwargs):
-        return 456
+        return 456, []
 
     monkeypatch.setattr(routes, "_ensure_conversation", fake_ensure_conversation)
 
@@ -193,7 +193,7 @@ def test_chat_ws_admin_sanitizes_streaming_errors(monkeypatch) -> None:
     monkeypatch.setattr(routes, "create_unified_graph", ExplodingGraph)
 
     async def fake_ensure_conversation(**kwargs):
-        return 999
+        return 999, []
 
     async def fake_persist_assistant_message(**kwargs):
         return None
