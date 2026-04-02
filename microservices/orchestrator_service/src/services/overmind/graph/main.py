@@ -3,7 +3,6 @@ import os
 from operator import add
 from typing import Annotated, TypedDict
 
-from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import END, StateGraph
 
 
@@ -440,5 +439,4 @@ def create_unified_graph(admin_app=None):
     graph.add_conditional_edges("validator", check_quality, {"pass": END, "fail": "supervisor"})
 
     graph.set_entry_point("supervisor")
-    memory = MemorySaver()
-    return graph.compile(checkpointer=memory)
+    return graph.compile()
