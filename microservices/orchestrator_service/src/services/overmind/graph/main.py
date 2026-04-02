@@ -395,10 +395,14 @@ class SupervisorNode:
         except Exception:
             pass
 
-        if len(query_normalized.split()) <= 3 and "?" not in query_normalized and "؟" not in query:
-            if not _looks_elliptical_followup(query, conversation_text):
-                emit_telemetry(node_name="SupervisorNode", start_time=start_time, state=state)
-                return {"intent": "chat"}
+        if (
+            len(query_normalized.split()) <= 3
+            and "?" not in query_normalized
+            and "؟" not in query
+            and not _looks_elliptical_followup(query, conversation_text)
+        ):
+            emit_telemetry(node_name="SupervisorNode", start_time=start_time, state=state)
+            return {"intent": "chat"}
 
         intent = "search"
         emit_telemetry(node_name="SupervisorNode", start_time=start_time, state=state)
@@ -518,6 +522,43 @@ class QueryRewriterNode:
             return False
         return "User:" not in candidate and "Assistant:" not in candidate
 
+    def _extract_latest_reference_snippet(self, messages: list[object]) -> str:
+        """يستخرج آخر رسالة مرجعية غير فارغة لتثبيت الإحالة الضميرية عند الفشل."""
+        if not messages:
+            return ""
+
+        for message in reversed(messages):
+            role = getattr(message, "type", getattr(message, "role", ""))
+            content = getattr(message, "content", "")
+            if role not in {"human", "user", "ai", "assistant"}:
+                continue
+            if not isinstance(content, str):
+                continue
+            text = content.strip()
+            if not text:
+                continue
+            if len(text) > 220:
+                return text[:220].strip()
+            return text
+        return ""
+
+    def _build_contextual_fallback_rewrite(self, query: str, messages: list[object]) -> str:
+        """يبني إعادة صياغة حتمية عند تعذر إعادة الصياغة الذكية لمنع عمى السياق."""
+        reference = self._extract_latest_reference_snippet(messages=messages)
+        if not reference:
+            return query
+
+        lowered = query.casefold()
+        if any(token in lowered for token in ["capital", "عاصمة"]):
+            return f"اعتمادًا على هذا السياق: {reference}\nالسؤال الحالي: {query}"
+
+        if _contains_anaphora_indicator(query=query) or _looks_elliptical_followup(
+            query=query,
+            history=build_conversation_context(messages=messages),
+        ):
+            return f"بالرجوع إلى آخر سياق في نفس المحادثة: {reference}\nالسؤال: {query}"
+        return query
+
     async def __call__(self, state: AgentState) -> dict:
         # CONTEXT_FIX: تنفيذ غير حاجب مع fallback آمن إلى السؤال الأصلي.
         """يعيد كتابة السؤال الغامض إلى صيغة مستقلة قبل دخوله مسار البحث."""
@@ -559,7 +600,10 @@ class QueryRewriterNode:
                 state=state,
                 error=error,
             )
-            return {"query": query}
+            return {"query": self._build_contextual_fallback_rewrite(query=query, messages=messages)}
+
+        if rewritten_query == query:
+            rewritten_query = self._build_contextual_fallback_rewrite(query=query, messages=messages)
 
         emit_telemetry(node_name="QueryRewriterNode", start_time=start_time, state=state)
         return {"query": rewritten_query}

@@ -1,7 +1,9 @@
 import pytest
+from langchain_core.messages import AIMessage, HumanMessage
 
 from microservices.orchestrator_service.src.services.overmind.graph.main import (
     ChatFallbackNode,
+    QueryRewriterNode,
     SupervisorNode,
 )
 
@@ -68,8 +70,6 @@ async def test_analyzer_history():
 
 @pytest.mark.asyncio
 async def test_full_chat_flow():
-    from langchain_core.messages import HumanMessage
-
     from microservices.orchestrator_service.src.services.overmind.graph.main import (
         create_unified_graph,
     )
@@ -87,3 +87,37 @@ async def test_full_chat_flow():
     res = await graph.ainvoke(inputs, config={"configurable": {"thread_id": "1"}})
     print("\nTURN 2:", res.get("final_response"))
     print("\nMESSAGES TURN 2:", res.get("messages", []))
+
+
+@pytest.mark.asyncio
+async def test_query_rewriter_contextual_fallback_for_pronouns() -> None:
+    node = QueryRewriterNode()
+    result = await node(
+        {
+            "query": "ما هي عاصمتها؟",
+            "messages": [
+                HumanMessage(content="أين تقع الجزائر؟"),
+                AIMessage(content="تقع الجزائر في شمال أفريقيا."),
+                HumanMessage(content="ما هي عاصمتها؟"),
+            ],
+        }
+    )
+
+    rewritten = str(result.get("query", ""))
+    assert "الجزائر" in rewritten
+    assert "ما هي عاصمتها" in rewritten
+
+
+@pytest.mark.asyncio
+async def test_query_rewriter_keeps_self_contained_queries() -> None:
+    node = QueryRewriterNode()
+    result = await node(
+        {
+            "query": "ما هي عاصمة الجزائر؟",
+            "messages": [
+                HumanMessage(content="ما هي عاصمة الجزائر؟"),
+            ],
+        }
+    )
+
+    assert result["query"] == "ما هي عاصمة الجزائر؟"
