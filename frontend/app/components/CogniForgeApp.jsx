@@ -133,10 +133,22 @@ const DashboardLayout = ({ user, onLogout }) => {
     const fetchConversations = useCallback(async () => {
          const token = localStorage.getItem('token');
          try {
-             const res = await fetch(apiUrl(convEndpoint), {
+             const res = await fetch(apiUrl(`${convEndpoint}?limit=50`), {
                  headers: { 'Authorization': `Bearer ${token}` }
              });
-             if (res.ok) setConversations(await res.json());
+             if (res.ok) {
+                const rawItems = await res.json();
+                const items = Array.isArray(rawItems) ? rawItems : [];
+                const uniqueMap = new Map();
+                items.forEach((item) => {
+                    const key = String(item?.conversation_id ?? '');
+                    if (!key) return;
+                    if (!uniqueMap.has(key)) {
+                        uniqueMap.set(key, item);
+                    }
+                });
+                setConversations(Array.from(uniqueMap.values()));
+             }
          } catch (e) { errorTracker.reportError(e); }
     }, [convEndpoint]);
 
@@ -165,6 +177,7 @@ const DashboardLayout = ({ user, onLogout }) => {
     const handleNewChat = () => {
         clearMessages();
         setConversationId(null);
+        setConversations([]);
         setIsSidebarOpen(false);
         setIsMenuOpen(false);
     };
@@ -242,7 +255,7 @@ const DashboardLayout = ({ user, onLogout }) => {
                                 <i className="fas fa-plus"></i>
                                 <span>محادثة جديدة</span>
                             </button>
-                            <button className="header-menu-item" onClick={() => setIsSidebarOpen(true)}>
+                            <button className="header-menu-item" onClick={() => { fetchConversations(); setIsSidebarOpen(true); }}>
                                 <i className="fas fa-history"></i>
                                 <span>المحادثات السابقة</span>
                             </button>

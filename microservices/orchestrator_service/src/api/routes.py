@@ -1,6 +1,7 @@
 import asyncio
 import json
 import logging
+import os
 import uuid
 from typing import TypedDict
 
@@ -13,6 +14,7 @@ from fastapi import (
     Depends,
     Header,
     HTTPException,
+    Query,
     Request,
     WebSocket,
     WebSocketDisconnect,
@@ -187,6 +189,52 @@ def _safe_assistant_error(request_id: str) -> str:
     return f"تعذر معالجة طلب الدردشة حالياً. رقم المتابعة: {request_id}"
 
 
+def _safe_conversation_id(raw_value: object) -> int | None:
+    """يحوّل conversation_id بشكل آمن لدعم int أو string رقمي مع تتبع تشخيصي واضح."""
+    if raw_value is None:
+        return None
+    if isinstance(raw_value, int):
+        return raw_value
+    if isinstance(raw_value, str):
+        stripped = raw_value.strip()
+        if not stripped:
+            return None
+        try:
+            parsed = int(stripped)
+            logger.warning(
+                "[CONV_ID_TYPE] Received conversation_id as string '%s' and converted to int=%s",
+                raw_value,
+                parsed,
+            )
+            return parsed
+        except ValueError:
+            logger.error(
+                "[CONV_ID_TYPE] Invalid numeric conversion for conversation_id='%s'; using None",
+                raw_value,
+            )
+            return None
+
+    logger.error(
+        "[CONV_ID_TYPE] Unexpected conversation_id type=%s; using None",
+        type(raw_value).__name__,
+    )
+    return None
+
+
+def _decode_auth_payload_or_401(authorization: str | None) -> tuple[int, dict[str, object]]:
+    """يفك JWT من ترويسة Authorization ويعيد user_id والحمولة مع فشل مغلق."""
+    token = extract_bearer_token(authorization)
+    settings = get_settings()
+    try:
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=["HS256"])
+    except jwt.PyJWTError as exc:
+        raise HTTPException(status_code=401, detail="Invalid token") from exc
+    user_id = decode_user_id(token, settings.SECRET_KEY)
+    if user_id <= 0:
+        raise HTTPException(status_code=401, detail="Invalid user")
+    return user_id, payload
+
+
 async def _serialize_json_async(payload: object) -> str:
     """يُسلسل الحمولة إلى JSON داخل خيط منفصل لحماية حلقة الأحداث من الحجب."""
     return await anyio.to_thread.run_sync(lambda p: json.dumps(p, ensure_ascii=False), payload)
@@ -350,6 +398,61 @@ async def _create_new_conversation(
     return int(created_id)
 
 
+async def _lazy_import_history_with_retry(
+    *,
+    conversation_id: int,
+    user_id: int,
+    conv_metadata: dict[str, str],
+    messages: list[dict[str, str]],
+    max_attempts: int = 3,
+) -> None:
+    """يحاول استيراد التاريخ إلى conversation-service مع إعادة المحاولة قبل الفشل."""
+    conv_service_url = os.getenv("CONVERSATION_SERVICE_URL", "http://conversation-service:8010").rstrip(
+        "/"
+    )
+    payload = {
+        "conversation_id": conversation_id,
+        "user_id": user_id,
+        "idempotency_key": f"{conversation_id}:{user_id}",
+        "max_messages": 50,
+        "conversation_metadata": conv_metadata,
+        "messages": messages,
+    }
+    last_error: Exception | None = None
+    for attempt in range(1, max_attempts + 1):
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                resp = await client.post(f"{conv_service_url}/api/v1/conversations/import", json=payload)
+                resp.raise_for_status()
+                data = resp.json()
+            if data.get("status") not in {"imported", "already_exists"}:
+                raise ValueError(f"Unexpected import status: {data.get('status')}")
+            return
+        except Exception as exc:
+            last_error = exc
+            if attempt < max_attempts:
+                wait_seconds = 0.5 * attempt
+                logger.warning(
+                    "[HISTORY_RETRY] attempt=%s/%s failed for conv=%s user=%s error=%s; retrying in %.1fs",
+                    attempt,
+                    max_attempts,
+                    conversation_id,
+                    user_id,
+                    exc,
+                    wait_seconds,
+                )
+                await asyncio.sleep(wait_seconds)
+            else:
+                logger.error(
+                    "[HISTORY_RETRY] all attempts failed for conv=%s user=%s: %s",
+                    conversation_id,
+                    user_id,
+                    last_error,
+                )
+    if last_error is not None:
+        raise last_error
+
+
 async def _ensure_conversation(
     *,
     chat_scope: str,
@@ -430,34 +533,29 @@ async def _ensure_conversation(
                     }
                     for m in messages_rows
                 ]
+                logger.info(
+                    "[CONV_LIFECYCLE] stage=history_loaded role=%s user=%s conv_id=%s msg_count=%s",
+                    "admin" if is_admin_scope else "customer",
+                    user_id,
+                    conversation_id,
+                    len(messages),
+                )
                 conv_metadata = {
                     "title": str(conv_row.title),
                     "created_at": conv_row.created_at.isoformat(),
                 }
-
-                payload = {
-                    "conversation_id": conversation_id,
-                    "user_id": user_id,
-                    "idempotency_key": f"{conversation_id}:{user_id}",
-                    "max_messages": 50,
-                    "conversation_metadata": conv_metadata,
-                    "messages": messages,
-                }
-
-                settings = get_settings()
-                conv_service_url = settings.CONVERSATION_SERVICE_URL.rstrip("/")
-                async with httpx.AsyncClient(timeout=10.0) as client:
-                    resp = await client.post(
-                        f"{conv_service_url}/api/v1/conversations/import", json=payload
-                    )
-                    resp.raise_for_status()
-                    data = resp.json()
-                    if data.get("status") not in {"imported", "already_exists"}:
-                        raise ValueError(f"Unexpected import status: {data.get('status')}")
+                await _lazy_import_history_with_retry(
+                    conversation_id=conversation_id,
+                    user_id=user_id,
+                    conv_metadata=conv_metadata,
+                    messages=messages,
+                )
             except Exception as e:
-                logger.warning(f"Lazy import failed for conversation {conversation_id}: {e}")
-                conversation_id = await _create_new_conversation(
-                    user_id, question, is_admin_scope, session
+                logger.error(
+                    "[ENSURE_CONV] failed lazy import for conversation=%s user=%s; preserving same conversation_id. error=%s",
+                    conversation_id,
+                    user_id,
+                    e,
                 )
         else:
             conversation_id = await _create_new_conversation(
@@ -799,6 +897,164 @@ async def chat_messages_health_endpoint() -> dict[str, str]:
     }
 
 
+@router.get("/api/chat/conversations", summary="List customer conversations")
+async def list_customer_conversations(
+    authorization: str | None = Header(default=None),
+    limit: int = Query(default=50, ge=1, le=200),
+) -> list[dict[str, object]]:
+    """يعرض قائمة محادثات العميل الحالي من قاعدة orchestrator."""
+    user_id, _payload = _decode_auth_payload_or_401(authorization)
+    query = text(
+        """
+        SELECT id, title, created_at
+        FROM customer_conversations
+        WHERE user_id = :user_id
+        ORDER BY created_at DESC, id DESC
+        LIMIT :limit
+        """
+    )
+    async with async_session_factory() as session:
+        rows = (await session.execute(query, {"user_id": user_id, "limit": limit})).fetchall()
+    return [
+        {
+            "conversation_id": int(row.id),
+            "title": str(row.title or ""),
+            "created_at": row.created_at.isoformat() if row.created_at is not None else None,
+        }
+        for row in rows
+    ]
+
+
+@router.get("/api/chat/conversations/{conversation_id}", summary="Customer conversation details")
+async def get_customer_conversation(
+    conversation_id: int,
+    authorization: str | None = Header(default=None),
+) -> dict[str, object]:
+    """يعيد تفاصيل محادثة عميل ورسائلها بترتيب زمني."""
+    user_id, _payload = _decode_auth_payload_or_401(authorization)
+    check_query = text(
+        """
+        SELECT id, title, created_at
+        FROM customer_conversations
+        WHERE id = :conversation_id AND user_id = :user_id
+        """
+    )
+    messages_query = text(
+        """
+        SELECT role, content, created_at
+        FROM customer_messages
+        WHERE conversation_id = :conversation_id
+        ORDER BY id ASC
+        """
+    )
+    async with async_session_factory() as session:
+        conv_row = (
+            await session.execute(
+                check_query, {"conversation_id": conversation_id, "user_id": user_id}
+            )
+        ).fetchone()
+        if conv_row is None:
+            raise HTTPException(status_code=404, detail="Conversation not found")
+        message_rows = (
+            await session.execute(messages_query, {"conversation_id": conversation_id})
+        ).fetchall()
+
+    return {
+        "conversation_id": int(conv_row.id),
+        "title": str(conv_row.title or ""),
+        "created_at": conv_row.created_at.isoformat() if conv_row.created_at is not None else None,
+        "messages": [
+            {
+                "role": str(msg.role),
+                "content": str(msg.content),
+                "created_at": msg.created_at.isoformat() if msg.created_at is not None else None,
+            }
+            for msg in message_rows
+        ],
+    }
+
+
+@router.get("/admin/api/conversations", summary="List admin conversations")
+async def list_admin_conversations(
+    authorization: str | None = Header(default=None),
+    limit: int = Query(default=50, ge=1, le=200),
+) -> list[dict[str, object]]:
+    """يعرض قائمة محادثات الأدمن الحالي."""
+    user_id, payload = _decode_auth_payload_or_401(authorization)
+    if not _is_admin_payload(payload):
+        raise HTTPException(status_code=403, detail="forbidden")
+    query = text(
+        """
+        SELECT id, title, created_at
+        FROM admin_conversations
+        WHERE user_id = :user_id
+        ORDER BY created_at DESC, id DESC
+        LIMIT :limit
+        """
+    )
+    async with async_session_factory() as session:
+        rows = (await session.execute(query, {"user_id": user_id, "limit": limit})).fetchall()
+    return [
+        {
+            "conversation_id": int(row.id),
+            "title": str(row.title or ""),
+            "created_at": row.created_at.isoformat() if row.created_at is not None else None,
+        }
+        for row in rows
+    ]
+
+
+@router.get("/admin/api/conversations/{conversation_id}", summary="Admin conversation details")
+async def get_admin_conversation(
+    conversation_id: int,
+    authorization: str | None = Header(default=None),
+) -> dict[str, object]:
+    """يعيد تفاصيل محادثة الأدمن ورسائلها."""
+    user_id, payload = _decode_auth_payload_or_401(authorization)
+    if not _is_admin_payload(payload):
+        raise HTTPException(status_code=403, detail="forbidden")
+    check_query = text(
+        """
+        SELECT id, title, created_at
+        FROM admin_conversations
+        WHERE id = :conversation_id AND user_id = :user_id
+        """
+    )
+    messages_query = text(
+        """
+        SELECT role, content, created_at
+        FROM admin_messages
+        WHERE conversation_id = :conversation_id
+        ORDER BY id ASC
+        """
+    )
+    async with async_session_factory() as session:
+        conv_row = (
+            await session.execute(
+                check_query, {"conversation_id": conversation_id, "user_id": user_id}
+            )
+        ).fetchone()
+        if conv_row is None:
+            raise HTTPException(status_code=404, detail="Conversation not found")
+        message_rows = (
+            await session.execute(messages_query, {"conversation_id": conversation_id})
+        ).fetchall()
+
+    return {
+        "conversation_id": int(conv_row.id),
+        "title": str(conv_row.title or ""),
+        "created_at": conv_row.created_at.isoformat() if conv_row.created_at is not None else None,
+        "messages": [
+            {
+                "role": str(msg.role),
+                "content": str(msg.content),
+                "created_at": msg.created_at.isoformat() if msg.created_at is not None else None,
+            }
+            for msg in message_rows
+        ],
+    }
+
+
 @router.post("/api/chat/messages", summary="StateGraph Chat Endpoint")
 async def chat_messages_endpoint(payload: dict[str, object], request: Request) -> dict[str, object]:
     """ينفّذ رسالة chat عبر خدمة LangGraph ويعيد نتيجة تشغيل موحدة."""
@@ -851,16 +1107,37 @@ async def chat_ws_stategraph(websocket: WebSocket) -> None:
                 continue
 
             requested_conversation_id = incoming.get("conversation_id")
-            conversation_id = (
-                requested_conversation_id if isinstance(requested_conversation_id, int) else None
+            logger.info(
+                "[CONV_LIFECYCLE] stage=ws_received role=customer user=%s conv_id=%s type=%s",
+                user_id,
+                requested_conversation_id,
+                type(requested_conversation_id).__name__,
+            )
+            conversation_id = _safe_conversation_id(requested_conversation_id)
+            logger.info(
+                "[CONV_LIFECYCLE] stage=parsed role=customer user=%s conv_id=%s type=%s",
+                user_id,
+                conversation_id,
+                type(conversation_id).__name__,
             )
             try:
                 logger.info(f"ORCHESTRATOR received | chat_scope=customer | role={user_id}")
+                logger.info(
+                    "[CONV_LIFECYCLE] stage=ensure_entry role=customer user=%s conv_id=%s",
+                    user_id,
+                    conversation_id,
+                )
                 conversation_id, history_messages = await _ensure_conversation(
                     chat_scope="customer",
                     user_id=user_id,
                     question=objective,
                     requested_conversation_id=conversation_id,
+                )
+                logger.info(
+                    "[CONV_LIFECYCLE] stage=ensure_exit role=customer user=%s conv_id=%s msg_count=%s",
+                    user_id,
+                    conversation_id,
+                    len(history_messages),
                 )
             except HTTPException as error:
                 await websocket.send_json(
@@ -901,6 +1178,11 @@ async def chat_ws_stategraph(websocket: WebSocket) -> None:
                 app_graph=getattr(websocket.app.state, "app_graph", None),
                 history_messages=history_messages,
             )
+            logger.info(
+                "[CONV_LIFECYCLE] stage=response_sent role=customer user=%s conv_id=%s",
+                user_id,
+                conversation_id,
+            )
 
     except WebSocketDisconnect:
         logger.info("Customer chat websocket disconnected")
@@ -940,16 +1222,37 @@ async def admin_chat_ws_stategraph(websocket: WebSocket) -> None:
                 continue
 
             requested_conversation_id = incoming.get("conversation_id")
-            conversation_id = (
-                requested_conversation_id if isinstance(requested_conversation_id, int) else None
+            logger.info(
+                "[CONV_LIFECYCLE] stage=ws_received role=admin user=%s conv_id=%s type=%s",
+                user_id,
+                requested_conversation_id,
+                type(requested_conversation_id).__name__,
+            )
+            conversation_id = _safe_conversation_id(requested_conversation_id)
+            logger.info(
+                "[CONV_LIFECYCLE] stage=parsed role=admin user=%s conv_id=%s type=%s",
+                user_id,
+                conversation_id,
+                type(conversation_id).__name__,
             )
             try:
                 logger.info(f"ORCHESTRATOR received | chat_scope=admin | role={user_id}")
+                logger.info(
+                    "[CONV_LIFECYCLE] stage=ensure_entry role=admin user=%s conv_id=%s",
+                    user_id,
+                    conversation_id,
+                )
                 conversation_id, history_messages = await _ensure_conversation(
                     chat_scope="admin",
                     user_id=user_id,
                     question=objective,
                     requested_conversation_id=conversation_id,
+                )
+                logger.info(
+                    "[CONV_LIFECYCLE] stage=ensure_exit role=admin user=%s conv_id=%s msg_count=%s",
+                    user_id,
+                    conversation_id,
+                    len(history_messages),
                 )
             except HTTPException as error:
                 await websocket.send_json(
@@ -990,6 +1293,11 @@ async def admin_chat_ws_stategraph(websocket: WebSocket) -> None:
                 app_graph=getattr(websocket.app.state, "app_graph", None),
                 admin_payload=auth_payload,
                 history_messages=history_messages,
+            )
+            logger.info(
+                "[CONV_LIFECYCLE] stage=response_sent role=admin user=%s conv_id=%s",
+                user_id,
+                conversation_id,
             )
 
     except WebSocketDisconnect:

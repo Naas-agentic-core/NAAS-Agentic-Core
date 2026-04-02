@@ -572,8 +572,11 @@ const { useState, useEffect, useRef, useCallback, memo } = React;
                 }
 
                 const payload = { question };
-                if (conversationId) {
-                    payload.conversation_id = String(conversationId);
+                if (conversationId !== null && conversationId !== undefined) {
+                    const normalizedConversationId = Number.parseInt(String(conversationId), 10);
+                    payload.conversation_id = Number.isNaN(normalizedConversationId)
+                        ? conversationId
+                        : normalizedConversationId;
                 }
 
                 const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
@@ -912,8 +915,11 @@ const { useState, useEffect, useRef, useCallback, memo } = React;
                 }
 
                 const payload = { question };
-                if (conversationId) {
-                    payload.conversation_id = String(conversationId);
+                if (conversationId !== null && conversationId !== undefined) {
+                    const normalizedConversationId = Number.parseInt(String(conversationId), 10);
+                    payload.conversation_id = Number.isNaN(normalizedConversationId)
+                        ? conversationId
+                        : normalizedConversationId;
                 }
 
                 const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';

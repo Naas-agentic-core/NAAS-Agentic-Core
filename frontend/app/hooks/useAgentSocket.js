@@ -208,7 +208,12 @@ export const useAgentSocket = (endpoint, token, onConversationUpdate) => {
         addMessage({ id: generateId(), role: 'user', content: text });
 
         const payload = { question: text, ...metadata };
-        if (conversationId) payload.conversation_id = String(conversationId);
+        if (conversationId !== null && conversationId !== undefined) {
+            const normalizedConversationId = Number.parseInt(String(conversationId), 10);
+            payload.conversation_id = Number.isNaN(normalizedConversationId)
+                ? conversationId
+                : normalizedConversationId;
+        }
 
         // Send via robust connection
         sendSocketMessage(payload);
