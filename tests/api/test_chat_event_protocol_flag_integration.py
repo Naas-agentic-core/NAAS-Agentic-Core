@@ -29,11 +29,7 @@ async def _stream_contextual_response(
             previous_assistant = item.get("content", "")
             break
 
-    content = (
-        f"CONTEXT_OK::{previous_assistant}"
-        if previous_assistant
-        else "CONTEXT_MISSING"
-    )
+    content = f"CONTEXT_OK::{previous_assistant}" if previous_assistant else "CONTEXT_MISSING"
     yield {"type": "assistant_final", "payload": {"content": content}}
     yield {"type": "complete", "payload": {}}
 
@@ -337,9 +333,7 @@ async def test_customer_ws_followup_uses_previous_answer_context_behaviorally(te
     ]
 
     def _chat_with_agent_side_effect(**kwargs):
-        return _stream_contextual_response(
-            history_messages=kwargs.get("history_messages")
-        )
+        return _stream_contextual_response(history_messages=kwargs.get("history_messages"))
 
     chat_with_agent_mock = MagicMock(side_effect=_chat_with_agent_side_effect)
 
@@ -369,9 +363,7 @@ async def test_customer_ws_followup_uses_previous_answer_context_behaviorally(te
                                 websocket.send_json(
                                     {
                                         "question": "اشرح الإجابة السابقة",
-                                        "conversation_id": first_init["payload"][
-                                            "conversation_id"
-                                        ],
+                                        "conversation_id": first_init["payload"]["conversation_id"],
                                     }
                                 )
                                 _second_init = websocket.receive_json()
@@ -409,9 +401,7 @@ async def test_admin_ws_followup_uses_previous_answer_context_behaviorally(test_
     ]
 
     def _chat_with_agent_side_effect(**kwargs):
-        return _stream_contextual_response(
-            history_messages=kwargs.get("history_messages")
-        )
+        return _stream_contextual_response(history_messages=kwargs.get("history_messages"))
 
     chat_with_agent_mock = MagicMock(side_effect=_chat_with_agent_side_effect)
 
@@ -441,9 +431,7 @@ async def test_admin_ws_followup_uses_previous_answer_context_behaviorally(test_
                                 websocket.send_json(
                                     {
                                         "question": "explain previous admin answer",
-                                        "conversation_id": first_init["payload"][
-                                            "conversation_id"
-                                        ],
+                                        "conversation_id": first_init["payload"]["conversation_id"],
                                     }
                                 )
                                 _second_init = websocket.receive_json()
@@ -455,7 +443,6 @@ async def test_admin_ws_followup_uses_previous_answer_context_behaviorally(test_
 
     assert all(item.get("role") != "assistant" for item in first_history)
     assert any(
-        item.get("role") == "assistant"
-        and item.get("content") == "admin-previous-answer"
+        item.get("role") == "assistant" and item.get("content") == "admin-previous-answer"
         for item in second_history
     )

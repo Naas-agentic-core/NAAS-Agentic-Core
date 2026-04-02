@@ -387,9 +387,7 @@ async def chat_stream_ws(
                             )
                         else:
                             await websocket.send_json(
-                                _bind_stream_metadata(
-                                    normalized_event, lc_id, request_id
-                                )
+                                _bind_stream_metadata(normalized_event, lc_id, request_id)
                             )
 
                         if _is_text_event(normalized_event) and isinstance(
@@ -447,7 +445,11 @@ async def chat_stream_ws(
                     if pending_terminal_event is not None:
                         await websocket.send_json(pending_terminal_event)
                     await websocket.send_json(
-                        _bind_stream_metadata(normalize_streaming_event({"type": "persisted"}), local_conversation_id, stream_request_id)
+                        _bind_stream_metadata(
+                            normalize_streaming_event({"type": "persisted"}),
+                            local_conversation_id,
+                            stream_request_id,
+                        )
                     )
                 elif pending_terminal_event is not None and stream_error is None:
                     await websocket.send_json(
