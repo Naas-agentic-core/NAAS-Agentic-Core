@@ -1232,8 +1232,15 @@ async def chat_messages_endpoint(payload: dict[str, object], request: Request) -
                 continue
             context[key] = value
 
+    history_messages = payload.get("history_messages", [])
+    if not isinstance(history_messages, list):
+        history_messages = []
+
     return await _run_chat_langgraph(
-        objective, context, app_graph=getattr(request.app.state, "app_graph", None)
+        objective,
+        context,
+        app_graph=getattr(request.app.state, "app_graph", None),
+        history_messages=history_messages,
     )
 
 
@@ -1584,7 +1591,28 @@ async def chat_with_agent_endpoint(request: ChatRequest, fastapi_req: Request) -
                     admin_payload = request.context
                 else:
                     admin_payload = {"is_admin": True, "role": "admin"}
-                admin_inputs = _merge_admin_inputs({"query": request.question}, admin_payload)
+
+                langchain_msgs: list[HumanMessage | AIMessage] = []
+                if request.history_messages:
+                    for msg in request.history_messages[-MAX_HISTORY_MESSAGES:]:
+                        role = msg.get("role")
+                        content = str(msg.get("content", "")).strip()
+                        if role not in {"user", "assistant"} or not content:
+                            continue
+                        if role == "user":
+                            langchain_msgs.append(HumanMessage(content=content))
+                        else:
+                            langchain_msgs.append(AIMessage(content=content))
+
+                if not langchain_msgs or (
+                    langchain_msgs[-1].content != request.question
+                    or getattr(langchain_msgs[-1], "type", "") != "human"
+                ):
+                    langchain_msgs.append(HumanMessage(content=request.question))
+
+                admin_inputs = _merge_admin_inputs(
+                    {"query": request.question, "messages": langchain_msgs}, admin_payload
+                )
                 res = await admin_app.ainvoke(
                     admin_inputs, config={"configurable": {"thread_id": str(uuid.uuid4())}}
                 )
