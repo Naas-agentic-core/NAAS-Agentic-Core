@@ -13,12 +13,10 @@ def test_safe_conversation_id_parses_string_and_int() -> None:
     assert _safe_conversation_id("") is None
 
 
-
 def test_frontend_no_longer_forces_string_conversation_id() -> None:
     source = Path("frontend/app/hooks/useAgentSocket.js").read_text(encoding="utf-8")
     assert "payload.conversation_id = String(conversationId)" not in source
     assert "Number.parseInt(String(conversationId), 10)" in source
-
 
 
 def test_gateway_has_explicit_admin_conversation_routes_before_admin_catch_all() -> None:
@@ -40,7 +38,10 @@ def test_frontend_fetches_limited_conversations_and_dedupes() -> None:
 def test_frontend_stream_filter_is_request_id_compatible_and_stray_safe() -> None:
     source = Path("frontend/app/hooks/useAgentSocket.js").read_text(encoding="utf-8")
     assert "activeRequestId &&\n                incomingRequestId" in source
-    assert "if (!activeRequestId && type !== 'conversation_init' && isStreamLifecycleEvent(type))" in source
+    assert (
+        "if (!activeRequestId && type !== 'conversation_init' && isStreamLifecycleEvent(type))"
+        in source
+    )
 
 
 def test_orchestrator_conversation_list_endpoints_are_limited() -> None:

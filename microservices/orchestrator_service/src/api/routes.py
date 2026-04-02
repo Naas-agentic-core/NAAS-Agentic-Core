@@ -407,9 +407,9 @@ async def _lazy_import_history_with_retry(
     max_attempts: int = 3,
 ) -> None:
     """يحاول استيراد التاريخ إلى conversation-service مع إعادة المحاولة قبل الفشل."""
-    conv_service_url = os.getenv("CONVERSATION_SERVICE_URL", "http://conversation-service:8010").rstrip(
-        "/"
-    )
+    conv_service_url = os.getenv(
+        "CONVERSATION_SERVICE_URL", "http://conversation-service:8010"
+    ).rstrip("/")
     payload = {
         "conversation_id": conversation_id,
         "user_id": user_id,
@@ -422,7 +422,9 @@ async def _lazy_import_history_with_retry(
     for attempt in range(1, max_attempts + 1):
         try:
             async with httpx.AsyncClient(timeout=10.0) as client:
-                resp = await client.post(f"{conv_service_url}/api/v1/conversations/import", json=payload)
+                resp = await client.post(
+                    f"{conv_service_url}/api/v1/conversations/import", json=payload
+                )
                 resp.raise_for_status()
                 data = resp.json()
             if data.get("status") not in {"imported", "already_exists"}:
@@ -770,8 +772,12 @@ async def _stream_chat_langgraph(
                 )
                 break
             if evt["type"] == "phase_start":
-                phase_name = evt["payload"].get("phase", "") if isinstance(evt["payload"], dict) else ""
-                agent_name = evt["payload"].get("agent", "") if isinstance(evt["payload"], dict) else ""
+                phase_name = (
+                    evt["payload"].get("phase", "") if isinstance(evt["payload"], dict) else ""
+                )
+                agent_name = (
+                    evt["payload"].get("agent", "") if isinstance(evt["payload"], dict) else ""
+                )
                 await websocket.send_json(
                     {
                         "type": "PHASE_STARTED",
@@ -791,8 +797,12 @@ async def _stream_chat_langgraph(
                     }
                 )
             elif evt["type"] == "phase_completed":
-                phase_name = evt["payload"].get("phase", "") if isinstance(evt["payload"], dict) else ""
-                agent_name = evt["payload"].get("agent", "") if isinstance(evt["payload"], dict) else ""
+                phase_name = (
+                    evt["payload"].get("phase", "") if isinstance(evt["payload"], dict) else ""
+                )
+                agent_name = (
+                    evt["payload"].get("agent", "") if isinstance(evt["payload"], dict) else ""
+                )
                 await websocket.send_json(
                     {
                         "type": "PHASE_COMPLETED",
