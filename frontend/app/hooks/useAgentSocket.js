@@ -127,6 +127,19 @@ export const useAgentSocket = (endpoint, token, onConversationUpdate) => {
         setMessages(prev => [...prev, msg]);
     }, []);
 
+    const isStreamLifecycleEvent = (eventType) => {
+        return (
+            eventType === 'delta' ||
+            eventType === 'assistant_delta' ||
+            eventType === 'assistant_final' ||
+            eventType === 'assistant_fallback' ||
+            eventType === 'persisted' ||
+            eventType === 'complete' ||
+            eventType === 'error' ||
+            eventType === 'assistant_error'
+        );
+    };
+
     // Handle incoming events (decoupled from socket logic)
     useEffect(() => {
         const handler = (e) => {
@@ -148,7 +161,18 @@ export const useAgentSocket = (endpoint, token, onConversationUpdate) => {
                     return;
                 }
             }
-            if (activeRequestId && String(activeRequestId) !== String(incomingRequestId || '')) {
+            // Accept events without request_id for backward compatibility with older gateways.
+            // Reject only when both sides have explicit IDs and they mismatch.
+            if (
+                activeRequestId &&
+                incomingRequestId &&
+                String(activeRequestId) !== String(incomingRequestId)
+            ) {
+                return;
+            }
+            // Defensive gate: if no active request, ignore stray stream events from
+            // other conversations/tabs unless they explicitly initialize a conversation.
+            if (!activeRequestId && type !== 'conversation_init' && isStreamLifecycleEvent(type)) {
                 return;
             }
 
@@ -176,6 +200,7 @@ export const useAgentSocket = (endpoint, token, onConversationUpdate) => {
                     }
                 });
             } else if (type === 'complete') {
+                 activeRequestIdRef.current = null;
                  setMessages(prev => {
                     const last = prev[prev.length - 1];
                     if (last && last.role === 'assistant') {
@@ -214,10 +239,12 @@ export const useAgentSocket = (endpoint, token, onConversationUpdate) => {
                  }
                  refreshConversationHistory();
             } else if (type === 'error') {
+                activeRequestIdRef.current = null;
                 const details = payload?.details || 'Unknown error';
                 notifyAgentError(String(details));
                 refreshConversationHistory();
             } else if (type === 'assistant_error') {
+                activeRequestIdRef.current = null;
                 const content = payload?.content || 'Unknown assistant error';
                 notifyAgentError(String(content));
                 refreshConversationHistory();

@@ -195,6 +195,7 @@ async def chat_stream_ws(
 
             original_conversation_id = payload.get("conversation_id")
             local_conversation_id: int | None = None
+            history_messages: list[dict[str, str]] = []
 
             try:
                 async with async_session_factory() as db:
@@ -209,6 +210,10 @@ async def chat_stream_ws(
                         local_conversation_id,
                         MessageRole.USER,
                         question,
+                    )
+                    history_messages = await persistence_service.get_chat_history(
+                        local_conversation_id,
+                        limit=50,
                     )
                 await websocket.send_json(
                     normalize_streaming_event(
@@ -272,6 +277,7 @@ async def chat_stream_ws(
                     q=question,
                     lc_id=local_conversation_id,
                     meta=metadata,
+                    history=history_messages,
                     request_id=stream_request_id,
                 ) -> None:
                     nonlocal pending_terminal_event
@@ -280,6 +286,7 @@ async def chat_stream_ws(
                         question=q,
                         user_id=actor.id,
                         conversation_id=lc_id,
+                        history_messages=history,
                         context={
                             "chat_scope": "customer",
                             "metadata": meta,
