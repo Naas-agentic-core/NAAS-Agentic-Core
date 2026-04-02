@@ -96,6 +96,48 @@ def _bind_stream_metadata(
     return bound_event
 
 
+def _extract_client_context_messages(payload: dict[str, object]) -> list[dict[str, str]]:
+    """استخراج سياق محادثة الواجهة مع تنظيف الأدوار والمحتوى."""
+    raw_context = payload.get("client_context_messages")
+    if not isinstance(raw_context, list):
+        return []
+
+    sanitized: list[dict[str, str]] = []
+    for item in raw_context:
+        if not isinstance(item, dict):
+            continue
+        role = item.get("role")
+        content = item.get("content")
+        if role not in {"user", "assistant"}:
+            continue
+        if not isinstance(content, str):
+            continue
+        text = content.strip()
+        if not text:
+            continue
+        sanitized.append({"role": role, "content": text})
+        if len(sanitized) >= 50:
+            break
+    return sanitized
+
+
+def _merge_history_with_client_context(
+    persisted_history: list[dict[str, str]],
+    client_context: list[dict[str, str]],
+) -> list[dict[str, str]]:
+    """دمج تاريخ المحادثة المخزّن مع سياق العميل لتقليل فقدان السياق."""
+    if not client_context:
+        return persisted_history
+    if not persisted_history:
+        return client_context
+
+    merged_history = list(persisted_history)
+    for message in client_context:
+        if message not in merged_history:
+            merged_history.append(message)
+    return merged_history[-80:]
+
+
 def get_chat_actor(
     current: CurrentUser = Depends(get_current_user),
 ) -> CurrentUser:
@@ -264,6 +306,9 @@ async def chat_stream_ws(
             metadata: dict[str, object] = {}
             if mission_type:
                 metadata["mission_type"] = mission_type
+            client_context_messages = _extract_client_context_messages(payload)
+            if client_context_messages:
+                metadata["client_context_messages"] = client_context_messages
 
             original_conversation_id = payload.get("conversation_id")
             local_conversation_id: int | None = None
@@ -286,6 +331,10 @@ async def chat_stream_ws(
                     history_messages = await persistence_service.get_chat_history(
                         local_conversation_id,
                         limit=50,
+                    )
+                    history_messages = _merge_history_with_client_context(
+                        history_messages,
+                        client_context_messages,
                     )
                 await websocket.send_json(
                     normalize_streaming_event(

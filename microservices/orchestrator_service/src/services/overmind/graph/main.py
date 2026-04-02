@@ -1,5 +1,6 @@
 import asyncio
 import json
+import logging
 import os
 import re
 from operator import add
@@ -169,6 +170,8 @@ ENGLISH_ANAPHORA = [
     "tell me more",
     "explain further",
 ]
+# CONTEXT_FIX: فواعل الضمائر المتصلة الأكثر شيوعًا في العربية للكشف المورفولوجي.
+ARABIC_PRONOUN_SUFFIXES = ["ها", "ه", "هم", "هن", "هما", "كم", "كن", "نا"]
 SHORT_QUERY_THRESHOLD = 6
 ELLIPTICAL_STARTERS = {
     "ما",
@@ -195,10 +198,18 @@ ELLIPTICAL_TERMS = {
 }
 
 
-def build_conversation_context(messages: list[object], max_turns: int = 6) -> str:
-    # CONTEXT_FIX: توحيد بناء سياق المحادثة للاستخدام عبر العقد المختلفة.
-    """يبني سياقًا منسقًا لآخر الرسائل ليُستهلك بأمان بواسطة نماذج اللغة."""
+def build_conversation_context(
+    messages: list[object],
+    max_turns: int = 6,
+    include_json_extraction: bool = True,
+) -> str:
+    # CONTEXT_FIX: توحيد بناء سجل المحادثة لكل العقد التي تعتمد على السياق.
+    """يبني تمثيلًا نصيًا متينًا للسياق الأخير دون رمي استثناءات."""
+    if not messages:
+        return ""
+
     recent_messages: list[str] = []
+    last_signature: tuple[str, str] | None = None
     for msg in messages[-max_turns:]:
         content = getattr(msg, "content", None)
         if not isinstance(content, str) or not content.strip():
@@ -206,7 +217,7 @@ def build_conversation_context(messages: list[object], max_turns: int = 6) -> st
         role = getattr(msg, "type", getattr(msg, "role", "user"))
         prefix = "User: " if role in ("human", "user") else "Assistant: "
         text = content.strip()
-        if text.startswith("{") and role in ("ai", "assistant"):
+        if include_json_extraction and text.startswith("{") and role in ("ai", "assistant"):
             try:
                 data = json.loads(text)
                 if isinstance(data, dict):
@@ -214,7 +225,11 @@ def build_conversation_context(messages: list[object], max_turns: int = 6) -> st
                     text = str(extracted)
             except Exception:
                 pass
+        signature = (prefix, text)
+        if signature == last_signature:
+            continue
         recent_messages.append(f"{prefix}{text}")
+        last_signature = signature
 
     return "\n".join(recent_messages)
 
@@ -430,20 +445,76 @@ class ChatFallbackNode:
 
 
 class QueryRewriterSignature(dspy.Signature):
-    # CONTEXT_FIX: توقيع متخصص لإعادة صياغة السؤال ليصبح مستقلًا عن السياق الضمني.
-    """يعيد صياغة السؤال الحالي ليكون واضحًا ومكتفيًا ذاتيًا دون الاعتماد على ضمائر مبهمة."""
+    # CONTEXT_FIX: توقيع مقيد بقواعد صارمة لضمان إعادة كتابة آمنة ومختصرة.
+    """Rewrite the current query into a self-contained standalone query.
 
-    conversation_history: str = dspy.InputField(desc="آخر الرسائل السياقية ذات الصلة")
-    current_query: str = dspy.InputField(desc="سؤال المستخدم الحالي بصيغته الخام")
-    rewritten_query: str = dspy.OutputField(desc="سؤال واضح مستقل خالٍ من الإحالات الضمنية")
+    Rules:
+    1) Resolve pronouns and implicit references using conversation history only.
+    2) Preserve user intent exactly; do not answer or expand semantics.
+    3) Keep the same user language (Arabic/English/mixed).
+    4) If the query is already self-contained, return it unchanged.
+    5) Keep rewrite concise and free of transcript labels.
+    """
+
+    conversation_history: str = dspy.InputField(
+        desc="Recent turns formatted as User/Assistant transcript"
+    )
+    current_query: str = dspy.InputField(
+        desc="Current possibly ambiguous user query"
+    )
+    rewritten_query: str = dspy.OutputField(
+        desc="Self-contained rewritten query or unchanged original query"
+    )
 
 
 class QueryRewriterNode:
-    # CONTEXT_FIX: عقدة مخصصة لحل الإحالات الضميرية قبل مسار البحث.
+    # CONTEXT_FIX: عقدة حل إحالات ضميرية مع بوابة سريعة + fallback آمن.
     def __init__(self) -> None:
         self.rewriter = dspy.ChainOfThought(QueryRewriterSignature)
+        self.logger = logging.getLogger("graph")
+
+    def _needs_rewrite(self, query: str, messages: list[object]) -> bool:
+        # CONTEXT_FIX: بوابة حتمية سريعة تمنع استدعاء LLM عند عدم الحاجة.
+        """يحدد إذا كان السؤال يحتاج إعادة صياغة مرجعية قبل البحث."""
+        if not query.strip() or not messages:
+            return False
+
+        query_words = _tokenize_query(query)
+        for word in query_words:
+            for suffix in ARABIC_PRONOUN_SUFFIXES:
+                if word.endswith(suffix) and len(word) > len(suffix) + 1:
+                    return True
+
+        if _contains_anaphora_indicator(query=query):
+            return True
+
+        history = build_conversation_context(messages=messages)
+        if _looks_elliptical_followup(query=query, history=history):
+            return True
+
+        return len(query_words) <= 5 and bool(history.strip())
+
+    def _is_valid_rewrite(
+        self,
+        original_query: str,
+        rewritten_query: str,
+        conversation_history: str,
+    ) -> bool:
+        # CONTEXT_FIX: تحقق صارم لمنع تسريب صيغة السجل أو التضخم غير المبرر.
+        """يتحقق من صلاحية إعادة الصياغة قبل تمريرها لعقد التحليل."""
+        candidate = rewritten_query.strip()
+        original = original_query.strip()
+        if not candidate:
+            return False
+        if candidate in conversation_history:
+            return False
+        if len(candidate) > max(24, len(original) * 3):
+            return False
+        return "User:" not in candidate and "Assistant:" not in candidate
 
     async def __call__(self, state: AgentState) -> dict:
+        # CONTEXT_FIX: تنفيذ غير حاجب مع fallback آمن إلى السؤال الأصلي.
+        """يعيد كتابة السؤال الغامض إلى صيغة مستقلة قبل دخوله مسار البحث."""
         import time
 
         from .telemetry import emit_telemetry
@@ -455,16 +526,12 @@ class QueryRewriterNode:
             emit_telemetry(node_name="QueryRewriterNode", start_time=start_time, state=state)
             return {"query": query}
 
-        history = build_conversation_context(messages=messages)
-        if not history.strip():
+        if not self._needs_rewrite(query=query, messages=messages):
             emit_telemetry(node_name="QueryRewriterNode", start_time=start_time, state=state)
             return {"query": query}
 
-        has_anaphora = _contains_anaphora_indicator(query=query)
-        looks_elliptical = _looks_elliptical_followup(query=query, history=history)
-        needs_rewrite = has_anaphora or looks_elliptical
-
-        if not needs_rewrite:
+        history = build_conversation_context(messages=messages)
+        if not history.strip():
             emit_telemetry(node_name="QueryRewriterNode", start_time=start_time, state=state)
             return {"query": query}
 
@@ -476,10 +543,17 @@ class QueryRewriterNode:
                 current_query=query,
             )
             candidate = getattr(result, "rewritten_query", "")
-            if isinstance(candidate, str) and candidate.strip():
+            if isinstance(candidate, str) and self._is_valid_rewrite(query, candidate, history):
                 rewritten_query = candidate.strip()
-        except Exception:
-            pass
+        except Exception as error:
+            self.logger.debug("QueryRewriterNode fallback to original query: %s", error)
+            emit_telemetry(
+                node_name="QueryRewriterNode",
+                start_time=start_time,
+                state=state,
+                error=error,
+            )
+            return {"query": query}
 
         emit_telemetry(node_name="QueryRewriterNode", start_time=start_time, state=state)
         return {"query": rewritten_query}

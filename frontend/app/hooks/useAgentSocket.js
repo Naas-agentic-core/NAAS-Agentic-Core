@@ -95,6 +95,57 @@ const notifyAgentError = (message) => {
     );
 };
 
+const computeOverlapLength = (existingContent, incomingContent) => {
+    const maxOverlap = Math.min(existingContent.length, incomingContent.length);
+    for (let size = maxOverlap; size > 0; size -= 1) {
+        if (existingContent.slice(-size) === incomingContent.slice(0, size)) {
+            return size;
+        }
+    }
+    return 0;
+};
+
+const mergeAssistantContent = (existingContent, incomingContent) => {
+    const current = typeof existingContent === 'string' ? existingContent : '';
+    const incoming = typeof incomingContent === 'string' ? incomingContent : '';
+
+    if (!incoming) return current;
+    if (!current) return incoming;
+
+    if (incoming.startsWith(current)) {
+        return incoming;
+    }
+
+    if (current.startsWith(incoming)) {
+        return current;
+    }
+
+    const overlapLength = computeOverlapLength(current, incoming);
+    if (overlapLength > 0) {
+        return `${current}${incoming.slice(overlapLength)}`;
+    }
+
+    return `${current}${incoming}`;
+};
+
+const buildClientContextMessages = (messages, currentQuestion) => {
+    const safeMessages = Array.isArray(messages) ? messages : [];
+    const normalized = safeMessages
+        .filter((item) => item && (item.role === 'user' || item.role === 'assistant'))
+        .map((item) => ({
+            role: item.role,
+            content: typeof item.content === 'string' ? item.content.trim() : '',
+        }))
+        .filter((item) => item.content.length > 0);
+
+    const questionText = typeof currentQuestion === 'string' ? currentQuestion.trim() : '';
+    if (questionText) {
+        normalized.push({ role: 'user', content: questionText });
+    }
+
+    return normalized.slice(-30);
+};
+
 export const useAgentSocket = (endpoint, token, onConversationUpdate) => {
     const [messages, setMessages] = useState([]);
     const [conversationId, setConversationId] = useState(null);
@@ -193,7 +244,10 @@ export const useAgentSocket = (endpoint, token, onConversationUpdate) => {
                 setMessages(prev => {
                     const last = prev[prev.length - 1];
                     if (last && last.role === 'assistant' && !last.isComplete && !last.isError) {
-                        const updated = { ...last, content: last.content + content };
+                        const updated = {
+                            ...last,
+                            content: mergeAssistantContent(last.content, content),
+                        };
                         return [...prev.slice(0, -1), updated];
                     } else {
                          return [...prev, { id: generateId(), role: 'assistant', content: content, isComplete: false }];
@@ -218,7 +272,7 @@ export const useAgentSocket = (endpoint, token, onConversationUpdate) => {
                 setMessages(prev => {
                     const last = prev[prev.length - 1];
                     if (last && last.role === 'assistant' && !last.isComplete && !last.isError) {
-                         const newContent = last.content + content;
+                         const newContent = mergeAssistantContent(last.content, content);
                          return [...prev.slice(0, -1), { ...last, content: newContent, isComplete: true }];
                     } else if (content) {
                          return [...prev, { id: generateId(), role: 'assistant', content: content, isComplete: true }];
@@ -265,7 +319,12 @@ export const useAgentSocket = (endpoint, token, onConversationUpdate) => {
         const clientRequestId = generateId();
         activeRequestIdRef.current = clientRequestId;
 
-        const payload = { question: text, client_request_id: clientRequestId, ...metadata };
+        const payload = {
+            question: text,
+            client_request_id: clientRequestId,
+            client_context_messages: buildClientContextMessages(messages, text),
+            ...metadata,
+        };
         if (conversationId !== null && conversationId !== undefined) {
             const normalizedConversationId = Number.parseInt(String(conversationId), 10);
             payload.conversation_id = Number.isNaN(normalizedConversationId)
@@ -276,7 +335,7 @@ export const useAgentSocket = (endpoint, token, onConversationUpdate) => {
         // Send via robust connection
         sendSocketMessage(payload);
 
-    }, [conversationId, addMessage, sendSocketMessage]);
+    }, [conversationId, addMessage, sendSocketMessage, messages]);
 
     const clearMessages = () => {
         activeRequestIdRef.current = null;
