@@ -28,7 +28,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from microservices.orchestrator_service.src.contracts.admin_tools import ADMIN_TOOL_CONTRACT
 from microservices.orchestrator_service.src.core.config import get_settings
-from microservices.orchestrator_service.src.core.database import async_session_factory, get_db
+from microservices.orchestrator_service.src.core.database import (
+    async_session_factory,
+    get_checkpointer,
+    get_db,
+)
 from microservices.orchestrator_service.src.core.event_bus import get_event_bus
 from microservices.orchestrator_service.src.core.security import (
     decode_user_id,
@@ -66,6 +70,9 @@ class ChatRunContext(TypedDict, total=False):
     """غلاف سياقي محدود لمسار تشغيل الدردشة لتجنّب القواميس المفتوحة في الحدود الحرجة."""
 
     mission_type: str
+    conversation_id: int | str
+    thread_id: int | str
+    session_id: int | str
 
 
 class MissionEventEnvelope(TypedDict):
@@ -121,6 +128,71 @@ def _build_older_history_digest(rows: list[object]) -> str:
         if len(digest_items) >= MAX_HISTORY_SUMMARY_ITEMS:
             break
     return "\n".join(digest_items)
+
+
+def _build_langchain_messages(
+    source_messages: list[dict[str, str]] | None,
+) -> list[HumanMessage | AIMessage]:
+    """يبني نافذة سياق محدودة ويزيل التكرارات المتجاورة لتقليل تلوث السياق."""
+    if not source_messages:
+        return []
+
+    normalized_messages: list[HumanMessage | AIMessage] = []
+    last_signature: tuple[str, str] | None = None
+    for message in source_messages[-MAX_HISTORY_MESSAGES:]:
+        role = message.get("role")
+        content = str(message.get("content", "")).strip()
+        if role not in {"user", "assistant"} or not content:
+            continue
+        signature = (role, content)
+        if signature == last_signature:
+            continue
+        if role == "user":
+            normalized_messages.append(HumanMessage(content=content))
+        else:
+            normalized_messages.append(AIMessage(content=content))
+        last_signature = signature
+    return normalized_messages
+
+
+def _build_graph_messages(
+    *,
+    objective: str,
+    history_messages: list[dict[str, str]] | None,
+    checkpointer_available: bool,
+    checkpoint_has_state: bool,
+) -> list[HumanMessage | AIMessage]:
+    """يبني رسائل الإدخال للرسم البياني مع مسار احتياطي صريح ضد عمى السياق."""
+    latest_user_message = HumanMessage(content=objective)
+    if checkpointer_available and checkpoint_has_state:
+        # الاعتماد على checkpointer يمنع تكرار الرسائل داخل LangGraph reducers.
+        return [latest_user_message]
+
+    # عند غياب checkpointer (أو تعطل تهيئته)، نمرّر نافذة تاريخية محدودة صراحةً.
+    seeded_history = _build_langchain_messages(history_messages)
+    seeded_history.append(latest_user_message)
+    return seeded_history
+
+
+async def _detect_checkpoint_state(thread_id: str) -> tuple[bool, bool]:
+    """يفحص توفّر checkpointer ووجود حالة محفوظة للخيط الحالي بشكل آمن."""
+    checkpointer = get_checkpointer()
+    if checkpointer is None:
+        return False, False
+
+    try:
+        checkpoint_config = {"configurable": {"thread_id": thread_id}}
+        checkpoint_tuple = await asyncio.wait_for(
+            checkpointer.aget_tuple(checkpoint_config), timeout=1.5
+        )
+        return True, checkpoint_tuple is not None
+    except Exception as exc:
+        logger.warning(
+            "[CHECKPOINTER] state probe failed for thread_id=%s; falling back to injected history. reason=%s",
+            thread_id,
+            exc,
+        )
+        return False, False
 
 
 def _canonicalize_mission_event(event: object) -> MissionEventEnvelope | None:
@@ -265,6 +337,40 @@ def _safe_conversation_id(raw_value: object) -> int | None:
         type(raw_value).__name__,
     )
     return None
+
+
+def _resolve_effective_conversation_id(
+    *, incoming_value: object, sticky_value: int | None
+) -> int | None:
+    """يحدّد conversation_id النهائي مع أولوية للطلب الحالي ثم ذاكرة الاتصال."""
+    parsed = _safe_conversation_id(incoming_value)
+    if parsed is not None:
+        return parsed
+    return sticky_value
+
+
+def _safe_thread_id(raw_value: object) -> str | None:
+    """يطبّع thread_id لدعم int/str مع رفض القيم الفارغة."""
+    if raw_value is None:
+        return None
+    if isinstance(raw_value, int):
+        return str(raw_value)
+    if isinstance(raw_value, str):
+        normalized = raw_value.strip()
+        if normalized:
+            return normalized
+    return None
+
+
+def _resolve_thread_id(context: ChatRunContext, fallback_conversation_id: int | str) -> str:
+    """يستخرج thread_id ثابتًا من السياق مع احتياطي conversation_id."""
+    candidate_keys = ("thread_id", "session_id", "conversation_id")
+    for key in candidate_keys:
+        if key in context:
+            normalized = _safe_thread_id(context.get(key))
+            if normalized:
+                return normalized
+    return str(fallback_conversation_id)
 
 
 def _decode_auth_payload_or_401(authorization: str | None) -> tuple[int, dict[str, object]]:
@@ -775,41 +881,28 @@ async def _stream_chat_langgraph(
     """يشغّل LangGraph الموحد لمسارات البحث والإدارة ويبث الأحداث."""
     queue: asyncio.Queue[dict[str, object]] = asyncio.Queue(maxsize=64)
 
-    def _build_langchain_messages(
-        source_messages: list[dict[str, str]] | None,
-    ) -> list[HumanMessage | AIMessage]:
-        """يبني نافذة سياق محدودة ويزيل التكرارات المتجاورة لتقليل تلوث السياق."""
-        if not source_messages:
-            return []
-
-        normalized_messages: list[HumanMessage | AIMessage] = []
-        last_signature: tuple[str, str] | None = None
-        for message in source_messages[-MAX_HISTORY_MESSAGES:]:
-            role = message.get("role")
-            content = str(message.get("content", "")).strip()
-            if role not in {"user", "assistant"} or not content:
-                continue
-            signature = (role, content)
-            if signature == last_signature:
-                continue
-            if role == "user":
-                normalized_messages.append(HumanMessage(content=content))
-            else:
-                normalized_messages.append(AIMessage(content=content))
-            last_signature = signature
-        return normalized_messages
-
     async def _runner():
         try:
             _graph = app_graph or getattr(websocket.app.state, "app_graph", None)
             if not _graph:
                 _graph = create_unified_graph()
-            config = {"configurable": {"thread_id": str(conversation_id)}}
-
-            # Postgres checkpointer natively handles history natively using thread_id.
-            # Stop manually feeding the DB's history output into the inputs, which causes
-            # exponential message duplication because LangGraph checkpoints accumulate state via `add` reducer.
-            langchain_msgs: list[HumanMessage | AIMessage] = [HumanMessage(content=objective)]
+            thread_id = _resolve_thread_id(context, conversation_id)
+            config = {"configurable": {"thread_id": thread_id}}
+            checkpointer_available, checkpoint_has_state = await _detect_checkpoint_state(thread_id)
+            langchain_msgs = _build_graph_messages(
+                objective=objective,
+                history_messages=history_messages,
+                checkpointer_available=checkpointer_available,
+                checkpoint_has_state=checkpoint_has_state,
+            )
+            logger.info(
+                "[CONTEXT_MODE] channel=websocket conv_id=%s thread_id=%s checkpointer_available=%s checkpoint_has_state=%s seeded_history=%s",
+                conversation_id,
+                thread_id,
+                checkpointer_available,
+                checkpoint_has_state,
+                max(0, len(langchain_msgs) - 1),
+            )
 
             inputs: dict[str, object] = {
                 "query": objective,
@@ -1007,14 +1100,34 @@ async def _run_chat_langgraph(
     """يشغّل LangGraph كعمود فقري لرحلة chat ويعيد حمولة موحدة قابلة للبث (HTTP legacy fallback)."""
     if not app_graph:
         app_graph = create_unified_graph()
-    conversation_id = (
-        context.get("conversation_id") if context and "conversation_id" in context else uuid.uuid4()
+    requested_conversation_id = context.get("conversation_id") if context else None
+    safe_conversation_id = _safe_conversation_id(requested_conversation_id)
+    conversation_id: int | str = safe_conversation_id if safe_conversation_id is not None else str(
+        uuid.uuid4()
     )
-    config = {"configurable": {"thread_id": str(conversation_id)}}
-
-    # Postgres checkpointer inherently retrieves state history based on thread_id.
-    # Appending history_messages array manually causes exponential duplication with the `add` reducer.
-    langchain_msgs = [HumanMessage(content=objective)]
+    thread_id = _resolve_thread_id(context, conversation_id)
+    config = {"configurable": {"thread_id": thread_id}}
+    logger.info(
+        "[THREAD_BINDING] channel=http thread_id=%s source=%s conversation_id=%s",
+        thread_id,
+        "request_context" if "thread_id" in context or "session_id" in context else "conversation_fallback",
+        str(conversation_id),
+    )
+    checkpointer_available, checkpoint_has_state = await _detect_checkpoint_state(thread_id)
+    langchain_msgs = _build_graph_messages(
+        objective=objective,
+        history_messages=history_messages,
+        checkpointer_available=checkpointer_available,
+        checkpoint_has_state=checkpoint_has_state,
+    )
+    logger.info(
+        "[CONTEXT_MODE] channel=http conv_id=%s thread_id=%s checkpointer_available=%s checkpoint_has_state=%s seeded_history=%s",
+        conversation_id,
+        thread_id,
+        checkpointer_available,
+        checkpoint_has_state,
+        max(0, len(langchain_msgs) - 1),
+    )
 
     inputs: dict[str, object] = {"query": objective, "messages": langchain_msgs}
     inputs = _merge_admin_inputs(inputs, admin_payload)
@@ -1219,6 +1332,16 @@ async def chat_messages_endpoint(payload: dict[str, object], request: Request) -
                 continue
             context[key] = value
 
+    requested_conversation_id = _safe_conversation_id(payload.get("conversation_id"))
+    if requested_conversation_id is not None:
+        context["conversation_id"] = requested_conversation_id
+    requested_thread_id = _safe_thread_id(payload.get("thread_id"))
+    if requested_thread_id is not None:
+        context["thread_id"] = requested_thread_id
+    requested_session_id = _safe_thread_id(payload.get("session_id"))
+    if requested_session_id is not None:
+        context["session_id"] = requested_session_id
+
     history_messages = payload.get("history_messages", [])
     if not isinstance(history_messages, list):
         history_messages = []
@@ -1249,6 +1372,8 @@ async def chat_ws_stategraph(websocket: WebSocket) -> None:
         return
 
     await websocket.accept(subprotocol=selected_protocol)
+    sticky_conversation_id: int | None = None
+    sticky_thread_id: str | None = None
     try:
         while True:
             incoming = await websocket.receive_json()
@@ -1263,13 +1388,19 @@ async def chat_ws_stategraph(websocket: WebSocket) -> None:
                 continue
 
             requested_conversation_id = incoming.get("conversation_id")
+            requested_thread_id = _safe_thread_id(incoming.get("thread_id"))
+            requested_session_id = _safe_thread_id(incoming.get("session_id"))
+            resolved_thread_id = requested_thread_id or requested_session_id or sticky_thread_id
             logger.info(
                 "[CONV_LIFECYCLE] stage=ws_received role=customer user=%s conv_id=%s type=%s",
                 user_id,
                 requested_conversation_id,
                 type(requested_conversation_id).__name__,
             )
-            conversation_id = _safe_conversation_id(requested_conversation_id)
+            conversation_id = _resolve_effective_conversation_id(
+                incoming_value=requested_conversation_id,
+                sticky_value=sticky_conversation_id,
+            )
             logger.info(
                 "[CONV_LIFECYCLE] stage=parsed role=customer user=%s conv_id=%s type=%s",
                 user_id,
@@ -1295,6 +1426,8 @@ async def chat_ws_stategraph(websocket: WebSocket) -> None:
                     conversation_id,
                     len(history_messages),
                 )
+                sticky_conversation_id = conversation_id
+                sticky_thread_id = resolved_thread_id or str(conversation_id)
             except HTTPException as error:
                 await websocket.send_json(
                     {"type": "assistant_error", "payload": {"content": error.detail}}
@@ -1324,6 +1457,9 @@ async def chat_ws_stategraph(websocket: WebSocket) -> None:
                 and "mission_type" in incoming["metadata"]
             ):
                 context["mission_type"] = incoming["metadata"]["mission_type"]
+            context["conversation_id"] = conversation_id
+            if sticky_thread_id:
+                context["thread_id"] = sticky_thread_id
 
             await _stream_chat_langgraph(
                 websocket,
@@ -1364,6 +1500,8 @@ async def admin_chat_ws_stategraph(websocket: WebSocket) -> None:
         return
 
     await websocket.accept(subprotocol=selected_protocol)
+    sticky_conversation_id: int | None = None
+    sticky_thread_id: str | None = None
     try:
         while True:
             incoming = await websocket.receive_json()
@@ -1378,13 +1516,19 @@ async def admin_chat_ws_stategraph(websocket: WebSocket) -> None:
                 continue
 
             requested_conversation_id = incoming.get("conversation_id")
+            requested_thread_id = _safe_thread_id(incoming.get("thread_id"))
+            requested_session_id = _safe_thread_id(incoming.get("session_id"))
+            resolved_thread_id = requested_thread_id or requested_session_id or sticky_thread_id
             logger.info(
                 "[CONV_LIFECYCLE] stage=ws_received role=admin user=%s conv_id=%s type=%s",
                 user_id,
                 requested_conversation_id,
                 type(requested_conversation_id).__name__,
             )
-            conversation_id = _safe_conversation_id(requested_conversation_id)
+            conversation_id = _resolve_effective_conversation_id(
+                incoming_value=requested_conversation_id,
+                sticky_value=sticky_conversation_id,
+            )
             logger.info(
                 "[CONV_LIFECYCLE] stage=parsed role=admin user=%s conv_id=%s type=%s",
                 user_id,
@@ -1410,6 +1554,8 @@ async def admin_chat_ws_stategraph(websocket: WebSocket) -> None:
                     conversation_id,
                     len(history_messages),
                 )
+                sticky_conversation_id = conversation_id
+                sticky_thread_id = resolved_thread_id or str(conversation_id)
             except HTTPException as error:
                 await websocket.send_json(
                     {"type": "assistant_error", "payload": {"content": error.detail}}
@@ -1439,6 +1585,9 @@ async def admin_chat_ws_stategraph(websocket: WebSocket) -> None:
                 and "mission_type" in incoming["metadata"]
             ):
                 context["mission_type"] = incoming["metadata"]["mission_type"]
+            context["conversation_id"] = conversation_id
+            if sticky_thread_id:
+                context["thread_id"] = sticky_thread_id
 
             await _stream_chat_langgraph(
                 websocket,
