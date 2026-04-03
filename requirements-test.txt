@@ -65,3 +65,5 @@ redis-om
 asgi-lifespan
 argon2_cffi
 docker
+langgraph-checkpoint-postgres
+psycopg-binary
