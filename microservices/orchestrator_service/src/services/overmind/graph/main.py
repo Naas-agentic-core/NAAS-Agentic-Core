@@ -220,6 +220,7 @@ def format_conversation_history(messages: list[object]) -> str:
 
     return "\n".join(dialogue)
 
+
 def build_conversation_context(
     messages: list[object],
     max_turns: int = 6,
@@ -353,7 +354,9 @@ def _configure_dspy() -> None:
 class IntentClassifier(dspy.Signature):
     """Classify if conversation needs admin system metrics, general chat/greetings, or educational search. If the user says a greeting (السلام عليكم, hello) or general chat, output is_chat=True. Follow-up questions about previous exercises/topics are educational searches, so is_chat=False."""
 
-    history: str = dspy.InputField(desc="Previous conversation context to resolve pronouns and context")
+    history: str = dspy.InputField(
+        desc="Previous conversation context to resolve pronouns and context"
+    )
     question: str = dspy.InputField()
     is_admin: bool = dspy.OutputField(desc="True if conversation needs real system counts/metrics")
     is_chat: bool = dspy.OutputField(
@@ -394,7 +397,9 @@ class SupervisorNode:
                 return {"intent": "admin"}
 
         try:
-            result = await asyncio.to_thread(self.dspy_classifier, history=formatted_history, question=query)
+            result = await asyncio.to_thread(
+                self.dspy_classifier, history=formatted_history, question=query
+            )
             try:
                 conf = float(result.confidence)
             except (ValueError, TypeError):
@@ -430,7 +435,9 @@ class SupervisorNode:
 class ChatFallbackSignature(dspy.Signature):
     """صياغة رد محادثي طبيعي ومدروس للمحادثات العامة خارج مسارات البحث."""
 
-    history: str = dspy.InputField(desc="Previous conversation context to resolve pronouns and context")
+    history: str = dspy.InputField(
+        desc="Previous conversation context to resolve pronouns and context"
+    )
     question: str = dspy.InputField()
     response: str = dspy.OutputField(desc="رد عربي طبيعي ومفيد للمستخدم")
 
@@ -452,7 +459,9 @@ class ChatFallbackNode:
             "وعليكم السلام! أنا هنا للمساعدة. أخبرني بما تحتاجه وسأتابع معك خطوة بخطوة."
         )
         try:
-            prediction = await asyncio.to_thread(self.generator, history=formatted_history, question=query)
+            prediction = await asyncio.to_thread(
+                self.generator, history=formatted_history, question=query
+            )
             model_response = getattr(prediction, "response", "")
             if isinstance(model_response, str) and model_response.strip():
                 fallback_response = model_response.strip()
@@ -544,7 +553,9 @@ class QueryRewriterNode:
         if not messages:
             return ""
 
-        for message in reversed(messages[:-1]): # exclude the last message which is the current query
+        for message in reversed(
+            messages[:-1]
+        ):  # exclude the last message which is the current query
             role = getattr(message, "type", getattr(message, "role", ""))
             content = getattr(message, "content", "")
             if role not in {"human", "user", "ai", "assistant"}:

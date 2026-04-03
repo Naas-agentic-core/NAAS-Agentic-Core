@@ -85,15 +85,15 @@ async def test_mission_complex_emits_timeout_error_when_event_bus_is_idle(monkey
         user_id=10,
     ):
         events.append(event)
-        if event.get("type") == "assistant_error":
+        if event.get("type") == "assistant_final":
             break
 
     assert any(event.get("type") == "mission_created" for event in events)
-    timeout_events = [event for event in events if event.get("type") == "assistant_error"]
+    timeout_events = [event for event in events if event.get("type") == "assistant_final"]
     assert timeout_events
     payload = timeout_events[-1].get("payload")
     assert isinstance(payload, dict)
-    assert "انتهت مهلة انتظار أحداث التنفيذ" in str(payload.get("content", ""))
+    assert "انتهت مهلة تنفيذ البحث الخارجي" in str(payload.get("content", ""))
 
 
 @pytest.mark.asyncio
