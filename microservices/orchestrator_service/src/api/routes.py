@@ -28,7 +28,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from microservices.orchestrator_service.src.contracts.admin_tools import ADMIN_TOOL_CONTRACT
 from microservices.orchestrator_service.src.core.config import get_settings
-from microservices.orchestrator_service.src.core.database import async_session_factory, get_db
+from microservices.orchestrator_service.src.core.database import (
+    async_session_factory,
+    get_checkpointer,
+    get_db,
+)
 from microservices.orchestrator_service.src.core.event_bus import get_event_bus
 from microservices.orchestrator_service.src.core.security import (
     decode_user_id,
@@ -121,6 +125,49 @@ def _build_older_history_digest(rows: list[object]) -> str:
         if len(digest_items) >= MAX_HISTORY_SUMMARY_ITEMS:
             break
     return "\n".join(digest_items)
+
+
+def _build_langchain_messages(
+    source_messages: list[dict[str, str]] | None,
+) -> list[HumanMessage | AIMessage]:
+    """يبني نافذة سياق محدودة ويزيل التكرارات المتجاورة لتقليل تلوث السياق."""
+    if not source_messages:
+        return []
+
+    normalized_messages: list[HumanMessage | AIMessage] = []
+    last_signature: tuple[str, str] | None = None
+    for message in source_messages[-MAX_HISTORY_MESSAGES:]:
+        role = message.get("role")
+        content = str(message.get("content", "")).strip()
+        if role not in {"user", "assistant"} or not content:
+            continue
+        signature = (role, content)
+        if signature == last_signature:
+            continue
+        if role == "user":
+            normalized_messages.append(HumanMessage(content=content))
+        else:
+            normalized_messages.append(AIMessage(content=content))
+        last_signature = signature
+    return normalized_messages
+
+
+def _build_graph_messages(
+    *,
+    objective: str,
+    history_messages: list[dict[str, str]] | None,
+    has_checkpointer: bool,
+) -> list[HumanMessage | AIMessage]:
+    """يبني رسائل الإدخال للرسم البياني مع مسار احتياطي صريح ضد عمى السياق."""
+    latest_user_message = HumanMessage(content=objective)
+    if has_checkpointer:
+        # الاعتماد على checkpointer يمنع تكرار الرسائل داخل LangGraph reducers.
+        return [latest_user_message]
+
+    # عند غياب checkpointer (أو تعطل تهيئته)، نمرّر نافذة تاريخية محدودة صراحةً.
+    seeded_history = _build_langchain_messages(history_messages)
+    seeded_history.append(latest_user_message)
+    return seeded_history
 
 
 def _canonicalize_mission_event(event: object) -> MissionEventEnvelope | None:
@@ -775,41 +822,24 @@ async def _stream_chat_langgraph(
     """يشغّل LangGraph الموحد لمسارات البحث والإدارة ويبث الأحداث."""
     queue: asyncio.Queue[dict[str, object]] = asyncio.Queue(maxsize=64)
 
-    def _build_langchain_messages(
-        source_messages: list[dict[str, str]] | None,
-    ) -> list[HumanMessage | AIMessage]:
-        """يبني نافذة سياق محدودة ويزيل التكرارات المتجاورة لتقليل تلوث السياق."""
-        if not source_messages:
-            return []
-
-        normalized_messages: list[HumanMessage | AIMessage] = []
-        last_signature: tuple[str, str] | None = None
-        for message in source_messages[-MAX_HISTORY_MESSAGES:]:
-            role = message.get("role")
-            content = str(message.get("content", "")).strip()
-            if role not in {"user", "assistant"} or not content:
-                continue
-            signature = (role, content)
-            if signature == last_signature:
-                continue
-            if role == "user":
-                normalized_messages.append(HumanMessage(content=content))
-            else:
-                normalized_messages.append(AIMessage(content=content))
-            last_signature = signature
-        return normalized_messages
-
     async def _runner():
         try:
             _graph = app_graph or getattr(websocket.app.state, "app_graph", None)
             if not _graph:
                 _graph = create_unified_graph()
             config = {"configurable": {"thread_id": str(conversation_id)}}
-
-            # Postgres checkpointer natively handles history natively using thread_id.
-            # Stop manually feeding the DB's history output into the inputs, which causes
-            # exponential message duplication because LangGraph checkpoints accumulate state via `add` reducer.
-            langchain_msgs: list[HumanMessage | AIMessage] = [HumanMessage(content=objective)]
+            has_checkpointer = get_checkpointer() is not None
+            langchain_msgs = _build_graph_messages(
+                objective=objective,
+                history_messages=history_messages,
+                has_checkpointer=has_checkpointer,
+            )
+            logger.info(
+                "[CONTEXT_MODE] channel=websocket conv_id=%s has_checkpointer=%s seeded_history=%s",
+                conversation_id,
+                has_checkpointer,
+                max(0, len(langchain_msgs) - 1),
+            )
 
             inputs: dict[str, object] = {
                 "query": objective,
@@ -1011,10 +1041,18 @@ async def _run_chat_langgraph(
         context.get("conversation_id") if context and "conversation_id" in context else uuid.uuid4()
     )
     config = {"configurable": {"thread_id": str(conversation_id)}}
-
-    # Postgres checkpointer inherently retrieves state history based on thread_id.
-    # Appending history_messages array manually causes exponential duplication with the `add` reducer.
-    langchain_msgs = [HumanMessage(content=objective)]
+    has_checkpointer = get_checkpointer() is not None
+    langchain_msgs = _build_graph_messages(
+        objective=objective,
+        history_messages=history_messages,
+        has_checkpointer=has_checkpointer,
+    )
+    logger.info(
+        "[CONTEXT_MODE] channel=http conv_id=%s has_checkpointer=%s seeded_history=%s",
+        conversation_id,
+        has_checkpointer,
+        max(0, len(langchain_msgs) - 1),
+    )
 
     inputs: dict[str, object] = {"query": objective, "messages": langchain_msgs}
     inputs = _merge_admin_inputs(inputs, admin_payload)
