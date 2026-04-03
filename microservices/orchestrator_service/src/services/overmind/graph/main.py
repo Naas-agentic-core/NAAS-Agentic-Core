@@ -338,7 +338,7 @@ def _configure_dspy() -> None:
 
     try:
         lm = dspy.LM(
-            model="openai/nvidia/nemotron-3-nano-30b-a3b:free",
+            model="openai/qwen/qwen3.6-plus:free",
             api_base="https://openrouter.ai/api/v1",
             api_key=openrouter_key,
         )
