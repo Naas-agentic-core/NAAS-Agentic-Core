@@ -39,3 +39,21 @@ def test_build_graph_messages_seeds_recent_history_without_checkpointer() -> Non
     assert isinstance(messages[1], AIMessage)
     assert isinstance(messages[2], HumanMessage)
     assert messages[2].content == "ما هي عاصمتها؟"
+
+
+def test_resolve_effective_conversation_id_prefers_incoming_value() -> None:
+    """يتأكد من أولوية conversation_id القادم من الرسالة عند صلاحيته."""
+    resolved = routes._resolve_effective_conversation_id(
+        incoming_value="42",
+        sticky_value=7,
+    )
+    assert resolved == 42
+
+
+def test_resolve_effective_conversation_id_falls_back_to_sticky_value() -> None:
+    """يتأكد من استخدام conversation_id المحفوظ عند غياب قيمة صالحة من العميل."""
+    resolved = routes._resolve_effective_conversation_id(
+        incoming_value="",
+        sticky_value=99,
+    )
+    assert resolved == 99

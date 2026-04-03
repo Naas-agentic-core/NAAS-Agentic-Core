@@ -70,6 +70,7 @@ class ChatRunContext(TypedDict, total=False):
     """غلاف سياقي محدود لمسار تشغيل الدردشة لتجنّب القواميس المفتوحة في الحدود الحرجة."""
 
     mission_type: str
+    conversation_id: int | str
 
 
 class MissionEventEnvelope(TypedDict):
@@ -312,6 +313,16 @@ def _safe_conversation_id(raw_value: object) -> int | None:
         type(raw_value).__name__,
     )
     return None
+
+
+def _resolve_effective_conversation_id(
+    *, incoming_value: object, sticky_value: int | None
+) -> int | None:
+    """يحدّد conversation_id النهائي مع أولوية للطلب الحالي ثم ذاكرة الاتصال."""
+    parsed = _safe_conversation_id(incoming_value)
+    if parsed is not None:
+        return parsed
+    return sticky_value
 
 
 def _decode_auth_payload_or_401(authorization: str | None) -> tuple[int, dict[str, object]]:
@@ -1037,10 +1048,17 @@ async def _run_chat_langgraph(
     """يشغّل LangGraph كعمود فقري لرحلة chat ويعيد حمولة موحدة قابلة للبث (HTTP legacy fallback)."""
     if not app_graph:
         app_graph = create_unified_graph()
-    conversation_id = (
-        context.get("conversation_id") if context and "conversation_id" in context else uuid.uuid4()
+    requested_conversation_id = context.get("conversation_id") if context else None
+    safe_conversation_id = _safe_conversation_id(requested_conversation_id)
+    conversation_id: int | str = safe_conversation_id if safe_conversation_id is not None else str(
+        uuid.uuid4()
     )
     config = {"configurable": {"thread_id": str(conversation_id)}}
+    logger.info(
+        "[THREAD_BINDING] channel=http thread_id=%s source=%s",
+        str(conversation_id),
+        "request_context" if safe_conversation_id is not None else "generated_uuid",
+    )
     has_checkpointer = get_checkpointer() is not None
     langchain_msgs = _build_graph_messages(
         objective=objective,
@@ -1257,6 +1275,10 @@ async def chat_messages_endpoint(payload: dict[str, object], request: Request) -
                 continue
             context[key] = value
 
+    requested_conversation_id = _safe_conversation_id(payload.get("conversation_id"))
+    if requested_conversation_id is not None:
+        context["conversation_id"] = requested_conversation_id
+
     history_messages = payload.get("history_messages", [])
     if not isinstance(history_messages, list):
         history_messages = []
@@ -1287,6 +1309,7 @@ async def chat_ws_stategraph(websocket: WebSocket) -> None:
         return
 
     await websocket.accept(subprotocol=selected_protocol)
+    sticky_conversation_id: int | None = None
     try:
         while True:
             incoming = await websocket.receive_json()
@@ -1307,7 +1330,10 @@ async def chat_ws_stategraph(websocket: WebSocket) -> None:
                 requested_conversation_id,
                 type(requested_conversation_id).__name__,
             )
-            conversation_id = _safe_conversation_id(requested_conversation_id)
+            conversation_id = _resolve_effective_conversation_id(
+                incoming_value=requested_conversation_id,
+                sticky_value=sticky_conversation_id,
+            )
             logger.info(
                 "[CONV_LIFECYCLE] stage=parsed role=customer user=%s conv_id=%s type=%s",
                 user_id,
@@ -1333,6 +1359,7 @@ async def chat_ws_stategraph(websocket: WebSocket) -> None:
                     conversation_id,
                     len(history_messages),
                 )
+                sticky_conversation_id = conversation_id
             except HTTPException as error:
                 await websocket.send_json(
                     {"type": "assistant_error", "payload": {"content": error.detail}}
@@ -1362,6 +1389,7 @@ async def chat_ws_stategraph(websocket: WebSocket) -> None:
                 and "mission_type" in incoming["metadata"]
             ):
                 context["mission_type"] = incoming["metadata"]["mission_type"]
+            context["conversation_id"] = conversation_id
 
             await _stream_chat_langgraph(
                 websocket,
@@ -1402,6 +1430,7 @@ async def admin_chat_ws_stategraph(websocket: WebSocket) -> None:
         return
 
     await websocket.accept(subprotocol=selected_protocol)
+    sticky_conversation_id: int | None = None
     try:
         while True:
             incoming = await websocket.receive_json()
@@ -1422,7 +1451,10 @@ async def admin_chat_ws_stategraph(websocket: WebSocket) -> None:
                 requested_conversation_id,
                 type(requested_conversation_id).__name__,
             )
-            conversation_id = _safe_conversation_id(requested_conversation_id)
+            conversation_id = _resolve_effective_conversation_id(
+                incoming_value=requested_conversation_id,
+                sticky_value=sticky_conversation_id,
+            )
             logger.info(
                 "[CONV_LIFECYCLE] stage=parsed role=admin user=%s conv_id=%s type=%s",
                 user_id,
@@ -1448,6 +1480,7 @@ async def admin_chat_ws_stategraph(websocket: WebSocket) -> None:
                     conversation_id,
                     len(history_messages),
                 )
+                sticky_conversation_id = conversation_id
             except HTTPException as error:
                 await websocket.send_json(
                     {"type": "assistant_error", "payload": {"content": error.detail}}
@@ -1477,6 +1510,7 @@ async def admin_chat_ws_stategraph(websocket: WebSocket) -> None:
                 and "mission_type" in incoming["metadata"]
             ):
                 context["mission_type"] = incoming["metadata"]["mission_type"]
+            context["conversation_id"] = conversation_id
 
             await _stream_chat_langgraph(
                 websocket,
