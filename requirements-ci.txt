@@ -76,3 +76,5 @@ Faker==38.2.0
 hypothesis==6.148.7
 sortedcontainers==2.4.0
 attrs==25.4.0
+langgraph-checkpoint-postgres
+psycopg-binary
