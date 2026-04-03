@@ -57,3 +57,21 @@ def test_resolve_effective_conversation_id_falls_back_to_sticky_value() -> None:
         sticky_value=99,
     )
     assert resolved == 99
+
+
+def test_resolve_thread_id_prefers_explicit_thread_key() -> None:
+    """يتأكد من أولوية thread_id الصريح على أي مفاتيح بديلة."""
+    context: routes.ChatRunContext = {
+        "thread_id": "thread-abc",
+        "session_id": "session-xyz",
+        "conversation_id": 50,
+    }
+    resolved = routes._resolve_thread_id(context, fallback_conversation_id=7)
+    assert resolved == "thread-abc"
+
+
+def test_resolve_thread_id_uses_fallback_when_context_empty() -> None:
+    """يتأكد من الرجوع إلى fallback conversation id عند غياب مفاتيح السياق."""
+    context: routes.ChatRunContext = {}
+    resolved = routes._resolve_thread_id(context, fallback_conversation_id=123)
+    assert resolved == "123"
