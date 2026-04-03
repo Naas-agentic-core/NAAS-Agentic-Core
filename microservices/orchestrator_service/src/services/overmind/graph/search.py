@@ -25,7 +25,8 @@ class AnalyzeQuery(dspy.Signature):
     If it is not explicitly stated in the prompt, you MUST output None.
     """
 
-    raw_query: str = dspy.InputField()
+    history: str = dspy.InputField(desc="Previous conversation context to resolve pronouns and context")
+    question: str = dspy.InputField()
     year: int | None = dspy.OutputField()
     subject: str = dspy.OutputField()
     branch: str = dspy.OutputField()
@@ -35,7 +36,7 @@ class AnalyzeQuery(dspy.Signature):
 
 
 class QueryFilters(BaseModel):
-    raw_query: str
+    question: str
     year: int | None = None
     subject: str = ""
     branch: str = ""
@@ -59,25 +60,8 @@ class QueryAnalyzerNode:
         messages = state.get("messages", [])
         error = None
 
-        recent_messages: list[str] = []
-        for msg in messages[-6:]:
-            content = getattr(msg, "content", None)
-            if not isinstance(content, str) or not content.strip():
-                continue
-            role = getattr(msg, "type", getattr(msg, "role", "user"))
-            prefix = "User: " if role in ("human", "user") else "Assistant: "
-            text = content.strip()
-            if text.startswith("{") and role in ("ai", "assistant"):
-                try:
-                    data = json.loads(text)
-                    if isinstance(data, dict):
-                        extracted = data.get("الإجابة") or data.get("التمرين") or text
-                        text = str(extracted)
-                except Exception:
-                    pass
-            recent_messages.append(f"{prefix}{text}")
-
-        context_query = "\n".join(recent_messages) if recent_messages else query
+        from .main import format_conversation_history
+        formatted_history = format_conversation_history(messages)
 
         try:
 
@@ -88,11 +72,11 @@ class QueryAnalyzerNode:
                 return int(text_value) if text_value.isdigit() else None
 
             prediction = await asyncio.wait_for(
-                anyio.to_thread.run_sync(lambda: self.analyzer(raw_query=context_query)),
+                anyio.to_thread.run_sync(lambda: self.analyzer(history=formatted_history, question=query)),
                 timeout=10.0,
             )
             filters = QueryFilters(
-                raw_query=context_query,
+                question=query,
                 year=_coerce_nullable_int(getattr(prediction, "year", None)),
                 subject=str(prediction.subject),
                 branch=str(prediction.branch),
@@ -102,7 +86,7 @@ class QueryAnalyzerNode:
             logger.warning(f"DSPy parsing failed, returning empty filters: {e}")
             error = e
             filters = QueryFilters(
-                raw_query=context_query,
+                question=query,
                 year=None,
                 subject="",
                 branch="",
@@ -135,7 +119,7 @@ class InternalRetrieverNode:
         try:
             exact_results = await asyncio.wait_for(
                 research_client.semantic_search(
-                    query=filters.raw_query, top_k=5, filters=exact_filters
+                    query=filters.question, top_k=5, filters=exact_filters
                 ),
                 timeout=10.0,
             )
@@ -165,7 +149,7 @@ class InternalRetrieverNode:
             # We broaden top_k but keep exact_filters to prevent returning a random 2024 exam.
             semantic_results = await asyncio.wait_for(
                 research_client.semantic_search(
-                    query=filters.raw_query, top_k=15, filters=exact_filters
+                    query=filters.question, top_k=15, filters=exact_filters
                 ),
                 timeout=10.0,
             )
@@ -228,7 +212,7 @@ class RerankerNode:
                 reranked_nodes = await anyio.to_thread.run_sync(
                     self.reranker.postprocess_nodes,
                     nodes,
-                    QueryBundle(filters.raw_query),
+                    QueryBundle(filters.question),
                 )
                 reranked = [
                     LlamaDocument(

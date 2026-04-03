@@ -204,6 +204,22 @@ ELLIPTICAL_TERMS = {
 }
 
 
+def format_conversation_history(messages: list[object]) -> str:
+    """Formats the entire messages list into a readable string dialogue."""
+    if not messages:
+        return ""
+
+    dialogue = []
+    for msg in messages:
+        content = getattr(msg, "content", "")
+        if not isinstance(content, str) or not content.strip():
+            continue
+        role = getattr(msg, "type", getattr(msg, "role", "user"))
+        prefix = "Human" if role in ("human", "user") else "AI"
+        dialogue.append(f"{prefix}: {content.strip()}")
+
+    return "\n".join(dialogue)
+
 def build_conversation_context(
     messages: list[object],
     max_turns: int = 6,
@@ -337,7 +353,8 @@ def _configure_dspy() -> None:
 class IntentClassifier(dspy.Signature):
     """Classify if conversation needs admin system metrics, general chat/greetings, or educational search. If the user says a greeting (السلام عليكم, hello) or general chat, output is_chat=True. Follow-up questions about previous exercises/topics are educational searches, so is_chat=False."""
 
-    conversation: str = dspy.InputField()
+    history: str = dspy.InputField(desc="Previous conversation context to resolve pronouns and context")
+    question: str = dspy.InputField()
     is_admin: bool = dspy.OutputField(desc="True if conversation needs real system counts/metrics")
     is_chat: bool = dspy.OutputField(
         desc="True if conversation is a greeting, small talk, or general conversational chat (e.g. السلام عليكم, شكرا, مرحبا)"
@@ -359,7 +376,7 @@ class SupervisorNode:
         start_time = time.time()
         query = state.get("query", "")
         messages = state.get("messages", [])
-        conversation_text = build_conversation_context(messages=messages) or query
+        formatted_history = format_conversation_history(messages)
 
         if emergency_intent_guard(query):
             intent = "admin"
@@ -377,7 +394,7 @@ class SupervisorNode:
                 return {"intent": "admin"}
 
         try:
-            result = await asyncio.to_thread(self.dspy_classifier, conversation=conversation_text)
+            result = await asyncio.to_thread(self.dspy_classifier, history=formatted_history, question=query)
             try:
                 conf = float(result.confidence)
             except (ValueError, TypeError):
@@ -400,7 +417,7 @@ class SupervisorNode:
             len(query_normalized.split()) <= 3
             and "?" not in query_normalized
             and "؟" not in query
-            and not _looks_elliptical_followup(query, conversation_text)
+            and not _looks_elliptical_followup(query, formatted_history)
         ):
             emit_telemetry(node_name="SupervisorNode", start_time=start_time, state=state)
             return {"intent": "chat"}
@@ -413,7 +430,8 @@ class SupervisorNode:
 class ChatFallbackSignature(dspy.Signature):
     """صياغة رد محادثي طبيعي ومدروس للمحادثات العامة خارج مسارات البحث."""
 
-    conversation: str = dspy.InputField()
+    history: str = dspy.InputField(desc="Previous conversation context to resolve pronouns and context")
+    question: str = dspy.InputField()
     response: str = dspy.OutputField(desc="رد عربي طبيعي ومفيد للمستخدم")
 
 
@@ -429,12 +447,12 @@ class ChatFallbackNode:
         start_time = time.time()
         query = state.get("query", "")
         messages = state.get("messages", [])
-        conversation = build_conversation_context(messages=messages) or query
+        formatted_history = format_conversation_history(messages)
         fallback_response = (
             "وعليكم السلام! أنا هنا للمساعدة. أخبرني بما تحتاجه وسأتابع معك خطوة بخطوة."
         )
         try:
-            prediction = await asyncio.to_thread(self.generator, conversation=conversation)
+            prediction = await asyncio.to_thread(self.generator, history=formatted_history, question=query)
             model_response = getattr(prediction, "response", "")
             if isinstance(model_response, str) and model_response.strip():
                 fallback_response = model_response.strip()
@@ -526,7 +544,7 @@ class QueryRewriterNode:
         if not messages:
             return ""
 
-        for message in reversed(messages):
+        for message in reversed(messages[:-1]): # exclude the last message which is the current query
             role = getattr(message, "type", getattr(message, "role", ""))
             content = getattr(message, "content", "")
             if role not in {"human", "user", "ai", "assistant"}:
