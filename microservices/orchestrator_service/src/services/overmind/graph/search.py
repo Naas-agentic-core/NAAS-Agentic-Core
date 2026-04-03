@@ -25,7 +25,9 @@ class AnalyzeQuery(dspy.Signature):
     If it is not explicitly stated in the prompt, you MUST output None.
     """
 
-    history: str = dspy.InputField(desc="Previous conversation context to resolve pronouns and context")
+    history: str = dspy.InputField(
+        desc="Previous conversation context to resolve pronouns and context"
+    )
     question: str = dspy.InputField()
     year: int | None = dspy.OutputField()
     subject: str = dspy.OutputField()
@@ -60,6 +62,7 @@ class QueryAnalyzerNode:
         error = None
 
         from .main import format_conversation_history
+
         formatted_history = format_conversation_history(messages)
 
         try:
@@ -71,7 +74,9 @@ class QueryAnalyzerNode:
                 return int(text_value) if text_value.isdigit() else None
 
             prediction = await asyncio.wait_for(
-                anyio.to_thread.run_sync(lambda: self.analyzer(history=formatted_history, question=query)),
+                anyio.to_thread.run_sync(
+                    lambda: self.analyzer(history=formatted_history, question=query)
+                ),
                 timeout=10.0,
             )
             filters = QueryFilters(
