@@ -30,6 +30,7 @@
 
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
 from functools import lru_cache
 
@@ -37,6 +38,14 @@ from .config import get_settings
 from .logging import get_logger
 
 logger = get_logger(__name__)
+
+
+def _resolve_primary_model(default_model: str) -> str:
+    """يحلّ نموذج التشغيل الأساسي من البيئة مع قيمة افتراضية آمنة."""
+    override_model = os.getenv("OPENROUTER_PRIMARY_MODEL", "").strip()
+    if override_model:
+        return override_model
+    return default_model
 
 
 class AvailableModels:
@@ -66,6 +75,7 @@ class AvailableModels:
     PHI_3_MINI_FREE = "microsoft/phi-3-mini-128k-instruct:free"
     KAT_CODER_PRO_FREE = "kwaipilot/kat-coder-pro:free"
     QWEN_QWEN3_CODER_FREE = "qwen/qwen3-coder:free"
+    QWEN_QWEN36_PLUS_FREE = "qwen/qwen3.6-plus:free"
     DEVSTRAL_2512 = "mistralai/devstral-2512:free"
     GLM_4_5_AIR_FREE = "z-ai/glm-4.5-air:free"
     DEEPSEEK_R1_CHIMERA_FREE = "tngtech/deepseek-r1t2-chimera:free"
@@ -91,18 +101,18 @@ class ActiveModels:
     ╚═══════════════════════════════════════════════════════════════════════════════════╝
     """
 
-    PRIMARY = AvailableModels.NEMOTRON_3_NANO
-    LOW_COST = AvailableModels.NEMOTRON_3_NANO
-    GATEWAY_PRIMARY = AvailableModels.NEMOTRON_3_NANO
+    PRIMARY = _resolve_primary_model(AvailableModels.QWEN_QWEN36_PLUS_FREE)
+    LOW_COST = PRIMARY
+    GATEWAY_PRIMARY = PRIMARY
     GATEWAY_FALLBACK_1 = AvailableModels.GEMINI_2_FLASH_EXP_FREE
     GATEWAY_FALLBACK_2 = AvailableModels.QWEN_QWEN3_CODER_FREE
     GATEWAY_FALLBACK_3 = AvailableModels.KAT_CODER_PRO_FREE
     GATEWAY_FALLBACK_4 = AvailableModels.PHI_3_MINI_FREE
     GATEWAY_FALLBACK_5 = AvailableModels.LLAMA_3_2_11B_VISION_FREE
-    TIER_NANO = AvailableModels.NEMOTRON_3_NANO
-    TIER_FAST = AvailableModels.NEMOTRON_3_NANO
-    TIER_SMART = AvailableModels.NEMOTRON_3_NANO
-    TIER_GENIUS = AvailableModels.NEMOTRON_3_NANO
+    TIER_NANO = PRIMARY
+    TIER_FAST = PRIMARY
+    TIER_SMART = PRIMARY
+    TIER_GENIUS = PRIMARY
 
 
 @dataclass(frozen=True)

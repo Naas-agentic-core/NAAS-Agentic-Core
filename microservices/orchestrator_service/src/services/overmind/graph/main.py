@@ -9,6 +9,8 @@ from typing import Annotated, TypedDict
 import dspy
 from langgraph.graph import END, StateGraph
 
+logger = logging.getLogger(__name__)
+
 
 def _load_search_nodes() -> tuple[type, type, type, type, type]:
     """يحمّل عقد البحث عند توفر التبعيات ويعيد بدائل آمنة عند غيابها."""
@@ -337,8 +339,9 @@ def _configure_dspy() -> None:
         return
 
     try:
+        dspy_model = os.getenv("OPENROUTER_DSPY_MODEL", "qwen/qwen3.6-plus:free").strip()
         lm = dspy.LM(
-            model="openai/qwen/qwen3.6-plus:free",
+            model=dspy_model,
             api_base="https://openrouter.ai/api/v1",
             api_key=openrouter_key,
         )
@@ -777,4 +780,11 @@ def create_unified_graph(admin_app=None):
     from microservices.orchestrator_service.src.core.database import get_checkpointer
 
     checkpointer = get_checkpointer()
-    return graph.compile(checkpointer=checkpointer) if checkpointer else graph.compile()
+    if checkpointer:
+        logger.info("[CHECKPOINTER] LangGraph compiled with Postgres checkpointer.")
+        return graph.compile(checkpointer=checkpointer)
+
+    logger.warning(
+        "[CHECKPOINTER] LangGraph compiled without checkpointer; state continuity relies on injected history."
+    )
+    return graph.compile()
