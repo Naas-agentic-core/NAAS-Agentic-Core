@@ -19,6 +19,7 @@ def test_agent_chat_mission_complex_stream_is_text_encodable(monkeypatch) -> Non
 
     async def fake_save_chat_to_db(*args, **kwargs) -> None:
         pass
+
     monkeypatch.setattr(routes, "_save_chat_to_db", fake_save_chat_to_db)
 
     async def fake_mission_stream(
@@ -96,6 +97,7 @@ def test_agent_chat_admin_path_is_fail_closed_without_admin_identity(monkeypatch
 
     async def fake_save_chat_to_db(*args, **kwargs) -> None:
         pass
+
     monkeypatch.setattr(routes, "_save_chat_to_db", fake_save_chat_to_db)
 
     class FakeAdminApp:
