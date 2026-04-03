@@ -9,7 +9,12 @@ from fastapi.middleware.cors import CORSMiddleware
 import microservices.orchestrator_service.src.models.mission  # noqa: F401
 from microservices.orchestrator_service.src.api import routes
 from microservices.orchestrator_service.src.core.config import settings
-from microservices.orchestrator_service.src.core.database import async_session_factory, init_db
+from microservices.orchestrator_service.src.core.database import (
+    async_session_factory,
+    close_db,
+    get_checkpointer,
+    init_db,
+)
 from microservices.orchestrator_service.src.core.event_bus import event_bus
 from microservices.orchestrator_service.src.services.overmind.state import MissionStateManager
 from microservices.orchestrator_service.src.services.tools.registry import register_all_tools
@@ -83,7 +88,9 @@ async def lifespan(app: FastAPI):
             create_unified_graph,
         )
 
-        app.state.admin_app = admin_graph.compile(interrupt_before=[])
+        app.state.admin_app = admin_graph.compile(
+            checkpointer=get_checkpointer(), interrupt_before=[]
+        )
         app.state.app_graph = create_unified_graph(admin_app=app.state.admin_app)
 
         # ═══ PHASE 3: WARMUP — PROVE IT WORKS ══════════════════════
@@ -120,6 +127,7 @@ async def lifespan(app: FastAPI):
             await relay_task
 
     await event_bus.close()
+    await close_db()
     tool_registry.clear()
     if hasattr(app.state, "admin_app"):
         del app.state.admin_app

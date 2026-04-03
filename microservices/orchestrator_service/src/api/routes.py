@@ -806,16 +806,10 @@ async def _stream_chat_langgraph(
                 _graph = create_unified_graph()
             config = {"configurable": {"thread_id": str(conversation_id)}}
 
-            langchain_msgs = _build_langchain_messages(history_messages)
-
-            # The newly received objective is already appended in DB inside _ensure_conversation,
-            # but if it isn't (or just to be safe), we ensure the last message is the current objective.
-            # To avoid duplicate last user message from DB, check if the last message matches the objective.
-            if not langchain_msgs or (
-                langchain_msgs[-1].content != objective
-                or getattr(langchain_msgs[-1], "type", "") != "human"
-            ):
-                langchain_msgs.append(HumanMessage(content=objective))
+            # Postgres checkpointer natively handles history natively using thread_id.
+            # Stop manually feeding the DB's history output into the inputs, which causes
+            # exponential message duplication because LangGraph checkpoints accumulate state via `add` reducer.
+            langchain_msgs: list[HumanMessage | AIMessage] = [HumanMessage(content=objective)]
 
             inputs: dict[str, object] = {
                 "query": objective,
@@ -1013,21 +1007,14 @@ async def _run_chat_langgraph(
     """يشغّل LangGraph كعمود فقري لرحلة chat ويعيد حمولة موحدة قابلة للبث (HTTP legacy fallback)."""
     if not app_graph:
         app_graph = create_unified_graph()
-    config = {"configurable": {"thread_id": str(uuid.uuid4())}}
+    conversation_id = (
+        context.get("conversation_id") if context and "conversation_id" in context else uuid.uuid4()
+    )
+    config = {"configurable": {"thread_id": str(conversation_id)}}
 
-    langchain_msgs = []
-    if history_messages:
-        for msg in history_messages:
-            if msg.get("role") == "user":
-                langchain_msgs.append(HumanMessage(content=msg.get("content", "")))
-            elif msg.get("role") == "assistant":
-                langchain_msgs.append(AIMessage(content=msg.get("content", "")))
-
-    if not langchain_msgs or (
-        langchain_msgs[-1].content != objective
-        or getattr(langchain_msgs[-1], "type", "") != "human"
-    ):
-        langchain_msgs.append(HumanMessage(content=objective))
+    # Postgres checkpointer inherently retrieves state history based on thread_id.
+    # Appending history_messages array manually causes exponential duplication with the `add` reducer.
+    langchain_msgs = [HumanMessage(content=objective)]
 
     inputs: dict[str, object] = {"query": objective, "messages": langchain_msgs}
     inputs = _merge_admin_inputs(inputs, admin_payload)
@@ -1593,28 +1580,21 @@ async def chat_with_agent_endpoint(request: ChatRequest, fastapi_req: Request) -
                     admin_payload = {"is_admin": True, "role": "admin"}
 
                 langchain_msgs: list[HumanMessage | AIMessage] = []
-                if request.history_messages:
-                    for msg in request.history_messages[-MAX_HISTORY_MESSAGES:]:
-                        role = msg.get("role")
-                        content = str(msg.get("content", "")).strip()
-                        if role not in {"user", "assistant"} or not content:
-                            continue
-                        if role == "user":
-                            langchain_msgs.append(HumanMessage(content=content))
-                        else:
-                            langchain_msgs.append(AIMessage(content=content))
 
-                if not langchain_msgs or (
-                    langchain_msgs[-1].content != request.question
-                    or getattr(langchain_msgs[-1], "type", "") != "human"
-                ):
-                    langchain_msgs.append(HumanMessage(content=request.question))
+                # Checkpointer natively handles history now, append only the current human query
+                langchain_msgs.append(HumanMessage(content=request.question))
 
                 admin_inputs = _merge_admin_inputs(
                     {"query": request.question, "messages": langchain_msgs}, admin_payload
                 )
+
+                conversation_id = (
+                    request.conversation_id
+                    if getattr(request, "conversation_id", None)
+                    else uuid.uuid4()
+                )
                 res = await admin_app.ainvoke(
-                    admin_inputs, config={"configurable": {"thread_id": str(uuid.uuid4())}}
+                    admin_inputs, config={"configurable": {"thread_id": str(conversation_id)}}
                 )
                 final_resp = res.get("final_response")
                 if isinstance(final_resp, dict):
