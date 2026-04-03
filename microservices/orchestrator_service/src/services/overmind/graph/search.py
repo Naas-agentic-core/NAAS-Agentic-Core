@@ -54,7 +54,6 @@ class QueryAnalyzerNode:
         from .telemetry import emit_telemetry
 
         start_time = time.time()
-        import json
 
         query = state.get("query", "")
         messages = state.get("messages", [])
