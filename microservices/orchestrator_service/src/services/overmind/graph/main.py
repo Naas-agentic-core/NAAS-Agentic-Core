@@ -743,4 +743,9 @@ def create_unified_graph(admin_app=None):
     graph.add_conditional_edges("validator", check_quality, {"pass": END, "fail": "supervisor"})
 
     graph.set_entry_point("supervisor")
-    return graph.compile()
+
+    # Use global postgres checkpointer if available, otherwise compile without it
+    from microservices.orchestrator_service.src.core.database import get_checkpointer
+
+    checkpointer = get_checkpointer()
+    return graph.compile(checkpointer=checkpointer) if checkpointer else graph.compile()

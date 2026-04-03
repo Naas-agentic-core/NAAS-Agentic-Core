@@ -1,5 +1,4 @@
-from langgraph.checkpoint.memory import MemorySaver
-
+from microservices.orchestrator_service.src.core.database import get_checkpointer
 from microservices.orchestrator_service.src.core.logging import get_logger
 from microservices.orchestrator_service.src.services.tools.registry import (
     get_registry,
@@ -41,7 +40,7 @@ class AgentBootstrap:
             )
 
         # Step 3
-        compiled = graph.compile(checkpointer=MemorySaver())
+        compiled = graph.compile(checkpointer=get_checkpointer())
 
         # Step 4
         probe = await compiled.ainvoke(

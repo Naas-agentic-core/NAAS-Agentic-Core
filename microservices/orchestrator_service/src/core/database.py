@@ -3,6 +3,8 @@ import os
 import ssl
 from collections.abc import AsyncGenerator
 
+from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
+from psycopg_pool import AsyncConnectionPool
 from sqlalchemy.engine.url import make_url
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
@@ -64,6 +66,13 @@ async_session_factory = async_sessionmaker(
     autoflush=False,
 )
 
+_postgres_pool: AsyncConnectionPool | None = None
+postgres_checkpointer: AsyncPostgresSaver | None = None
+
+
+def get_checkpointer() -> AsyncPostgresSaver | None:
+    return postgres_checkpointer
+
 
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
     async with async_session_factory() as session:
@@ -79,12 +88,31 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
 
 async def init_db() -> None:
     """Initialize database schema."""
+    global _postgres_pool, postgres_checkpointer
     try:
         # Import models here or ensure they are imported before calling this
         # We rely on main.py importing them.
         async with engine.begin() as conn:
             await conn.run_sync(OrchestratorSQLModel.metadata.create_all)
+
+        # Initialize LangGraph Postgres checkpointer pool
+        # Need to re-create a proper psycopg string from settings.DATABASE_URL
+        # We will use psycopg's kwargs mapping or simple asyncpg string since it is similar
+        pool_kwargs = {
+            "conninfo": settings.DATABASE_URL.replace("postgresql+asyncpg", "postgresql")
+        }
+        _postgres_pool = AsyncConnectionPool(**pool_kwargs)
+        await _postgres_pool.open()
+        postgres_checkpointer = AsyncPostgresSaver(_postgres_pool)
+        await postgres_checkpointer.setup()
+
         logger.info("Database initialized successfully.")
     except Exception as e:
         logger.error(f"Database initialization failed: {e}")
         raise
+
+
+async def close_db() -> None:
+    """Close the database and checkpointer pool."""
+    if _postgres_pool:
+        await _postgres_pool.close()
