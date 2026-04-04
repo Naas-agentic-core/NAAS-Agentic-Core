@@ -137,6 +137,21 @@ def test_is_ambiguous_followup_detects_capital_pronoun() -> None:
     assert routes._is_ambiguous_followup("ما هي عاصمتها؟") is True
 
 
+def test_is_ambiguous_followup_detects_population_pronoun() -> None:
+    """يتأكد من التقاط أسئلة السكان الإحالية لمنع فقدان السياق في المتابعة."""
+    assert routes._is_ambiguous_followup("كم عدد سكانها؟") is True
+
+
+def test_is_ambiguous_followup_detects_demonstrative_state_reference() -> None:
+    """يتأكد من التقاط أسئلة مثل (هذه الدولة) كمتابعة تعتمد على السياق السابق."""
+    assert routes._is_ambiguous_followup("كم ولاية في هذه الدولة؟") is True
+
+
+def test_is_ambiguous_followup_detects_vague_math_followup() -> None:
+    """يتأكد من التقاط صيغ رياضية مبهمة تبدأ بـ(كيف جاءت) وتحتاج سياقًا سابقًا."""
+    assert routes._is_ambiguous_followup("كيف جاءت الدالة معدومة؟") is True
+
+
 def test_is_ambiguous_followup_rejects_explicit_query() -> None:
     """يتأكد من عدم تفعيل نمط المتابعة عند السؤال الواضح المستقل."""
     assert routes._is_ambiguous_followup("ما هي عاصمة فرنسا؟") is False

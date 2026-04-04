@@ -206,15 +206,70 @@ def _is_ambiguous_followup(query: str) -> bool:
         "عاصمتها",
         "عاصمته",
         "عاصمتهم",
+        "عدد سكانها",
+        "عدد سكانه",
+        "سكانها",
+        "سكانه",
+        "موقعها",
+        "موقعه",
+        "اين تقعها",
+        "أين تقعها",
+        "where is it",
+        "where is she",
+        "where is he",
+        "what is its population",
+        "how many people live there",
         "what is its",
         "its capital",
         "their capital",
     )
     if any(trigger in normalized for trigger in triggers):
         return True
+
+    demonstratives = ("هذا", "هذه", "ذلك", "تلك", "هاته", "there", "this", "that")
+    followup_nouns = (
+        "الدولة",
+        "البلد",
+        "المدينة",
+        "الكيان",
+        "الدالة",
+        "المعادلة",
+        "التمرين",
+        "السؤال",
+        "function",
+        "equation",
+        "problem",
+    )
+    if any(word in normalized for word in demonstratives) and any(
+        noun in normalized for noun in followup_nouns
+    ):
+        return True
+
+    vague_leads = ("كيف جاءت", "كيف حصل", "كيف صارت", "لماذا جاءت", "كيف طلعت")
+    if any(normalized.startswith(prefix) for prefix in vague_leads):
+        return True
+
     tokens = normalized.split()
-    pronoun_like_terms = {"عاصمتها", "عاصمته", "عاصمتهم", "عاصمتها؟", "عاصمته؟", "عاصمتهم؟"}
-    return len(tokens) <= 4 and any(token in pronoun_like_terms for token in tokens)
+    pronoun_like_terms = {
+        "عاصمتها",
+        "عاصمته",
+        "عاصمتهم",
+        "عاصمتها؟",
+        "عاصمته؟",
+        "عاصمتهم؟",
+        "سكانها",
+        "سكانه",
+        "سكانها؟",
+        "سكانه؟",
+        "عددهم",
+        "عددها",
+    }
+    if len(tokens) <= 6 and any(token in pronoun_like_terms for token in tokens):
+        return True
+
+    return any(
+        len(token) > 2 and token.endswith(("ها", "ه", "هم")) for token in tokens
+    ) and len(tokens) <= 8
 
 
 def _canonicalize_mission_event(event: object) -> MissionEventEnvelope | None:

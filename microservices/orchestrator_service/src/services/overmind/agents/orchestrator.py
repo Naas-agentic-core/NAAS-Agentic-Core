@@ -144,6 +144,7 @@ class OrchestratorAgent:
         normalized = question.strip()
         context = context or {}
         normalized = self._resolve_contextual_reference(normalized, context)
+        normalized = self._inject_recent_history_context(normalized, context)
 
         # 1. Intent Detection
         intent = None
@@ -259,41 +260,60 @@ class OrchestratorAgent:
         if not self._looks_like_pronoun_followup(trimmed_question):
             return trimmed_question
 
-        last_user_message = self._extract_last_user_message(context)
-        if not last_user_message:
+        anchor_message = self._extract_context_anchor(
+            context=context,
+            current_question=trimmed_question,
+        )
+        if not anchor_message:
             return trimmed_question
 
         return (
             f"{trimmed_question}\n\n"
-            f"مرجع سياقي إلزامي من الرسالة السابقة للمستخدم: {last_user_message}"
+            f"مرجع سياقي إلزامي من الرسائل السابقة: {anchor_message}"
         )
 
-    def _extract_last_user_message(self, context: dict[str, object]) -> str | None:
+    def _extract_context_anchor(
+        self,
+        *,
+        context: dict[str, object],
+        current_question: str,
+    ) -> str | None:
         """
-        يسترجع آخر رسالة مستخدم صالحة من history_messages.
+        يستخرج مرجعًا سياقيًا موثوقًا من التاريخ مع تجاهل السؤال الحالي.
         """
         history_value = context.get("history_messages")
         if not isinstance(history_value, list):
             return None
 
+        normalized_current = current_question.strip().casefold()
+        skipped_current_user = False
         for item in reversed(history_value):
             if not isinstance(item, dict):
                 continue
-            if item.get("role") != "user":
+            role = item.get("role")
+            if role not in {"user", "assistant"}:
                 continue
             content = item.get("content")
             if not isinstance(content, str):
                 continue
             cleaned = content.strip()
-            if cleaned:
-                return cleaned
+            if not cleaned:
+                continue
+            if (
+                role == "user"
+                and not skipped_current_user
+                and cleaned.casefold() == normalized_current
+            ):
+                skipped_current_user = True
+                continue
+            return cleaned
         return None
 
     def _looks_like_pronoun_followup(self, question: str) -> bool:
         """
         يتعرف على أنماط الأسئلة التي تعتمد على ضمير دون ذكر الكيان صراحة.
         """
-        lowered = question.lower()
+        lowered = question.casefold()
         pronoun_markers = (
             "ها",
             "عاصمتها",
@@ -306,7 +326,84 @@ class OrchestratorAgent:
         )
         if any(marker in lowered for marker in pronoun_markers):
             return True
-        return "this" in lowered or "that" in lowered
+        demonstratives = ("هذا", "هذه", "ذلك", "تلك", "هاته", "this", "that", "there")
+        referential_nouns = (
+            "الدولة",
+            "البلد",
+            "المدينة",
+            "الكيان",
+            "الدالة",
+            "المعادلة",
+            "التمرين",
+            "السؤال",
+            "function",
+            "equation",
+            "problem",
+        )
+        if any(word in lowered for word in demonstratives) and any(
+            noun in lowered for noun in referential_nouns
+        ):
+            return True
+        return lowered.startswith(("كيف جاءت", "كيف حصل", "كيف صارت", "لماذا جاءت"))
+
+    def _inject_recent_history_context(self, question: str, context: dict[str, object]) -> str:
+        """
+        يحقن ملخصًا موجزًا من آخر الرسائل لضمان وعي سياقي حتى في الأسئلة غير الضميرية.
+        """
+        history_brief = self._build_recent_history_brief(context=context, current_question=question)
+        if not history_brief:
+            return question
+        if "سياق المحادثة السابق (موجز)" in question:
+            return question
+        return (
+            "سياق المحادثة السابق (موجز):\n"
+            f"{history_brief}\n\n"
+            f"السؤال الحالي: {question}"
+        )
+
+    def _build_recent_history_brief(
+        self,
+        *,
+        context: dict[str, object],
+        current_question: str,
+    ) -> str:
+        """
+        يبني موجزًا محدودًا من التاريخ مع حذف السؤال الجاري لتقليل الضوضاء.
+        """
+        history_value = context.get("history_messages")
+        if not isinstance(history_value, list):
+            return ""
+
+        normalized_current = current_question.strip().casefold()
+        items: list[str] = []
+        skipped_current_user = False
+
+        for item in reversed(history_value):
+            if not isinstance(item, dict):
+                continue
+            role = item.get("role")
+            if role not in {"user", "assistant"}:
+                continue
+            content = item.get("content")
+            if not isinstance(content, str):
+                continue
+            cleaned = " ".join(content.split()).strip()
+            if not cleaned:
+                continue
+            if (
+                role == "user"
+                and not skipped_current_user
+                and cleaned.casefold() == normalized_current
+            ):
+                skipped_current_user = True
+                continue
+            role_label = "المستخدم" if role == "user" else "المساعد"
+            items.append(f"- {role_label}: {cleaned[:220]}")
+            if len(items) >= 4:
+                break
+
+        items.reverse()
+        return "\n".join(items)
 
     async def _handle_content_retrieval(
         self, question: str, context: dict
