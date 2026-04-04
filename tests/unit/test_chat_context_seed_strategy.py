@@ -58,6 +58,21 @@ def test_build_graph_messages_seeds_history_when_checkpointer_has_no_state() -> 
     assert len(messages) == 3
 
 
+def test_build_graph_messages_forces_seed_on_ambiguous_followup() -> None:
+    """يتأكد من حقن التاريخ للاستعلامات الضميرية حتى مع وجود checkpoint."""
+    messages = routes._build_graph_messages(
+        objective="ما هي عاصمتها؟",
+        history_messages=[
+            {"role": "user", "content": "أين تقع فرنسا؟"},
+            {"role": "assistant", "content": "تقع فرنسا في أوروبا الغربية."},
+        ],
+        checkpointer_available=True,
+        checkpoint_has_state=True,
+        force_seed_history=True,
+    )
+    assert len(messages) == 3
+
+
 def test_resolve_effective_conversation_id_prefers_incoming_value() -> None:
     """يتأكد من أولوية conversation_id القادم من الرسالة عند صلاحيته."""
     resolved = routes._resolve_effective_conversation_id(
@@ -115,3 +130,13 @@ async def test_detect_checkpoint_state_when_state_exists(monkeypatch) -> None:
     available, has_state = await routes._detect_checkpoint_state("thread-1")
     assert available is True
     assert has_state is True
+
+
+def test_is_ambiguous_followup_detects_capital_pronoun() -> None:
+    """يتأكد من اكتشاف صيغة سؤال مرجعي تحتاج سياقًا سابقًا."""
+    assert routes._is_ambiguous_followup("ما هي عاصمتها؟") is True
+
+
+def test_is_ambiguous_followup_rejects_explicit_query() -> None:
+    """يتأكد من عدم تفعيل نمط المتابعة عند السؤال الواضح المستقل."""
+    assert routes._is_ambiguous_followup("ما هي عاصمة فرنسا؟") is False
