@@ -115,3 +115,13 @@ async def test_detect_checkpoint_state_when_state_exists(monkeypatch) -> None:
     available, has_state = await routes._detect_checkpoint_state("thread-1")
     assert available is True
     assert has_state is True
+
+
+def test_looks_like_contextual_followup_detects_pronoun_capital_question() -> None:
+    """يتأكد من اكتشاف أسئلة المتابعة المرجعية مثل سؤال العاصمة الضميري."""
+    assert routes._looks_like_contextual_followup("ما هي عاصمتها؟") is True
+
+
+def test_looks_like_contextual_followup_ignores_explicit_full_question() -> None:
+    """يتأكد من عدم اعتبار الأسئلة الواضحة الطويلة كمتابعة غامضة."""
+    assert routes._looks_like_contextual_followup("ما هي عاصمة فرنسا؟") is False
