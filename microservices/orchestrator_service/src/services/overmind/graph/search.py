@@ -371,6 +371,7 @@ class SynthesizerNode:
             confidence=float(confidence),
         )
         import json
+
         from langchain_core.messages import AIMessage
         return {
             "final_response": response_json,

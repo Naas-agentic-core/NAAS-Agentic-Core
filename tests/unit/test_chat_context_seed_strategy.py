@@ -126,7 +126,7 @@ async def test_detect_checkpoint_state_when_state_exists(monkeypatch) -> None:
         async def aget_tuple(self, _config: dict[str, object]) -> object:
             return {"checkpoint": "exists"}
 
-    monkeypatch.setattr(routes, "get_checkpointer", lambda: _FakeCheckpointer())
+    monkeypatch.setattr(routes, "get_checkpointer", _FakeCheckpointer)
     available, has_state = await routes._detect_checkpoint_state("thread-1")
     assert available is True
     assert has_state is True
