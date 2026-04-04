@@ -2,6 +2,7 @@ import asyncio
 import json
 import logging
 import os
+import time
 import uuid
 from contextlib import suppress
 from typing import TypedDict
@@ -908,6 +909,13 @@ async def _stream_chat_langgraph(
             if not _graph:
                 _graph = create_unified_graph()
             thread_id = _resolve_thread_id(context, conversation_id)
+            incoming_messages = history_messages or []
+            logger.critical(
+                f"[TELEMETRY] INGRESS | "
+                f"conversation_id={conversation_id!r} | "
+                f"thread_id={thread_id!r} | "
+                f"messages_in_request={len(incoming_messages)}"
+            )
             config = {"configurable": {"thread_id": thread_id}}
             checkpointer_available, checkpoint_has_state = await _detect_checkpoint_state(thread_id)
             force_seed_history = _is_ambiguous_followup(objective)
@@ -933,8 +941,54 @@ async def _stream_chat_langgraph(
                 "messages": langchain_msgs,
             }
             inputs = _merge_admin_inputs(inputs, admin_payload if chat_scope == "admin" else None)
+            state_dict = inputs
+            payload_messages = state_dict.get("messages", [])
+            logger.critical(
+                f"[TELEMETRY] PRE-INVOKE | "
+                f"messages type={type(payload_messages).__name__} | "
+                f"count={len(payload_messages)} | "
+                f"last_msg={str(payload_messages[-1])[:120] if payload_messages else 'EMPTY'}"
+            )
+            checkpointer = get_checkpointer()
+            if checkpointer is None:
+                logger.critical("[TELEMETRY] CHECKPOINTER NOT IN SCOPE")
+            else:
+                _t = time.monotonic()
+                try:
+                    _ckpt = await checkpointer.aget(config)
+                    _elapsed = time.monotonic() - _t
+                    _keys = list(_ckpt.channel_values.keys()) if _ckpt else None
+                    logger.critical(
+                        f"[TELEMETRY] CHECKPOINTER | "
+                        f"elapsed={_elapsed:.4f}s | "
+                        f"state={'NONE — silent failure' if _ckpt is None else _keys}"
+                    )
+                except Exception as _e:
+                    logger.critical(
+                        f"[TELEMETRY] CHECKPOINTER CRASHED | {type(_e).__name__}: {_e}"
+                    )
 
             res = await _graph.ainvoke(inputs, config=config)
+            if checkpointer is not None:
+                _t2 = time.monotonic()
+                try:
+                    _ckpt_after = await checkpointer.aget(config)
+                    _elapsed2 = time.monotonic() - _t2
+                    _msgs_saved = (
+                        len(_ckpt_after.channel_values.get("messages", []))
+                        if _ckpt_after
+                        else 0
+                    )
+                    logger.critical(
+                        f"[TELEMETRY] POST-INVOKE | "
+                        f"elapsed={_elapsed2:.4f}s | "
+                        f"messages_persisted={_msgs_saved} | "
+                        f"state={'NONE — not saved' if _ckpt_after is None else 'SAVED'}"
+                    )
+                except Exception as _e:
+                    logger.critical(
+                        f"[TELEMETRY] POST-INVOKE CRASHED | {type(_e).__name__}: {_e}"
+                    )
 
             if queue.full():
                 await queue.get()
