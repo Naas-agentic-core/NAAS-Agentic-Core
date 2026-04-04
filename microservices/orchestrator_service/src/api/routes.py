@@ -307,24 +307,6 @@ def _safe_assistant_error(request_id: str) -> str:
     return f"تعذر معالجة طلب الدردشة حالياً. رقم المتابعة: {request_id}"
 
 
-def _looks_like_contextual_followup(question: str) -> bool:
-    """يتحسس الأسئلة المرجعية القصيرة التي غالبًا تعتمد على سياق سابق."""
-    normalized = question.strip().casefold()
-    if not normalized:
-        return False
-    triggers = (
-        "عاصمتها",
-        "عاصمته",
-        "عاصمتهم",
-        "its capital",
-        "their capital",
-        "ما هي عاصمت",
-    )
-    if any(trigger in normalized for trigger in triggers):
-        return True
-    return len(normalized.split()) <= 4 and ("ها" in normalized or "ذلك" in normalized)
-
-
 def _safe_conversation_id(raw_value: object) -> int | None:
     """يحوّل conversation_id بشكل آمن لدعم int أو string رقمي مع تتبع تشخيصي واضح."""
     if raw_value is None:
@@ -382,53 +364,13 @@ def _safe_thread_id(raw_value: object) -> str | None:
 
 def _resolve_thread_id(context: ChatRunContext, fallback_conversation_id: int | str) -> str:
     """يستخرج thread_id ثابتًا من السياق مع احتياطي conversation_id."""
-    candidate_keys = ("thread_id", "session_id", "conversation_id")
+    candidate_keys = ("conversation_id", "thread_id", "session_id")
     for key in candidate_keys:
         if key in context:
             normalized = _safe_thread_id(context.get(key))
             if normalized:
                 return normalized
     return str(fallback_conversation_id)
-
-
-async def _load_latest_conversation_id(
-    *,
-    chat_scope: str,
-    user_id: int,
-) -> int | None:
-    """يجلب أحدث conversation_id للمستخدم كصمام أمان عند فقد هوية الجلسة من العميل."""
-    is_admin_scope = chat_scope == "admin"
-    query = (
-        text(
-            """
-            SELECT id
-            FROM admin_conversations
-            WHERE user_id = :user_id
-            ORDER BY created_at DESC, id DESC
-            LIMIT 1
-            """
-        )
-        if is_admin_scope
-        else text(
-            """
-            SELECT id
-            FROM customer_conversations
-            WHERE user_id = :user_id
-            ORDER BY created_at DESC, id DESC
-            LIMIT 1
-            """
-        )
-    )
-
-    async with async_session_factory() as session:
-        result = await session.execute(query, {"user_id": user_id})
-        row = result.fetchone()
-        if row is None:
-            return None
-        try:
-            return int(row.id)
-        except (TypeError, ValueError):
-            return None
 
 
 def _decode_auth_payload_or_401(authorization: str | None) -> tuple[int, dict[str, object]]:
@@ -1459,22 +1401,6 @@ async def chat_ws_stategraph(websocket: WebSocket) -> None:
                 incoming_value=requested_conversation_id,
                 sticky_value=sticky_conversation_id,
             )
-            if (
-                conversation_id is None
-                and resolved_thread_id is None
-                and _looks_like_contextual_followup(objective)
-            ):
-                recovered_conversation_id = await _load_latest_conversation_id(
-                    chat_scope="customer",
-                    user_id=user_id,
-                )
-                if recovered_conversation_id is not None:
-                    conversation_id = recovered_conversation_id
-                    logger.warning(
-                        "[CONV_RECOVERY] role=customer user=%s recovered_conv_id=%s by followup heuristic",
-                        user_id,
-                        conversation_id,
-                    )
             logger.info(
                 "[CONV_LIFECYCLE] stage=parsed role=customer user=%s conv_id=%s type=%s",
                 user_id,
@@ -1603,22 +1529,6 @@ async def admin_chat_ws_stategraph(websocket: WebSocket) -> None:
                 incoming_value=requested_conversation_id,
                 sticky_value=sticky_conversation_id,
             )
-            if (
-                conversation_id is None
-                and resolved_thread_id is None
-                and _looks_like_contextual_followup(objective)
-            ):
-                recovered_conversation_id = await _load_latest_conversation_id(
-                    chat_scope="admin",
-                    user_id=user_id,
-                )
-                if recovered_conversation_id is not None:
-                    conversation_id = recovered_conversation_id
-                    logger.warning(
-                        "[CONV_RECOVERY] role=admin user=%s recovered_conv_id=%s by followup heuristic",
-                        user_id,
-                        conversation_id,
-                    )
             logger.info(
                 "[CONV_LIFECYCLE] stage=parsed role=admin user=%s conv_id=%s type=%s",
                 user_id,

@@ -77,14 +77,14 @@ def test_resolve_effective_conversation_id_falls_back_to_sticky_value() -> None:
 
 
 def test_resolve_thread_id_prefers_explicit_thread_key() -> None:
-    """يتأكد من أولوية thread_id الصريح على أي مفاتيح بديلة."""
+    """يتأكد من أولوية conversation_id لعزل المحادثات عن session عام مشترك."""
     context: routes.ChatRunContext = {
         "thread_id": "thread-abc",
         "session_id": "session-xyz",
         "conversation_id": 50,
     }
     resolved = routes._resolve_thread_id(context, fallback_conversation_id=7)
-    assert resolved == "thread-abc"
+    assert resolved == "50"
 
 
 def test_resolve_thread_id_uses_fallback_when_context_empty() -> None:
@@ -115,13 +115,3 @@ async def test_detect_checkpoint_state_when_state_exists(monkeypatch) -> None:
     available, has_state = await routes._detect_checkpoint_state("thread-1")
     assert available is True
     assert has_state is True
-
-
-def test_looks_like_contextual_followup_detects_pronoun_capital_question() -> None:
-    """يتأكد من اكتشاف أسئلة المتابعة المرجعية مثل سؤال العاصمة الضميري."""
-    assert routes._looks_like_contextual_followup("ما هي عاصمتها؟") is True
-
-
-def test_looks_like_contextual_followup_ignores_explicit_full_question() -> None:
-    """يتأكد من عدم اعتبار الأسئلة الواضحة الطويلة كمتابعة غامضة."""
-    assert routes._looks_like_contextual_followup("ما هي عاصمة فرنسا؟") is False
