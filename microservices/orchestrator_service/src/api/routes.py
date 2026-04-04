@@ -1126,15 +1126,17 @@ async def _run_chat_langgraph(
         app_graph = create_unified_graph()
     requested_conversation_id = context.get("conversation_id") if context else None
     safe_conversation_id = _safe_conversation_id(requested_conversation_id)
-    conversation_id: int | str = safe_conversation_id if safe_conversation_id is not None else str(
-        uuid.uuid4()
+    conversation_id: int | str = (
+        safe_conversation_id if safe_conversation_id is not None else str(uuid.uuid4())
     )
     thread_id = _resolve_thread_id(context, conversation_id)
     config = {"configurable": {"thread_id": thread_id}}
     logger.info(
         "[THREAD_BINDING] channel=http thread_id=%s source=%s conversation_id=%s",
         thread_id,
-        "request_context" if "thread_id" in context or "session_id" in context else "conversation_fallback",
+        "request_context"
+        if "thread_id" in context or "session_id" in context
+        else "conversation_fallback",
         str(conversation_id),
     )
     checkpointer_available, checkpoint_has_state = await _detect_checkpoint_state(thread_id)
