@@ -236,6 +236,12 @@ def _canonicalize_mission_event(event: object) -> MissionEventEnvelope | None:
     return {"event_type": raw_event_type, "data": payload_candidate}
 
 
+def _append_telemetry_line(line: str) -> None:
+    """يكتب سطر تتبع حرج إلى ملف أدلة قابل للفحص خارج مخرجات الطرفية."""
+    with open("telemetry_evidence.txt", "a", encoding="utf-8") as telemetry_file:
+        telemetry_file.write(f"{line}\n")
+
+
 router = APIRouter(
     tags=["Overmind (Super Agent)"],
 )
@@ -910,7 +916,7 @@ async def _stream_chat_langgraph(
                 _graph = create_unified_graph()
             thread_id = _resolve_thread_id(context, conversation_id)
             incoming_messages = history_messages or []
-            logger.critical(
+            _append_telemetry_line(
                 f"[TELEMETRY] INGRESS | "
                 f"conversation_id={conversation_id!r} | "
                 f"thread_id={thread_id!r} | "
@@ -943,7 +949,7 @@ async def _stream_chat_langgraph(
             inputs = _merge_admin_inputs(inputs, admin_payload if chat_scope == "admin" else None)
             state_dict = inputs
             payload_messages = state_dict.get("messages", [])
-            logger.critical(
+            _append_telemetry_line(
                 f"[TELEMETRY] PRE-INVOKE | "
                 f"messages type={type(payload_messages).__name__} | "
                 f"count={len(payload_messages)} | "
@@ -951,20 +957,20 @@ async def _stream_chat_langgraph(
             )
             checkpointer = get_checkpointer()
             if checkpointer is None:
-                logger.critical("[TELEMETRY] CHECKPOINTER NOT IN SCOPE")
+                _append_telemetry_line("[TELEMETRY] CHECKPOINTER NOT IN SCOPE")
             else:
                 _t = time.monotonic()
                 try:
                     _ckpt = await checkpointer.aget(config)
                     _elapsed = time.monotonic() - _t
                     _keys = list(_ckpt.channel_values.keys()) if _ckpt else None
-                    logger.critical(
+                    _append_telemetry_line(
                         f"[TELEMETRY] CHECKPOINTER | "
                         f"elapsed={_elapsed:.4f}s | "
                         f"state={'NONE — silent failure' if _ckpt is None else _keys}"
                     )
                 except Exception as _e:
-                    logger.critical(
+                    _append_telemetry_line(
                         f"[TELEMETRY] CHECKPOINTER CRASHED | {type(_e).__name__}: {_e}"
                     )
 
@@ -979,14 +985,14 @@ async def _stream_chat_langgraph(
                         if _ckpt_after
                         else 0
                     )
-                    logger.critical(
+                    _append_telemetry_line(
                         f"[TELEMETRY] POST-INVOKE | "
                         f"elapsed={_elapsed2:.4f}s | "
                         f"messages_persisted={_msgs_saved} | "
                         f"state={'NONE — not saved' if _ckpt_after is None else 'SAVED'}"
                     )
                 except Exception as _e:
-                    logger.critical(
+                    _append_telemetry_line(
                         f"[TELEMETRY] POST-INVOKE CRASHED | {type(_e).__name__}: {_e}"
                     )
 
