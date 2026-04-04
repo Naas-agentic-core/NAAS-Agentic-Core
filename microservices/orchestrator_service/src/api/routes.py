@@ -2,6 +2,7 @@ import asyncio
 import json
 import logging
 import os
+import re
 import time
 import uuid
 from contextlib import suppress
@@ -60,6 +61,7 @@ logger = logging.getLogger(__name__)
 
 active_background_tasks = set()
 MAX_HISTORY_MESSAGES = 24
+MAX_CHECKPOINT_ANCHOR_MESSAGES = 4
 MAX_HISTORY_SUMMARY_MESSAGES = 40
 MAX_HISTORY_SUMMARY_CHARS = 2400
 MAX_HISTORY_SUMMARY_ITEMS = 18
@@ -167,13 +169,158 @@ def _build_graph_messages(
     """يبني رسائل الإدخال للرسم البياني مع مسار احتياطي صريح ضد عمى السياق."""
     latest_user_message = HumanMessage(content=objective)
     if checkpointer_available and checkpoint_has_state and not force_seed_history:
-        # الاعتماد على checkpointer يمنع تكرار الرسائل داخل LangGraph reducers.
+        # حتى مع checkpointer فعّال، نحقن مرساة قصيرة من آخر الرسائل لمنع
+        # العمى السياقي عند ضياع مؤشر الخيط أو عدم اكتمال الحالة.
+        anchor_messages = _build_langchain_messages(history_messages)[-MAX_CHECKPOINT_ANCHOR_MESSAGES:]
+        if anchor_messages:
+            return [*anchor_messages, latest_user_message]
         return [latest_user_message]
 
     # عند غياب checkpointer (أو تعطل تهيئته)، نمرّر نافذة تاريخية محدودة صراحةً.
     seeded_history = _build_langchain_messages(history_messages)
     seeded_history.append(latest_user_message)
     return seeded_history
+
+
+def _question_contains_explicit_entity(question: str) -> bool:
+    """يتحقق مما إذا كان السؤال يحتوي كيانًا صريحًا بدل الضمير المرجعي."""
+    normalized = question.strip()
+    if not normalized:
+        return False
+
+    if re.search(r"\b(?:france|algeria|egypt|morocco|tunisia|germany|spain)\b", normalized, re.I):
+        return True
+
+    arabic_tokens = [
+        token.strip("؟،.!:؛")
+        for token in re.findall(r"[\u0600-\u06FF]+", normalized)
+        if token
+    ]
+    arabic_tokens = [token for token in arabic_tokens if token]
+    if not arabic_tokens:
+        return False
+
+    stop_words = {
+        "ما",
+        "ماذا",
+        "من",
+        "هي",
+        "هو",
+        "هل",
+        "كم",
+        "عدد",
+        "في",
+        "على",
+        "عن",
+        "الى",
+        "إلى",
+        "هذه",
+        "هذا",
+        "ذلك",
+        "تلك",
+        "الدولة",
+        "البلد",
+        "المدينة",
+        "عاصمة",
+        "عاصمتها",
+        "سكانها",
+        "عددها",
+        "عددهم",
+        "موقعها",
+        "مساحتها",
+        "حدثني",
+        "اخبرني",
+        "أخبرني",
+        "قل",
+        "تكلم",
+        "احك",
+    }
+    return any(token not in stop_words and len(token) > 2 for token in arabic_tokens)
+
+
+def _extract_recent_entity_anchor(history_messages: list[dict[str, str]] | None) -> str | None:
+    """يستخرج مرساة كيان حديثة من آخر رسائل المستخدم كحل احتياطي ضد فقدان السياق."""
+    if not history_messages:
+        return None
+
+    stop_words = {
+        "و",
+        "ما",
+        "وما",
+        "ماذا",
+        "وماذا",
+        "من",
+        "هي",
+        "هو",
+        "هل",
+        "كم",
+        "عدد",
+        "في",
+        "على",
+        "عن",
+        "الى",
+        "إلى",
+        "هذه",
+        "هذا",
+        "ذلك",
+        "تلك",
+        "عاصمتها",
+        "سكانها",
+        "عددها",
+        "موقعها",
+        "مساحتها",
+    }
+
+    for message in reversed(history_messages):
+        if message.get("role") != "user":
+            continue
+        content = str(message.get("content", "")).strip()
+        if not content:
+            continue
+
+        english_entities = re.findall(
+            r"\b(?:France|Algeria|Egypt|Morocco|Tunisia|Germany|Spain)\b",
+            content,
+            flags=re.IGNORECASE,
+        )
+        if english_entities:
+            return english_entities[-1]
+
+        arabic_tokens = [
+            token.strip("؟،.!:؛")
+            for token in re.findall(r"[\u0600-\u06FF]+", content)
+            if token
+        ]
+        arabic_tokens = [token for token in arabic_tokens if token]
+        candidate_tokens = [token for token in arabic_tokens if len(token) > 2 and token not in stop_words]
+        if not candidate_tokens:
+            continue
+
+        tail = candidate_tokens[-3:]
+        return " ".join(tail)
+    return None
+
+
+def _augment_ambiguous_objective(
+    objective: str,
+    history_messages: list[dict[str, str]] | None,
+) -> str:
+    """يعزّز السؤال الإحالي بمرساة كيان صريحة قبل تمريره للنموذج."""
+    normalized = objective.strip()
+    if not normalized:
+        return normalized
+    if not _is_ambiguous_followup(normalized):
+        return normalized
+    if _question_contains_explicit_entity(normalized):
+        return normalized
+
+    anchor = _extract_recent_entity_anchor(history_messages)
+    if not anchor:
+        return normalized
+    return (
+        f"{normalized}\n\n"
+        f"مرجع سياقي إلزامي: الكيان المقصود في هذا السؤال هو: {anchor}."
+    )
 
 
 async def _detect_checkpoint_state(thread_id: str) -> tuple[bool, bool]:
@@ -963,6 +1110,7 @@ async def _stream_chat_langgraph(
 ) -> None:
     """يشغّل LangGraph الموحد لمسارات البحث والإدارة ويبث الأحداث."""
     queue: asyncio.Queue[dict[str, object]] = asyncio.Queue(maxsize=64)
+    prepared_objective = _augment_ambiguous_objective(objective, history_messages)
 
     async def _runner():
         try:
@@ -981,7 +1129,7 @@ async def _stream_chat_langgraph(
             checkpointer_available, checkpoint_has_state = await _detect_checkpoint_state(thread_id)
             force_seed_history = _is_ambiguous_followup(objective)
             langchain_msgs = _build_graph_messages(
-                objective=objective,
+                objective=prepared_objective,
                 history_messages=history_messages,
                 checkpointer_available=checkpointer_available,
                 checkpoint_has_state=checkpoint_has_state,
@@ -998,7 +1146,7 @@ async def _stream_chat_langgraph(
             )
 
             inputs: dict[str, object] = {
-                "query": objective,
+                "query": prepared_objective,
                 "messages": langchain_msgs,
             }
             inputs = _merge_admin_inputs(inputs, admin_payload if chat_scope == "admin" else None)
@@ -1245,6 +1393,7 @@ async def _run_chat_langgraph(
         safe_conversation_id if safe_conversation_id is not None else str(uuid.uuid4())
     )
     thread_id = _resolve_thread_id(context, conversation_id)
+    prepared_objective = _augment_ambiguous_objective(objective, history_messages)
     config = {"configurable": {"thread_id": thread_id}}
     logger.info(
         "[THREAD_BINDING] channel=http thread_id=%s source=%s conversation_id=%s",
@@ -1257,7 +1406,7 @@ async def _run_chat_langgraph(
     checkpointer_available, checkpoint_has_state = await _detect_checkpoint_state(thread_id)
     force_seed_history = _is_ambiguous_followup(objective)
     langchain_msgs = _build_graph_messages(
-        objective=objective,
+        objective=prepared_objective,
         history_messages=history_messages,
         checkpointer_available=checkpointer_available,
         checkpoint_has_state=checkpoint_has_state,
@@ -1273,7 +1422,7 @@ async def _run_chat_langgraph(
         max(0, len(langchain_msgs) - 1),
     )
 
-    inputs: dict[str, object] = {"query": objective, "messages": langchain_msgs}
+    inputs: dict[str, object] = {"query": prepared_objective, "messages": langchain_msgs}
     inputs = _merge_admin_inputs(inputs, admin_payload)
 
     res = await app_graph.ainvoke(inputs, config=config)

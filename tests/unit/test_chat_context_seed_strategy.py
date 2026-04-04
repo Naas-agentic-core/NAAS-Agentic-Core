@@ -8,8 +8,8 @@ from langchain_core.messages import AIMessage, HumanMessage
 from microservices.orchestrator_service.src.api import routes
 
 
-def test_build_graph_messages_uses_only_objective_with_checkpointer() -> None:
-    """يتأكد من منع التكرار عند توفر checkpointer والاعتماد على thread history."""
+def test_build_graph_messages_includes_short_anchor_with_checkpointer() -> None:
+    """يتأكد من إبقاء مرساة سياقية قصيرة حتى مع checkpointer فعّال."""
     messages = routes._build_graph_messages(
         objective="ما هي عاصمتها؟",
         history_messages=[
@@ -20,9 +20,11 @@ def test_build_graph_messages_uses_only_objective_with_checkpointer() -> None:
         checkpoint_has_state=True,
     )
 
-    assert len(messages) == 1
+    assert len(messages) == 3
     assert isinstance(messages[0], HumanMessage)
-    assert messages[0].content == "ما هي عاصمتها؟"
+    assert isinstance(messages[1], AIMessage)
+    assert isinstance(messages[2], HumanMessage)
+    assert messages[2].content == "ما هي عاصمتها؟"
 
 
 def test_build_graph_messages_seeds_recent_history_without_checkpointer() -> None:
@@ -155,3 +157,37 @@ def test_is_ambiguous_followup_detects_vague_math_followup() -> None:
 def test_is_ambiguous_followup_rejects_explicit_query() -> None:
     """يتأكد من عدم تفعيل نمط المتابعة عند السؤال الواضح المستقل."""
     assert routes._is_ambiguous_followup("ما هي عاصمة فرنسا؟") is False
+
+
+def test_extract_recent_entity_anchor_prefers_recent_user_entity() -> None:
+    """يتأكد من استخراج كيان مرجعي من آخر رسالة مستخدم مناسبة."""
+    anchor = routes._extract_recent_entity_anchor(
+        [
+            {"role": "user", "content": "حدثني عن الجزائر"},
+            {"role": "assistant", "content": "الجزائر دولة عربية في شمال أفريقيا."},
+            {"role": "user", "content": "وماذا عن فرنسا؟"},
+        ]
+    )
+    assert anchor == "فرنسا"
+
+
+def test_augment_ambiguous_objective_injects_anchor_when_entity_missing() -> None:
+    """يتأكد من إضافة مرجع إلزامي عندما يكون السؤال إحاليًا بلا كيان صريح."""
+    prepared = routes._augment_ambiguous_objective(
+        "ما هي عاصمتها؟",
+        [
+            {"role": "user", "content": "حدثني عن الجزائر"},
+            {"role": "assistant", "content": "تقع الجزائر في شمال أفريقيا."},
+        ],
+    )
+    assert "مرجع سياقي إلزامي" in prepared
+    assert "الجزائر" in prepared
+
+
+def test_augment_ambiguous_objective_keeps_explicit_entity_unchanged() -> None:
+    """يتأكد من عدم تعديل السؤال عندما يكون الكيان مذكورًا صراحةً."""
+    prepared = routes._augment_ambiguous_objective(
+        "ما هي عاصمة فرنسا؟",
+        [{"role": "user", "content": "حدثني عن الجزائر"}],
+    )
+    assert prepared == "ما هي عاصمة فرنسا؟"
