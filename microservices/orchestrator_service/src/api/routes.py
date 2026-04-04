@@ -161,10 +161,11 @@ def _build_graph_messages(
     history_messages: list[dict[str, str]] | None,
     checkpointer_available: bool,
     checkpoint_has_state: bool,
+    force_seed_history: bool = False,
 ) -> list[HumanMessage | AIMessage]:
     """يبني رسائل الإدخال للرسم البياني مع مسار احتياطي صريح ضد عمى السياق."""
     latest_user_message = HumanMessage(content=objective)
-    if checkpointer_available and checkpoint_has_state:
+    if checkpointer_available and checkpoint_has_state and not force_seed_history:
         # الاعتماد على checkpointer يمنع تكرار الرسائل داخل LangGraph reducers.
         return [latest_user_message]
 
@@ -193,6 +194,26 @@ async def _detect_checkpoint_state(thread_id: str) -> tuple[bool, bool]:
             exc,
         )
         return False, False
+
+
+def _is_ambiguous_followup(query: str) -> bool:
+    """يكتشف الاستعلامات الإحالية القصيرة التي تحتاج سياقًا صريحًا."""
+    normalized = query.strip().casefold()
+    if not normalized:
+        return False
+    triggers = (
+        "عاصمتها",
+        "عاصمته",
+        "عاصمتهم",
+        "what is its",
+        "its capital",
+        "their capital",
+    )
+    if any(trigger in normalized for trigger in triggers):
+        return True
+    tokens = normalized.split()
+    pronoun_like_terms = {"عاصمتها", "عاصمته", "عاصمتهم", "عاصمتها؟", "عاصمته؟", "عاصمتهم؟"}
+    return len(tokens) <= 4 and any(token in pronoun_like_terms for token in tokens)
 
 
 def _canonicalize_mission_event(event: object) -> MissionEventEnvelope | None:
@@ -889,18 +910,21 @@ async def _stream_chat_langgraph(
             thread_id = _resolve_thread_id(context, conversation_id)
             config = {"configurable": {"thread_id": thread_id}}
             checkpointer_available, checkpoint_has_state = await _detect_checkpoint_state(thread_id)
+            force_seed_history = _is_ambiguous_followup(objective)
             langchain_msgs = _build_graph_messages(
                 objective=objective,
                 history_messages=history_messages,
                 checkpointer_available=checkpointer_available,
                 checkpoint_has_state=checkpoint_has_state,
+                force_seed_history=force_seed_history,
             )
             logger.info(
-                "[CONTEXT_MODE] channel=websocket conv_id=%s thread_id=%s checkpointer_available=%s checkpoint_has_state=%s seeded_history=%s",
+                "[CONTEXT_MODE] channel=websocket conv_id=%s thread_id=%s checkpointer_available=%s checkpoint_has_state=%s force_seed_history=%s seeded_history=%s",
                 conversation_id,
                 thread_id,
                 checkpointer_available,
                 checkpoint_has_state,
+                force_seed_history,
                 max(0, len(langchain_msgs) - 1),
             )
 
@@ -1114,18 +1138,21 @@ async def _run_chat_langgraph(
         str(conversation_id),
     )
     checkpointer_available, checkpoint_has_state = await _detect_checkpoint_state(thread_id)
+    force_seed_history = _is_ambiguous_followup(objective)
     langchain_msgs = _build_graph_messages(
         objective=objective,
         history_messages=history_messages,
         checkpointer_available=checkpointer_available,
         checkpoint_has_state=checkpoint_has_state,
+        force_seed_history=force_seed_history,
     )
     logger.info(
-        "[CONTEXT_MODE] channel=http conv_id=%s thread_id=%s checkpointer_available=%s checkpoint_has_state=%s seeded_history=%s",
+        "[CONTEXT_MODE] channel=http conv_id=%s thread_id=%s checkpointer_available=%s checkpoint_has_state=%s force_seed_history=%s seeded_history=%s",
         conversation_id,
         thread_id,
         checkpointer_available,
         checkpoint_has_state,
+        force_seed_history,
         max(0, len(langchain_msgs) - 1),
     )
 
