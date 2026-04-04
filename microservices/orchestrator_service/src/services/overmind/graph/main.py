@@ -484,9 +484,10 @@ class ChatFallbackNode:
         import json
 
         from langchain_core.messages import AIMessage
+
         return {
             "final_response": final_resp,
-            "messages": [AIMessage(content=json.dumps(final_resp, ensure_ascii=False))]
+            "messages": [AIMessage(content=json.dumps(final_resp, ensure_ascii=False))],
         }
 
 
@@ -688,10 +689,11 @@ class ToolExecutorNode:
             node_name="ToolExecutorNode", start_time=start_time, state=state, tool_invoked=True
         )
         from langchain_core.messages import AIMessage
+
         return {
             "final_response": "\n".join(results),
             "tools_executed": True,
-            "messages": [AIMessage(content="\n".join(results))]
+            "messages": [AIMessage(content="\n".join(results))],
         }
 
 

@@ -251,8 +251,9 @@ class AdminAgentNode:
 
         # We need to make sure the state structure expected by caller is returned
         from langchain_core.messages import AIMessage
+
         return {
             "final_response": res.get("final_response"),
             "tools_executed": True,
-            "messages": [AIMessage(content=str(res.get("final_response")))]
+            "messages": [AIMessage(content=str(res.get("final_response")))],
         }
