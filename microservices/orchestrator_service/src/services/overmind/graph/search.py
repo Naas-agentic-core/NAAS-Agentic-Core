@@ -370,4 +370,9 @@ class SynthesizerNode:
             state=state,
             confidence=float(confidence),
         )
-        return {"final_response": response_json}
+        import json
+        from langchain_core.messages import AIMessage
+        return {
+            "final_response": response_json,
+            "messages": [AIMessage(content=json.dumps(response_json, ensure_ascii=False))]
+        }

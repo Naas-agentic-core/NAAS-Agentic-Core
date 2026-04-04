@@ -477,11 +477,15 @@ class ChatFallbackNode:
             )
 
         emit_telemetry(node_name="ChatFallbackNode", start_time=start_time, state=state)
+        final_resp = {
+            "الإجابة": fallback_response,
+            "المصدر": "chat_fallback",
+        }
+        import json
+        from langchain_core.messages import AIMessage
         return {
-            "final_response": {
-                "الإجابة": fallback_response,
-                "المصدر": "chat_fallback",
-            }
+            "final_response": final_resp,
+            "messages": [AIMessage(content=json.dumps(final_resp, ensure_ascii=False))]
         }
 
 
@@ -682,7 +686,12 @@ class ToolExecutorNode:
         emit_telemetry(
             node_name="ToolExecutorNode", start_time=start_time, state=state, tool_invoked=True
         )
-        return {"final_response": "\n".join(results), "tools_executed": True}
+        from langchain_core.messages import AIMessage
+        return {
+            "final_response": "\n".join(results),
+            "tools_executed": True,
+            "messages": [AIMessage(content="\n".join(results))]
+        }
 
 
 class ValidatorNode:

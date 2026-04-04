@@ -250,4 +250,9 @@ class AdminAgentNode:
         res = await self.admin_app.ainvoke(inputs, config=config)
 
         # We need to make sure the state structure expected by caller is returned
-        return {"final_response": res.get("final_response"), "tools_executed": True}
+        from langchain_core.messages import AIMessage
+        return {
+            "final_response": res.get("final_response"),
+            "tools_executed": True,
+            "messages": [AIMessage(content=str(res.get("final_response")))]
+        }
