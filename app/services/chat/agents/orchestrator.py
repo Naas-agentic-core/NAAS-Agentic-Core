@@ -117,6 +117,7 @@ class OrchestratorAgent:
         logger.info(f"Orchestrator received: {question}")
         normalized = question.strip()
         context = context or {}
+        normalized = self._resolve_contextual_reference(normalized, context)
 
         # 1. Intent Detection
         if "intent" in context and isinstance(context["intent"], ChatIntent):
@@ -176,6 +177,68 @@ class OrchestratorAgent:
             context["feedback"] = "too_hard" if "صعب" in lowered else "good"
         else:
             context["intent_type"] = "recommendation"
+
+    def _resolve_contextual_reference(self, question: str, context: dict[str, object]) -> str:
+        """
+        يحل الضمائر المرجعية القصيرة اعتماداً على آخر رسالة مستخدم في السياق.
+
+        يهدف هذا التابع لتقليل حالات "العمى السياقي" عندما يرسل المستخدم
+        أسئلة مختصرة مثل: "ما هي عاصمتها؟" بعد ذكر كيان واضح في الرسالة السابقة.
+        """
+        trimmed_question = question.strip()
+        if not trimmed_question:
+            return trimmed_question
+        if not self._looks_like_pronoun_followup(trimmed_question):
+            return trimmed_question
+
+        last_user_message = self._extract_last_user_message(context)
+        if not last_user_message:
+            return trimmed_question
+
+        return (
+            f"{trimmed_question}\n\n"
+            f"مرجع سياقي إلزامي من الرسالة السابقة للمستخدم: {last_user_message}"
+        )
+
+    def _extract_last_user_message(self, context: dict[str, object]) -> str | None:
+        """
+        يستخرج آخر رسالة صريحة للمستخدم من history_messages إن توفرت.
+        """
+        history_value = context.get("history_messages")
+        if not isinstance(history_value, list):
+            return None
+
+        for item in reversed(history_value):
+            if not isinstance(item, dict):
+                continue
+            if item.get("role") != "user":
+                continue
+            content = item.get("content")
+            if not isinstance(content, str):
+                continue
+            cleaned = content.strip()
+            if cleaned:
+                return cleaned
+        return None
+
+    def _looks_like_pronoun_followup(self, question: str) -> bool:
+        """
+        يتحقق ما إذا كان السؤال يعتمد غالباً على ضمير مرجعي يحتاج سياقاً سابقاً.
+        """
+        lowered = question.lower()
+        pronoun_markers = (
+            "ها",
+            "عاصمتها",
+            "سكانها",
+            "مساحتها",
+            "موقعها",
+            "علمها",
+            "اقتصادها",
+            "تاريخها",
+        )
+        if any(marker in lowered for marker in pronoun_markers):
+            return True
+        return "this" in lowered or "that" in lowered
 
     async def _handle_content_retrieval(
         self, question: str, context: dict
