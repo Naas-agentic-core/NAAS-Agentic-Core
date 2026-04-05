@@ -199,10 +199,7 @@ class OrchestratorAgent:
         if not anchor_message:
             return trimmed_question
 
-        return (
-            f"{trimmed_question}\n\n"
-            f"مرجع سياقي إلزامي من الرسائل السابقة: {anchor_message}"
-        )
+        return f"{trimmed_question}\n\nمرجع سياقي إلزامي من الرسائل السابقة: {anchor_message}"
 
     def _extract_context_anchor(
         self,
@@ -287,11 +284,7 @@ class OrchestratorAgent:
             return question
         if "سياق المحادثة السابق (موجز)" in question:
             return question
-        return (
-            "سياق المحادثة السابق (موجز):\n"
-            f"{history_brief}\n\n"
-            f"السؤال الحالي: {question}"
-        )
+        return f"سياق المحادثة السابق (موجز):\n{history_brief}\n\nالسؤال الحالي: {question}"
 
     def _build_recent_history_brief(
         self,
