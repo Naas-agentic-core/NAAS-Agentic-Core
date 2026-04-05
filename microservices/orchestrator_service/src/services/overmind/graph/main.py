@@ -487,6 +487,9 @@ class ChatFallbackNode:
 
         return {
             "final_response": final_resp,
+            # Context blindness fix: We must explicitly inject our final response into state.messages
+            # so that LangGraph's native Postgres checkpointer natively tracks it as AIMessage
+            # without manual extraction from DB for subsequent turns.
             "messages": [AIMessage(content=json.dumps(final_resp, ensure_ascii=False))],
         }
 
@@ -572,6 +575,15 @@ class QueryRewriterNode:
             if not isinstance(content, str):
                 continue
             text = content.strip()
+            # Context blindness fix: try extracting the core text if the response was JSON-encoded by LangGraph
+            if text.startswith("{") and role in {"ai", "assistant"}:
+                try:
+                    data = json.loads(text)
+                    if isinstance(data, dict):
+                        extracted = data.get("الإجابة") or data.get("التمرين") or text
+                        text = str(extracted).strip()
+                except Exception:
+                    pass
             if not text:
                 continue
             if len(text) > 220:
