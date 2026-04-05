@@ -169,11 +169,8 @@ def _build_graph_messages(
     """يبني رسائل الإدخال للرسم البياني مع مسار احتياطي صريح ضد عمى السياق."""
     latest_user_message = HumanMessage(content=objective)
     if checkpointer_available and checkpoint_has_state and not force_seed_history:
-        # حتى مع checkpointer فعّال، نحقن مرساة قصيرة من آخر الرسائل لمنع
-        # العمى السياقي عند ضياع مؤشر الخيط أو عدم اكتمال الحالة.
-        anchor_messages = _build_langchain_messages(history_messages)[-MAX_CHECKPOINT_ANCHOR_MESSAGES:]
-        if anchor_messages:
-            return [*anchor_messages, latest_user_message]
+        # Prevent context amnesia and exponential message duplication in LangGraph
+        # by relying purely on the checkpointer to manage history. Do not inject manually.
         return [latest_user_message]
 
     # عند غياب checkpointer (أو تعطل تهيئته)، نمرّر نافذة تاريخية محدودة صراحةً.
