@@ -189,9 +189,7 @@ def _question_contains_explicit_entity(question: str) -> bool:
         return True
 
     arabic_tokens = [
-        token.strip("؟،.!:؛")
-        for token in re.findall(r"[\u0600-\u06FF]+", normalized)
-        if token
+        token.strip("؟،.!:؛") for token in re.findall(r"[\u0600-\u06FF]+", normalized) if token
     ]
     arabic_tokens = [token for token in arabic_tokens if token]
     if not arabic_tokens:
@@ -284,12 +282,12 @@ def _extract_recent_entity_anchor(history_messages: list[dict[str, str]] | None)
             return english_entities[-1]
 
         arabic_tokens = [
-            token.strip("؟،.!:؛")
-            for token in re.findall(r"[\u0600-\u06FF]+", content)
-            if token
+            token.strip("؟،.!:؛") for token in re.findall(r"[\u0600-\u06FF]+", content) if token
         ]
         arabic_tokens = [token for token in arabic_tokens if token]
-        candidate_tokens = [token for token in arabic_tokens if len(token) > 2 and token not in stop_words]
+        candidate_tokens = [
+            token for token in arabic_tokens if len(token) > 2 and token not in stop_words
+        ]
         if not candidate_tokens:
             continue
 
@@ -314,10 +312,7 @@ def _augment_ambiguous_objective(
     anchor = _extract_recent_entity_anchor(history_messages)
     if not anchor:
         return normalized
-    return (
-        f"{normalized}\n\n"
-        f"مرجع سياقي إلزامي: الكيان المقصود في هذا السؤال هو: {anchor}."
-    )
+    return f"{normalized}\n\nمرجع سياقي إلزامي: الكيان المقصود في هذا السؤال هو: {anchor}."
 
 
 async def _detect_checkpoint_state(thread_id: str) -> tuple[bool, bool]:
@@ -411,9 +406,10 @@ def _is_ambiguous_followup(query: str) -> bool:
     if len(tokens) <= 6 and any(token in pronoun_like_terms for token in tokens):
         return True
 
-    return any(
-        len(token) > 2 and token.endswith(("ها", "ه", "هم")) for token in tokens
-    ) and len(tokens) <= 8
+    return (
+        any(len(token) > 2 and token.endswith(("ها", "ه", "هم")) for token in tokens)
+        and len(tokens) <= 8
+    )
 
 
 def _canonicalize_mission_event(event: object) -> MissionEventEnvelope | None:
@@ -1181,9 +1177,7 @@ async def _stream_chat_langgraph(
                     _ckpt_after = await checkpointer.aget(config)
                     _elapsed2 = time.monotonic() - _t2
                     _msgs_saved = (
-                        len(_ckpt_after.channel_values.get("messages", []))
-                        if _ckpt_after
-                        else 0
+                        len(_ckpt_after.channel_values.get("messages", [])) if _ckpt_after else 0
                     )
                     _append_telemetry_line(
                         f"[TELEMETRY] POST-INVOKE | "
