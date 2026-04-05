@@ -40,6 +40,8 @@
 }
 
 body {
+    user-select: none;
+    -webkit-user-select: none;
     font-family: var(--font-family);
     background-color: var(--bg-color);
     color: var(--text-color);
@@ -816,4 +818,11 @@ body {
 
 .step-label {
     flex: 1;
+}
+
+.message-bubble,
+.input-area textarea,
+.markdown-content {
+    user-select: text;
+    -webkit-user-select: text;
 }

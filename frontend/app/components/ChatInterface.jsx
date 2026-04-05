@@ -85,8 +85,50 @@ export const ChatInterface = ({ messages, onSendMessage, status, user }) => {
                 ) : (
                     messages.map((msg, idx) => (
                         <div key={msg.id || idx} className={`message ${msg.role}`}>
-                            <div className="message-bubble">
+                            <div className="message-bubble" style={{ position: 'relative', paddingBottom: msg.role === 'assistant' ? '24px' : undefined }}>
                                 {msg.role === 'assistant' ? <Markdown content={msg.content} /> : msg.content}
+                                {msg.role === 'assistant' && (
+                                    <button
+                                        className="copy-button"
+                                        onClick={() => {
+                                            navigator.clipboard.writeText(msg.content).then(() => {
+                                                const btn = document.getElementById(`copy-btn-${msg.id || idx}`);
+                                                if (btn) {
+                                                    const icon = btn.querySelector('i');
+                                                    icon.className = 'fas fa-check';
+                                                    setTimeout(() => {
+                                                        icon.className = 'far fa-copy';
+                                                    }, 2000);
+                                                }
+                                            });
+                                        }}
+                                        id={`copy-btn-${msg.id || idx}`}
+                                        title="نسخ النص"
+                                        style={{
+                                            position: 'absolute',
+                                            bottom: '4px',
+                                            left: '8px',
+                                            background: 'transparent',
+                                            border: 'none',
+                                            color: 'var(--text-secondary)',
+                                            cursor: 'pointer',
+                                            padding: '4px',
+                                            borderRadius: '4px',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            opacity: 0.6,
+                                            transition: 'opacity 0.2s, transform 0.1s',
+                                            fontSize: '0.85rem'
+                                        }}
+                                        onMouseEnter={(e) => e.currentTarget.style.opacity = '1'}
+                                        onMouseLeave={(e) => e.currentTarget.style.opacity = '0.6'}
+                                        onMouseDown={(e) => e.currentTarget.style.transform = 'scale(0.9)'}
+                                        onMouseUp={(e) => e.currentTarget.style.transform = 'scale(1)'}
+                                    >
+                                        <i className="far fa-copy"></i>
+                                    </button>
+                                )}
                             </div>
                         </div>
                     ))
