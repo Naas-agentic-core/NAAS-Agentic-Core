@@ -382,7 +382,7 @@ class SupervisorNode:
         start_time = time.time()
         query = state.get("query", "")
         messages = state.get("messages", [])
-        formatted_history = format_conversation_history(messages)
+        formatted_history = format_conversation_history(messages[:-1])
 
         if emergency_intent_guard(query):
             intent = "admin"
@@ -457,7 +457,7 @@ class ChatFallbackNode:
         start_time = time.time()
         query = state.get("query", "")
         messages = state.get("messages", [])
-        formatted_history = format_conversation_history(messages)
+        formatted_history = format_conversation_history(messages[:-1])
         fallback_response = (
             "وعليكم السلام! أنا هنا للمساعدة. أخبرني بما تحتاجه وسأتابع معك خطوة بخطوة."
         )

@@ -63,7 +63,7 @@ class QueryAnalyzerNode:
 
         from .main import format_conversation_history
 
-        formatted_history = format_conversation_history(messages)
+        formatted_history = format_conversation_history(messages[:-1])
 
         try:
 
