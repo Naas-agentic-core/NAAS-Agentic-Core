@@ -327,7 +327,7 @@ def _configure_dspy() -> None:
         return
 
     try:
-        dspy_model = os.getenv("OPENROUTER_DSPY_MODEL", "qwen/qwen3.6-plus:free").strip()
+        dspy_model = os.getenv("OPENROUTER_DSPY_MODEL", "nvidia/nemotron-3-super-120b-a12b:free").strip()
         lm = dspy.LM(
             model=dspy_model,
             api_base="https://openrouter.ai/api/v1",
