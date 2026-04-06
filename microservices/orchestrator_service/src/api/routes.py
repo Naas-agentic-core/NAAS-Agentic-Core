@@ -28,6 +28,10 @@ from pydantic import BaseModel, Field
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from microservices.orchestrator_service.src.api.context_utils import (
+    _extract_client_context_messages,
+    _merge_history_with_client_context,
+)
 from microservices.orchestrator_service.src.contracts.admin_tools import ADMIN_TOOL_CONTRACT
 from microservices.orchestrator_service.src.core.config import get_settings
 from microservices.orchestrator_service.src.core.database import (
@@ -1738,6 +1742,19 @@ async def chat_ws_stategraph(websocket: WebSocket) -> None:
             if sticky_thread_id:
                 context["thread_id"] = sticky_thread_id
 
+            try:
+                client_context = _extract_client_context_messages(incoming)
+                hydrated_messages = _merge_history_with_client_context(
+                    history_messages, client_context
+                )
+            except Exception as e:
+                logger.error(
+                    "[HYDRATION_GUARD] Context hydration failed — "
+                    f"falling back to DB history only. "
+                    f"Error: {type(e).__name__}: {e}"
+                )
+                hydrated_messages = history_messages
+
             await _stream_chat_langgraph(
                 websocket,
                 objective=objective,
@@ -1745,7 +1762,7 @@ async def chat_ws_stategraph(websocket: WebSocket) -> None:
                 chat_scope="customer",
                 conversation_id=conversation_id,
                 app_graph=getattr(websocket.app.state, "app_graph", None),
-                history_messages=history_messages,
+                history_messages=hydrated_messages,
             )
             logger.info(
                 "[CONV_LIFECYCLE] stage=response_sent role=customer user=%s conv_id=%s",
@@ -1866,6 +1883,19 @@ async def admin_chat_ws_stategraph(websocket: WebSocket) -> None:
             if sticky_thread_id:
                 context["thread_id"] = sticky_thread_id
 
+            try:
+                client_context = _extract_client_context_messages(incoming)
+                hydrated_messages = _merge_history_with_client_context(
+                    history_messages, client_context
+                )
+            except Exception as e:
+                logger.error(
+                    "[HYDRATION_GUARD] Context hydration failed — "
+                    f"falling back to DB history only. "
+                    f"Error: {type(e).__name__}: {e}"
+                )
+                hydrated_messages = history_messages
+
             await _stream_chat_langgraph(
                 websocket,
                 objective=objective,
@@ -1874,7 +1904,7 @@ async def admin_chat_ws_stategraph(websocket: WebSocket) -> None:
                 conversation_id=conversation_id,
                 app_graph=getattr(websocket.app.state, "app_graph", None),
                 admin_payload=auth_payload,
-                history_messages=history_messages,
+                history_messages=hydrated_messages,
             )
             logger.info(
                 "[CONV_LIFECYCLE] stage=response_sent role=admin user=%s conv_id=%s",
