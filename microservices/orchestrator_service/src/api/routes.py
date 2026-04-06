@@ -80,6 +80,7 @@ class ChatRunContext(TypedDict, total=False):
     conversation_id: int | str
     thread_id: int | str
     session_id: int | str
+    user_id: int
 
 
 class MissionEventEnvelope(TypedDict):
@@ -326,9 +327,8 @@ async def _detect_checkpoint_state(thread_id: str) -> tuple[bool, bool]:
 
     try:
         checkpoint_config = {"configurable": {"thread_id": thread_id}}
-        checkpoint_tuple = await asyncio.wait_for(
-            checkpointer.aget_tuple(checkpoint_config), timeout=1.5
-        )
+        async with asyncio.timeout(1.5):
+            checkpoint_tuple = await checkpointer.aget_tuple(checkpoint_config)
         return True, checkpoint_tuple is not None
     except Exception as exc:
         logger.warning(
@@ -410,7 +410,7 @@ def _is_ambiguous_followup(query: str) -> bool:
         return True
 
     return (
-        any(len(token) > 2 and token.endswith(("ها", "ه", "هم")) for token in tokens)
+        any(len(token) > 2 and token.endswith(("ها", "هم")) for token in tokens)
         and len(tokens) <= 8
     )
 
@@ -434,10 +434,15 @@ def _canonicalize_mission_event(event: object) -> MissionEventEnvelope | None:
     return {"event_type": raw_event_type, "data": payload_candidate}
 
 
-def _append_telemetry_line(line: str) -> None:
+async def _append_telemetry_line(line: str) -> None:
     """يكتب سطر تتبع حرج إلى ملف أدلة قابل للفحص خارج مخرجات الطرفية."""
-    with open("telemetry_evidence.txt", "a", encoding="utf-8") as telemetry_file:
-        telemetry_file.write(f"{line}\n")
+    def write_sync():
+        import os
+        path = os.path.join(os.getenv("STATE_DIR", "/app"), "telemetry_evidence.txt")
+        with open(path, "a", encoding="utf-8") as telemetry_file:
+            telemetry_file.write(f"{line}\n")
+    import anyio
+    await anyio.to_thread.run_sync(write_sync)
 
 
 router = APIRouter(
@@ -589,8 +594,12 @@ def _safe_thread_id(raw_value: object) -> str | None:
 
 
 def _resolve_thread_id(context: ChatRunContext, fallback_conversation_id: int | str) -> str:
-    """يستخرج thread_id ثابتًا من السياق مع احتياطي conversation_id."""
-    return str(context.get("conversation_id", fallback_conversation_id))
+    """يستخرج thread_id ثابتًا من السياق مع عزل المستخدم."""
+    conv_id = context.get("conversation_id", fallback_conversation_id)
+    user_id = context.get("user_id")
+    if user_id is not None:
+        return f"u{user_id}:c{conv_id}"
+    return str(conv_id)
 
 
 def _decode_auth_payload_or_401(authorization: str | None) -> tuple[int, dict[str, object]]:
@@ -756,10 +765,8 @@ async def _create_new_conversation(
     )
     title = question.strip()[:120] or "Super Agent Mission"
     try:
-        created = await asyncio.wait_for(
-            session.execute(create_query, {"title": title, "user_id": user_id}),
-            timeout=5.0,
-        )
+        async with asyncio.timeout(5.0):
+            created = await session.execute(create_query, {"title": title, "user_id": user_id})
     except TimeoutError as e:
         raise HTTPException(
             status_code=504, detail="Database timeout during conversation creation"
@@ -785,7 +792,7 @@ async def _lazy_import_history_with_retry(
     payload = {
         "conversation_id": conversation_id,
         "user_id": user_id,
-        "idempotency_key": f"{conversation_id}:{user_id}",
+        "idempotency_key": f"{conversation_id}:{user_id}:{len(messages)}",
         "max_messages": 50,
         "conversation_metadata": conv_metadata,
         "messages": messages,
@@ -915,13 +922,11 @@ async def _ensure_conversation(
         conversation_id = requested_conversation_id
         if conversation_id is not None:
             try:
-                result = await asyncio.wait_for(
-                    session.execute(
+                async with asyncio.timeout(5.0):
+                    result = await session.execute(
                         check_query,
                         {"conversation_id": conversation_id, "user_id": user_id},
-                    ),
-                    timeout=5.0,
-                )
+                    )
             except TimeoutError as e:
                 raise HTTPException(
                     status_code=504, detail="Database timeout checking conversation"
@@ -932,16 +937,14 @@ async def _ensure_conversation(
 
             try:
                 try:
-                    messages_res = await asyncio.wait_for(
-                        session.execute(
+                    async with asyncio.timeout(5.0):
+                        messages_res = await session.execute(
                             get_messages_query,
                             {
                                 "conversation_id": conversation_id,
                                 "history_limit": MAX_HISTORY_MESSAGES,
                             },
-                        ),
-                        timeout=5.0,
-                    )
+                        )
                 except TimeoutError as e:
                     raise HTTPException(
                         status_code=504, detail="Database timeout retrieving messages"
@@ -956,17 +959,15 @@ async def _ensure_conversation(
                     }
                     for m in messages_rows
                 ]
-                older_messages_res = await asyncio.wait_for(
-                    session.execute(
+                async with asyncio.timeout(5.0):
+                    older_messages_res = await session.execute(
                         get_older_messages_query,
                         {
                             "conversation_id": conversation_id,
                             "history_limit": MAX_HISTORY_MESSAGES,
                             "summary_limit": MAX_HISTORY_SUMMARY_MESSAGES,
                         },
-                    ),
-                    timeout=5.0,
-                )
+                    )
                 older_messages_rows = list(reversed(older_messages_res.fetchall()))
                 if older_messages_rows:
                     digest = _build_older_history_digest(older_messages_rows)
@@ -1009,17 +1010,15 @@ async def _ensure_conversation(
             )
 
         try:
-            await asyncio.wait_for(
-                session.execute(
+            async with asyncio.timeout(5.0):
+                await session.execute(
                     insert_message_query,
                     {
                         "conversation_id": int(conversation_id),
                         "role": "user",
                         "content": question.replace("\x00", ""),
                     },
-                ),
-                timeout=5.0,
-            )
+                )
         except TimeoutError as e:
             raise HTTPException(status_code=504, detail="Database timeout inserting message") from e
         await session.commit()
@@ -1053,17 +1052,15 @@ async def _persist_assistant_message(
 
     async with async_session_factory() as session:
         try:
-            await asyncio.wait_for(
-                session.execute(
+            async with asyncio.timeout(5.0):
+                await session.execute(
                     insert_message_query,
                     {
                         "conversation_id": conversation_id,
                         "role": "assistant",
                         "content": content.replace("\x00", ""),
                     },
-                ),
-                timeout=5.0,
-            )
+                )
         except TimeoutError as e:
             raise HTTPException(
                 status_code=504, detail="Database timeout persisting assistant message"
@@ -1071,16 +1068,14 @@ async def _persist_assistant_message(
 
         if is_admin_scope and mission_id is not None:
             try:
-                await asyncio.wait_for(
-                    session.execute(
+                async with asyncio.timeout(5.0):
+                    await session.execute(
                         link_query,
                         {
                             "mission_id": mission_id,
                             "conversation_id": conversation_id,
                         },
-                    ),
-                    timeout=5.0,
-                )
+                    )
             except TimeoutError as e:
                 raise HTTPException(
                     status_code=504, detail="Database timeout linking mission"
@@ -1109,7 +1104,7 @@ async def _stream_chat_langgraph(
                 _graph = create_unified_graph()
             thread_id = _resolve_thread_id(context, conversation_id)
             incoming_messages = history_messages or []
-            _append_telemetry_line(
+            await _append_telemetry_line(
                 f"[TELEMETRY] INGRESS | "
                 f"conversation_id={conversation_id!r} | "
                 f"thread_id={thread_id!r} | "
@@ -1139,7 +1134,7 @@ async def _stream_chat_langgraph(
             inputs = _merge_admin_inputs(inputs, admin_payload if chat_scope == "admin" else None)
             state_dict = inputs
             payload_messages = state_dict.get("messages", [])
-            _append_telemetry_line(
+            await _append_telemetry_line(
                 f"[TELEMETRY] PRE-INVOKE | "
                 f"messages type={type(payload_messages).__name__} | "
                 f"count={len(payload_messages)} | "
@@ -1147,24 +1142,47 @@ async def _stream_chat_langgraph(
             )
             checkpointer = get_checkpointer()
             if checkpointer is None:
-                _append_telemetry_line("[TELEMETRY] CHECKPOINTER NOT IN SCOPE")
+                await _append_telemetry_line("[TELEMETRY] CHECKPOINTER NOT IN SCOPE")
             else:
                 _t = time.monotonic()
                 try:
                     _ckpt = await checkpointer.aget(config)
                     _elapsed = time.monotonic() - _t
                     _keys = list(_ckpt.channel_values.keys()) if _ckpt else None
-                    _append_telemetry_line(
+                    await _append_telemetry_line(
                         f"[TELEMETRY] CHECKPOINTER | "
                         f"elapsed={_elapsed:.4f}s | "
                         f"state={'NONE — silent failure' if _ckpt is None else _keys}"
                     )
                 except Exception as _e:
-                    _append_telemetry_line(
+                    await _append_telemetry_line(
                         f"[TELEMETRY] CHECKPOINTER CRASHED | {type(_e).__name__}: {_e}"
                     )
 
-            res = await _graph.ainvoke(inputs, config=config)
+            final_res = None
+            async for event in _graph.astream_events(inputs, config=config, version="v2"):
+                if event["event"] == "on_chain_start":
+                    node_name = event.get("name", "")
+                    if node_name and not node_name.startswith("__") and node_name != "LangGraph":
+                        if queue.full():
+                            await queue.get()
+                        await queue.put({"type": "phase_start", "payload": {"phase": node_name, "agent": "orchestrator"}})
+                elif event["event"] == "on_chain_end":
+                    node_name = event.get("name", "")
+                    if node_name and not node_name.startswith("__") and node_name != "LangGraph":
+                        if queue.full():
+                            await queue.get()
+                        await queue.put({"type": "phase_completed", "payload": {"phase": node_name, "agent": "orchestrator"}})
+                    if not node_name or node_name == "LangGraph":
+                        final_res = event["data"].get("output", {})
+                        if final_res and isinstance(final_res, dict) and "final_response" in final_res:
+                            pass # We have our final response
+                        elif final_res and isinstance(final_res, dict) and "messages" in final_res and final_res["messages"]:
+                            # Fallback to extract final response from last message
+                            last_msg = final_res["messages"][-1]
+                            if hasattr(last_msg, "content"):
+                                final_res = {"final_response": last_msg.content}
+
             if checkpointer is not None:
                 _t2 = time.monotonic()
                 try:
@@ -1173,20 +1191,23 @@ async def _stream_chat_langgraph(
                     _msgs_saved = (
                         len(_ckpt_after.channel_values.get("messages", [])) if _ckpt_after else 0
                     )
-                    _append_telemetry_line(
+                    await _append_telemetry_line(
                         f"[TELEMETRY] POST-INVOKE | "
                         f"elapsed={_elapsed2:.4f}s | "
                         f"messages_persisted={_msgs_saved} | "
                         f"state={'NONE — not saved' if _ckpt_after is None else 'SAVED'}"
                     )
                 except Exception as _e:
-                    _append_telemetry_line(
+                    await _append_telemetry_line(
                         f"[TELEMETRY] POST-INVOKE CRASHED | {type(_e).__name__}: {_e}"
                     )
 
+            if not final_res:
+                final_res = {"final_response": "لم يتم العثور على رد من النظام"}
+
             if queue.full():
                 await queue.get()
-            await queue.put({"type": "__DONE__", "result": res})
+            await queue.put({"type": "__DONE__", "result": final_res})
         except Exception as e:
             if queue.full():
                 await queue.get()
@@ -1665,7 +1686,7 @@ async def chat_ws_stategraph(websocket: WebSocket) -> None:
             requested_conversation_id = incoming.get("conversation_id")
             requested_thread_id = _safe_thread_id(incoming.get("thread_id"))
             requested_session_id = _safe_thread_id(incoming.get("session_id"))
-            resolved_thread_id = requested_thread_id or requested_session_id or sticky_thread_id
+
             logger.info(
                 "[CONV_LIFECYCLE] stage=ws_received role=customer user=%s conv_id=%s type=%s",
                 user_id,
@@ -1676,6 +1697,12 @@ async def chat_ws_stategraph(websocket: WebSocket) -> None:
                 incoming_value=requested_conversation_id,
                 sticky_value=sticky_conversation_id,
             )
+            if (
+                requested_conversation_id is not None
+                and requested_conversation_id != sticky_conversation_id
+            ):
+                sticky_thread_id = None
+            resolved_thread_id = requested_thread_id or requested_session_id or sticky_thread_id
             logger.info(
                 "[CONV_LIFECYCLE] stage=parsed role=customer user=%s conv_id=%s type=%s",
                 user_id,
@@ -1733,6 +1760,7 @@ async def chat_ws_stategraph(websocket: WebSocket) -> None:
             ):
                 context["mission_type"] = incoming["metadata"]["mission_type"]
             context["conversation_id"] = conversation_id
+            context["user_id"] = user_id
             if sticky_thread_id:
                 context["thread_id"] = sticky_thread_id
 
@@ -1806,7 +1834,7 @@ async def admin_chat_ws_stategraph(websocket: WebSocket) -> None:
             requested_conversation_id = incoming.get("conversation_id")
             requested_thread_id = _safe_thread_id(incoming.get("thread_id"))
             requested_session_id = _safe_thread_id(incoming.get("session_id"))
-            resolved_thread_id = requested_thread_id or requested_session_id or sticky_thread_id
+
             logger.info(
                 "[CONV_LIFECYCLE] stage=ws_received role=admin user=%s conv_id=%s type=%s",
                 user_id,
@@ -1817,6 +1845,12 @@ async def admin_chat_ws_stategraph(websocket: WebSocket) -> None:
                 incoming_value=requested_conversation_id,
                 sticky_value=sticky_conversation_id,
             )
+            if (
+                requested_conversation_id is not None
+                and requested_conversation_id != sticky_conversation_id
+            ):
+                sticky_thread_id = None
+            resolved_thread_id = requested_thread_id or requested_session_id or sticky_thread_id
             logger.info(
                 "[CONV_LIFECYCLE] stage=parsed role=admin user=%s conv_id=%s type=%s",
                 user_id,
@@ -1874,6 +1908,7 @@ async def admin_chat_ws_stategraph(websocket: WebSocket) -> None:
             ):
                 context["mission_type"] = incoming["metadata"]["mission_type"]
             context["conversation_id"] = conversation_id
+            context["user_id"] = user_id
             if sticky_thread_id:
                 context["thread_id"] = sticky_thread_id
 
@@ -1952,10 +1987,8 @@ async def _save_chat_to_db(
                     )
                 )
                 title = user_msg.strip()[:120] or "Super Agent Mission"
-                res = await asyncio.wait_for(
-                    session.execute(create_query, {"title": title, "user_id": user_id}),
-                    timeout=5.0,
-                )
+                async with asyncio.timeout(5.0):
+                    res = await session.execute(create_query, {"title": title, "user_id": user_id})
                 created_id = res.scalar_one_or_none()
                 if created_id is not None:
                     conversation_id = int(created_id)
