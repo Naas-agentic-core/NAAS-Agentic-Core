@@ -590,12 +590,6 @@ def _safe_thread_id(raw_value: object) -> str | None:
 
 def _resolve_thread_id(context: ChatRunContext, fallback_conversation_id: int | str) -> str:
     """يستخرج thread_id ثابتًا من السياق مع احتياطي conversation_id."""
-    candidate_keys = ("conversation_id", "thread_id", "session_id")
-    for key in candidate_keys:
-        if key in context:
-            normalized = _safe_thread_id(context.get(key))
-            if normalized:
-                return normalized
     return str(fallback_conversation_id)
 
 
