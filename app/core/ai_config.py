@@ -75,7 +75,7 @@ class AvailableModels:
     PHI_3_MINI_FREE = "microsoft/phi-3-mini-128k-instruct:free"
     KAT_CODER_PRO_FREE = "kwaipilot/kat-coder-pro:free"
     QWEN_QWEN3_CODER_FREE = "qwen/qwen3-coder:free"
-    QWEN_QWEN36_PLUS_FREE = "qwen/qwen3.6-plus:free"
+    QWEN_QWEN36_PLUS_FREE = "nvidia/nemotron-3-super-120b-a12b:free"
     DEVSTRAL_2512 = "mistralai/devstral-2512:free"
     GLM_4_5_AIR_FREE = "z-ai/glm-4.5-air:free"
     DEEPSEEK_R1_CHIMERA_FREE = "tngtech/deepseek-r1t2-chimera:free"
