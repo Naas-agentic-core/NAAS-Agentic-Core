@@ -590,7 +590,7 @@ def _safe_thread_id(raw_value: object) -> str | None:
 
 def _resolve_thread_id(context: ChatRunContext, fallback_conversation_id: int | str) -> str:
     """يستخرج thread_id ثابتًا من السياق مع احتياطي conversation_id."""
-    return str(fallback_conversation_id)
+    return str(context.get("conversation_id", fallback_conversation_id))
 
 
 def _decode_auth_payload_or_401(authorization: str | None) -> tuple[int, dict[str, object]]:
