@@ -436,12 +436,16 @@ def _canonicalize_mission_event(event: object) -> MissionEventEnvelope | None:
 
 async def _append_telemetry_line(line: str) -> None:
     """يكتب سطر تتبع حرج إلى ملف أدلة قابل للفحص خارج مخرجات الطرفية."""
+
     def write_sync():
         import os
+
         path = os.path.join(os.getenv("STATE_DIR", "/app"), "telemetry_evidence.txt")
         with open(path, "a", encoding="utf-8") as telemetry_file:
             telemetry_file.write(f"{line}\n")
+
     import anyio
+
     await anyio.to_thread.run_sync(write_sync)
 
 
@@ -1166,18 +1170,37 @@ async def _stream_chat_langgraph(
                     if node_name and not node_name.startswith("__") and node_name != "LangGraph":
                         if queue.full():
                             await queue.get()
-                        await queue.put({"type": "phase_start", "payload": {"phase": node_name, "agent": "orchestrator"}})
+                        await queue.put(
+                            {
+                                "type": "phase_start",
+                                "payload": {"phase": node_name, "agent": "orchestrator"},
+                            }
+                        )
                 elif event["event"] == "on_chain_end":
                     node_name = event.get("name", "")
                     if node_name and not node_name.startswith("__") and node_name != "LangGraph":
                         if queue.full():
                             await queue.get()
-                        await queue.put({"type": "phase_completed", "payload": {"phase": node_name, "agent": "orchestrator"}})
+                        await queue.put(
+                            {
+                                "type": "phase_completed",
+                                "payload": {"phase": node_name, "agent": "orchestrator"},
+                            }
+                        )
                     if not node_name or node_name == "LangGraph":
                         final_res = event["data"].get("output", {})
-                        if final_res and isinstance(final_res, dict) and "final_response" in final_res:
-                            pass # We have our final response
-                        elif final_res and isinstance(final_res, dict) and "messages" in final_res and final_res["messages"]:
+                        if (
+                            final_res
+                            and isinstance(final_res, dict)
+                            and "final_response" in final_res
+                        ):
+                            pass  # We have our final response
+                        elif (
+                            final_res
+                            and isinstance(final_res, dict)
+                            and "messages" in final_res
+                            and final_res["messages"]
+                        ):
                             # Fallback to extract final response from last message
                             last_msg = final_res["messages"][-1]
                             if hasattr(last_msg, "content"):
