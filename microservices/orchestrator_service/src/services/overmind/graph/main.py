@@ -208,19 +208,7 @@ ELLIPTICAL_TERMS = {
 
 def format_conversation_history(messages: list[object]) -> str:
     """Formats the entire messages list into a readable string dialogue."""
-    if not messages:
-        return ""
-
-    dialogue = []
-    for msg in messages:
-        content = getattr(msg, "content", "")
-        if not isinstance(content, str) or not content.strip():
-            continue
-        role = getattr(msg, "type", getattr(msg, "role", "user"))
-        prefix = "Human" if role in ("human", "user") else "AI"
-        dialogue.append(f"{prefix}: {content.strip()}")
-
-    return "\n".join(dialogue)
+    return build_conversation_context(messages, max_turns=24)
 
 
 def build_conversation_context(
