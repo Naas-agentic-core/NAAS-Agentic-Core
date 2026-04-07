@@ -473,7 +473,6 @@ class ChatFallbackNode:
             "الإجابة": fallback_response,
             "المصدر": "chat_fallback",
         }
-        import json
 
         from langchain_core.messages import AIMessage
 
