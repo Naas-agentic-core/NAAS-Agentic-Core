@@ -12,6 +12,7 @@ from typing import TypedDict
 import anyio
 import httpx
 import jwt
+from cachetools import TTLCache
 from fastapi import (
     APIRouter,
     BackgroundTasks,
@@ -25,7 +26,6 @@ from fastapi import (
 )
 from fastapi.responses import StreamingResponse
 from langchain_core.messages import AIMessage, HumanMessage
-from cachetools import TTLCache
 from pydantic import BaseModel, Field
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -470,7 +470,6 @@ async def get_conv_service_client() -> httpx.AsyncClient:
 
 
 async def close_conv_service_client() -> None:
-    global _conv_service_client
     if _conv_service_client and not _conv_service_client.is_closed:
         await _conv_service_client.aclose()
 
@@ -1801,13 +1800,21 @@ async def chat_messages_endpoint(
 
         if final_content:
             try:
-                await _save_chat_to_db(
-                    chat_scope=chat_scope,
-                    user_id=user_id,
-                    conversation_id=conversation_id,
-                    user_msg=objective,
-                    ai_msg=final_content,
-                )
+                async with async_session_factory() as db_session:
+                    conv_id, _ = await _ensure_conversation(
+                        session=db_session,
+                        conversation_id=conversation_id,
+                        user_id=user_id,
+                        question=objective,
+                        is_admin_scope=(chat_scope == "admin"),
+                        messages=history_messages,
+                    )
+                    await _persist_assistant_message(
+                        session=db_session,
+                        conversation_id=conv_id,
+                        is_admin_scope=(chat_scope == "admin"),
+                        message=final_content,
+                    )
             except Exception as e:
                 logger.error("[HTTP_PERSIST] failed to save final chat message: %s", e)
 
@@ -2315,13 +2322,21 @@ async def chat_with_agent_endpoint(
             full_ai_response = "".join(ai_chunks)
             if full_ai_response:
                 try:
-                    await _save_chat_to_db(
-                        chat_scope="customer",
-                        user_id=request.user_id,
-                        conversation_id=request.conversation_id,
-                        user_msg=full_user_message,
-                        ai_msg=full_ai_response,
-                    )
+                    async with async_session_factory() as db_session:
+                        conv_id, _ = await _ensure_conversation(
+                            session=db_session,
+                            conversation_id=request.conversation_id,
+                            user_id=request.user_id,
+                            question=full_user_message,
+                            is_admin_scope=False,
+                            messages=request.history_messages,
+                        )
+                        await _persist_assistant_message(
+                            session=db_session,
+                            conversation_id=conv_id,
+                            is_admin_scope=False,
+                            message=full_ai_response,
+                        )
                     yield await _serialize_stream_frame(
                         {"type": "assistant_delta", "payload": {"content": "\n\n✅ [DB SAVED]"}}
                     )
