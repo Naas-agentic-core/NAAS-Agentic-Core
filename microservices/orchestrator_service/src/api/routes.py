@@ -12,7 +12,6 @@ from typing import TypedDict
 import anyio
 import httpx
 import jwt
-from cachetools import TTLCache
 from fastapi import (
     APIRouter,
     BackgroundTasks,
@@ -828,9 +827,6 @@ async def _create_new_conversation(
     return int(created_id)
 
 
-_last_imported_count: TTLCache = TTLCache(maxsize=10_000, ttl=3600)
-
-
 async def _lazy_import_history_with_retry(
     *,
     conversation_id: int,
@@ -840,11 +836,7 @@ async def _lazy_import_history_with_retry(
     max_attempts: int = 3,
 ) -> None:
     """يحاول استيراد التاريخ إلى conversation-service مع إعادة المحاولة قبل الفشل."""
-    already_imported = _last_imported_count.get(conversation_id, 0)
-    if len(messages) <= already_imported:
-        return
-
-    delta_messages = messages[already_imported:]
+    delta_messages = messages
 
     payload = {
         "conversation_id": conversation_id,
@@ -863,7 +855,6 @@ async def _lazy_import_history_with_retry(
             data = resp.json()
             if data.get("status") not in {"imported", "already_exists"}:
                 raise ValueError(f"Unexpected import status: {data.get('status')}")
-            _last_imported_count[conversation_id] = len(messages)
             return
         except Exception as exc:
             last_error = exc
@@ -1757,16 +1748,18 @@ async def chat_messages_endpoint(
     user_id, _jwt_payload = _decode_auth_payload_or_401(authorization)
     context["user_id"] = user_id
 
-    chat_scope = str(context.get("chat_scope", "customer"))
+    chat_scope = "customer"
 
     requested_conversation_id = _safe_conversation_id(payload.get("conversation_id"))
 
-    conversation_id, history_messages = await _ensure_conversation(
-        chat_scope=chat_scope,
-        user_id=user_id,
-        question=objective,
-        requested_conversation_id=requested_conversation_id,
-    )
+    async with async_session_factory() as session:
+        conversation_id, history_messages = await _ensure_conversation(
+            session=session,
+            chat_scope=chat_scope,
+            user_id=user_id,
+            question=objective,
+            requested_conversation_id=requested_conversation_id,
+        )
     context["conversation_id"] = conversation_id
 
     requested_thread_id = _safe_thread_id(payload.get("thread_id"))
@@ -1798,17 +1791,16 @@ async def chat_messages_endpoint(
                 async with async_session_factory() as db_session:
                     conv_id, _ = await _ensure_conversation(
                         session=db_session,
-                        conversation_id=conversation_id,
+                        chat_scope=chat_scope,
                         user_id=user_id,
                         question=objective,
-                        is_admin_scope=(chat_scope == "admin"),
-                        messages=history_messages,
+                        requested_conversation_id=conversation_id,
                     )
                     await _persist_assistant_message(
                         session=db_session,
+                        chat_scope=chat_scope,
                         conversation_id=conv_id,
-                        is_admin_scope=(chat_scope == "admin"),
-                        message=final_content,
+                        content=final_content,
                     )
             except Exception as e:
                 logger.error("[HTTP_PERSIST] failed to save final chat message: %s", e)
@@ -1882,12 +1874,14 @@ async def chat_ws_stategraph(websocket: WebSocket) -> None:
                     user_id,
                     conversation_id,
                 )
-                conversation_id, history_messages = await _ensure_conversation(
-                    chat_scope="customer",
-                    user_id=user_id,
-                    question=objective,
-                    requested_conversation_id=conversation_id,
-                )
+                async with async_session_factory() as session:
+                    conversation_id, history_messages = await _ensure_conversation(
+                        session=session,
+                        chat_scope="customer",
+                        user_id=user_id,
+                        question=objective,
+                        requested_conversation_id=conversation_id,
+                    )
                 logger.info(
                     "[CONV_LIFECYCLE] stage=ensure_exit role=customer user=%s conv_id=%s msg_count=%s",
                     user_id,
@@ -2032,12 +2026,14 @@ async def admin_chat_ws_stategraph(websocket: WebSocket) -> None:
                     user_id,
                     conversation_id,
                 )
-                conversation_id, history_messages = await _ensure_conversation(
-                    chat_scope="admin",
-                    user_id=user_id,
-                    question=objective,
-                    requested_conversation_id=conversation_id,
-                )
+                async with async_session_factory() as session:
+                    conversation_id, history_messages = await _ensure_conversation(
+                        session=session,
+                        chat_scope="admin",
+                        user_id=user_id,
+                        question=objective,
+                        requested_conversation_id=conversation_id,
+                    )
                 logger.info(
                     "[CONV_LIFECYCLE] stage=ensure_exit role=admin user=%s conv_id=%s msg_count=%s",
                     user_id,
