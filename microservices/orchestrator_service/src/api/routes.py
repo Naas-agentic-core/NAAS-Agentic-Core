@@ -6,7 +6,7 @@ import re
 import time
 import uuid
 from contextlib import suppress
-from typing import TypedDict
+from typing import AsyncGenerator, TypedDict
 
 import anyio
 import httpx
@@ -646,12 +646,15 @@ async def _serialize_json_async(payload: object) -> str:
 
 async def _serialize_stream_frame(payload: object) -> str:
     """يبني NDJSON صارمًا لضمان عدم تسريب dict خام إلى عميل البث النصي."""
+    return _serialize_stream_frame_sync(payload)
+
+def _serialize_stream_frame_sync(payload: object) -> str:
+    """سريع، متزامن، آمن لـ event loop."""
     if isinstance(payload, dict):
         frame = StreamFrame.model_validate(payload).model_dump()
     else:
         frame = StreamFrame(type="assistant_delta", payload={"content": str(payload)}).model_dump()
-    serialized = await _serialize_json_async(frame)
-    return f"{serialized}\n"
+    return json.dumps(frame, ensure_ascii=False) + "\n"
 
 
 @router.get(
@@ -800,6 +803,8 @@ async def _create_new_conversation(
     return int(created_id)
 
 
+_last_imported_count: dict[int, int] = {}
+
 async def _lazy_import_history_with_retry(
     *,
     conversation_id: int,
@@ -809,6 +814,12 @@ async def _lazy_import_history_with_retry(
     max_attempts: int = 3,
 ) -> None:
     """يحاول استيراد التاريخ إلى conversation-service مع إعادة المحاولة قبل الفشل."""
+    already_imported = _last_imported_count.get(conversation_id, 0)
+    if len(messages) <= already_imported:
+        return
+
+    delta_messages = messages[already_imported:]
+
     conv_service_url = os.getenv(
         "CONVERSATION_SERVICE_URL", "http://conversation-service:8010"
     ).rstrip("/")
@@ -818,7 +829,7 @@ async def _lazy_import_history_with_retry(
         "idempotency_key": f"{conversation_id}:{user_id}:{len(messages)}",
         "max_messages": 50,
         "conversation_metadata": conv_metadata,
-        "messages": messages,
+        "messages": delta_messages,
     }
     last_error: Exception | None = None
     for attempt in range(1, max_attempts + 1):
@@ -831,6 +842,7 @@ async def _lazy_import_history_with_retry(
             data = resp.json()
             if data.get("status") not in {"imported", "already_exists"}:
                 raise ValueError(f"Unexpected import status: {data.get('status')}")
+            _last_imported_count[conversation_id] = len(messages)
             return
         except Exception as exc:
             last_error = exc
@@ -940,9 +952,12 @@ async def _ensure_conversation(
         )
     )
 
+    messages: list[dict[str, str]] = []
+    conversation_id = requested_conversation_id
+    conv_metadata_to_import: dict[str, str] | None = None
+    messages_to_import: list[dict[str, str]] = []
+
     async with async_session_factory() as session:
-        messages: list[dict[str, str]] = []
-        conversation_id = requested_conversation_id
         if conversation_id is not None:
             try:
                 async with asyncio.timeout(5.0):
@@ -1014,19 +1029,14 @@ async def _ensure_conversation(
                     conversation_id,
                     len(messages),
                 )
-                conv_metadata = {
+                conv_metadata_to_import = {
                     "title": str(conv_row.title),
                     "created_at": conv_row.created_at.isoformat(),
                 }
-                await _lazy_import_history_with_retry(
-                    conversation_id=conversation_id,
-                    user_id=user_id,
-                    conv_metadata=conv_metadata,
-                    messages=messages,
-                )
+                messages_to_import = list(messages)
             except Exception as e:
                 logger.error(
-                    "[ENSURE_CONV] failed lazy import for conversation=%s user=%s; preserving same conversation_id. error=%s",
+                    "[ENSURE_CONV] failed preparing history for import for conversation=%s user=%s; preserving same conversation_id. error=%s",
                     conversation_id,
                     user_id,
                     e,
@@ -1049,6 +1059,22 @@ async def _ensure_conversation(
         except TimeoutError as e:
             raise HTTPException(status_code=504, detail="Database timeout inserting message") from e
         await session.commit()
+
+    if conv_metadata_to_import is not None and conversation_id is not None:
+        try:
+            await _lazy_import_history_with_retry(
+                conversation_id=conversation_id,
+                user_id=user_id,
+                conv_metadata=conv_metadata_to_import,
+                messages=messages_to_import,
+            )
+        except Exception as e:
+            logger.error(
+                "[ENSURE_CONV] failed lazy import for conversation=%s user=%s. error=%s",
+                conversation_id,
+                user_id,
+                e,
+            )
 
     return int(conversation_id), messages
 
@@ -1121,22 +1147,12 @@ async def _stream_chat_langgraph(
     history_messages: list[dict[str, str]] | None = None,
 ) -> None:
     """يشغّل LangGraph الموحد لمسارات البحث والإدارة ويبث الأحداث."""
-    queue: asyncio.Queue[dict[str, object]] = asyncio.Queue(maxsize=64)
+    queue: asyncio.Queue[dict[str, object]] = asyncio.Queue()
     prepared_objective = _augment_ambiguous_objective(objective, history_messages)
 
     async def _runner():
         async def _safe_put(evt: dict[str, object]) -> None:
-            try:
-                await asyncio.wait_for(queue.put(evt), timeout=0.1)
-            except asyncio.TimeoutError:
-                logger.warning("[QUEUE] Consumer too slow, dropping %s", evt.get("type"))
-                if evt.get("type") in ("__DONE__", "__ERROR__"):
-                    if queue.full():
-                        try:
-                            queue.get_nowait()
-                        except asyncio.QueueEmpty:
-                            pass
-                    queue.put_nowait(evt)
+            queue.put_nowait(evt)
 
         try:
             _graph = app_graph or getattr(websocket.app.state, "app_graph", None)
@@ -1727,9 +1743,18 @@ async def chat_messages_endpoint(
     user_id, _jwt_payload = _decode_auth_payload_or_401(authorization)
     context["user_id"] = user_id
 
+    chat_scope = str(context.get("chat_scope", "customer"))
+
     requested_conversation_id = _safe_conversation_id(payload.get("conversation_id"))
-    if requested_conversation_id is not None:
-        context["conversation_id"] = requested_conversation_id
+
+    conversation_id, history_messages = await _ensure_conversation(
+        chat_scope=chat_scope,
+        user_id=user_id,
+        question=objective,
+        requested_conversation_id=requested_conversation_id,
+    )
+    context["conversation_id"] = conversation_id
+
     requested_thread_id = _safe_thread_id(payload.get("thread_id"))
     if requested_thread_id is not None:
         context["thread_id"] = requested_thread_id
@@ -1737,17 +1762,36 @@ async def chat_messages_endpoint(
     if requested_session_id is not None:
         context["session_id"] = requested_session_id
 
-    history_messages = payload.get("history_messages", [])
-    if not isinstance(history_messages, list):
-        history_messages = []
+    async def _generator_with_persistence() -> AsyncGenerator[str, None]:
+        generator = _run_chat_langgraph(
+            objective,
+            context,
+            app_graph=getattr(request.app.state, "app_graph", None),
+            history_messages=history_messages,
+        )
+        final_content = ""
+        async for chunk in generator:
+            try:
+                chunk_data = json.loads(chunk)
+                if chunk_data.get("type") == "assistant_final":
+                    final_content = chunk_data.get("payload", {}).get("content", "")
+            except Exception:
+                pass
+            yield chunk
 
-    generator = _run_chat_langgraph(
-        objective,
-        context,
-        app_graph=getattr(request.app.state, "app_graph", None),
-        history_messages=history_messages,
-    )
-    return StreamingResponse(generator, media_type="text/plain")
+        if final_content:
+            try:
+                await _save_chat_to_db(
+                    chat_scope=chat_scope,
+                    user_id=user_id,
+                    conversation_id=conversation_id,
+                    user_msg=objective,
+                    ai_msg=final_content,
+                )
+            except Exception as e:
+                logger.error("[HTTP_PERSIST] failed to save final chat message: %s", e)
+
+    return StreamingResponse(_generator_with_persistence(), media_type="text/plain")
 
 
 @router.websocket("/api/chat/ws")
@@ -1906,8 +1950,10 @@ async def admin_chat_ws_stategraph(websocket: WebSocket) -> None:
 
     try:
         auth_payload = jwt.decode(token, get_settings().SECRET_KEY, algorithms=["HS256"])
-        user_id = decode_user_id(token, get_settings().SECRET_KEY)
-    except (HTTPException, jwt.PyJWTError):
+        user_id = int(auth_payload.get("sub", auth_payload.get("user_id", 0)) or 0)
+        if user_id <= 0:
+            raise HTTPException(status_code=401, detail="Invalid user")
+    except (HTTPException, jwt.PyJWTError, ValueError):
         await websocket.close(code=4401)
         return
 
@@ -2152,7 +2198,7 @@ async def chat_with_agent_endpoint(request: ChatRequest, fastapi_req: Request) -
 
     if is_admin:
 
-        async def _admin_stream():
+        async def _admin_stream() -> AsyncGenerator[str, None]:
             try:
                 admin_app = getattr(fastapi_req.app.state, "admin_app", None)
                 if isinstance(request.context, dict):
@@ -2174,12 +2220,45 @@ async def chat_with_agent_endpoint(request: ChatRequest, fastapi_req: Request) -
                 conversation_id = (
                     request.conversation_id
                     if getattr(request, "conversation_id", None)
-                    else uuid.uuid4()
+                    else str(uuid.uuid4())
                 )
-                res = await admin_app.ainvoke(
-                    admin_inputs, config={"configurable": {"thread_id": str(conversation_id)}}
+
+                thread_id = _resolve_thread_id(
+                    {"user_id": request.user_id, "conversation_id": request.conversation_id},
+                    fallback_conversation_id=str(conversation_id)
                 )
-                final_resp = res.get("final_response")
+
+                final_resp = None
+                config = {"configurable": {"thread_id": thread_id}}
+                async for event in admin_app.astream_events(admin_inputs, config=config, version="v2"):
+                    if event["event"] == "on_chain_start":
+                        node_name = event.get("name", "")
+                        if node_name and not node_name.startswith("__") and node_name != "LangGraph":
+                            yield await _serialize_stream_frame(
+                                {
+                                    "type": "phase_start",
+                                    "payload": {"phase": node_name, "agent": "admin"},
+                                }
+                            )
+                    elif event["event"] == "on_chain_end":
+                        node_name = event.get("name", "")
+                        if node_name and not node_name.startswith("__") and node_name != "LangGraph":
+                            yield await _serialize_stream_frame(
+                                {
+                                    "type": "phase_completed",
+                                    "payload": {"phase": node_name, "agent": "admin"},
+                                }
+                            )
+                        if not node_name or node_name == "LangGraph":
+                            output_data = event["data"].get("output", {})
+                            if output_data and isinstance(output_data, dict):
+                                if "final_response" in output_data:
+                                    final_resp = output_data["final_response"]
+                                elif "messages" in output_data and output_data["messages"]:
+                                    last_msg = output_data["messages"][-1]
+                                    if hasattr(last_msg, "content"):
+                                        final_resp = last_msg.content
+
                 if isinstance(final_resp, dict):
                     response_text = await _serialize_json_async(final_resp)
                 else:
@@ -2438,10 +2517,7 @@ async def stream_mission_ws(
         logger.error(f"WS Loop Error: {e}")
     finally:
         await websocket.close()
-        # Subscription is a generator, we just break loop to stop it,
-        # but cleanup of redis pubsub happens in generator finally block if we break?
-        # Python async generators support cleanup on garbage collection or aclose()
-        # Ideally we should use `async with` on the generator if it supported it, or manually close.
-        # My implementation of subscribe uses try/finally. If we break, `finally` runs?
-        # Yes, if we stop iterating, the generator is closed.
-        pass
+        try:
+            await subscription.aclose()
+        except Exception as e:
+            logger.warning("[WS_CLEANUP] subscription.aclose() failed: %s", e)
