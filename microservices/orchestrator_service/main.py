@@ -127,6 +127,7 @@ async def lifespan(app: FastAPI):
             await relay_task
 
     from microservices.orchestrator_service.src.api.routes import close_conv_service_client
+
     await close_conv_service_client()
     await event_bus.close()
     await close_db()
