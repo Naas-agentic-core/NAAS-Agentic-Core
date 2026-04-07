@@ -25,6 +25,7 @@ from fastapi import (
 )
 from fastapi.responses import StreamingResponse
 from langchain_core.messages import AIMessage, HumanMessage
+from cachetools import TTLCache
 from pydantic import BaseModel, Field
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -468,6 +469,12 @@ async def get_conv_service_client() -> httpx.AsyncClient:
     return _conv_service_client
 
 
+async def close_conv_service_client() -> None:
+    global _conv_service_client
+    if _conv_service_client and not _conv_service_client.is_closed:
+        await _conv_service_client.aclose()
+
+
 class OutboxRelayResponse(BaseModel):
     """استجابة تشغيل relay اليدوي لسجلات outbox."""
 
@@ -634,7 +641,7 @@ def _decode_auth_payload_or_401(authorization: str | None) -> tuple[int, dict[st
         payload = jwt.decode(token, settings.SECRET_KEY, algorithms=["HS256"])
     except jwt.PyJWTError as exc:
         raise HTTPException(status_code=401, detail="Invalid token") from exc
-    user_id = decode_user_id(token, settings.SECRET_KEY)
+    user_id = int(payload.get("sub", payload.get("user_id", 0)) or 0)
     if user_id <= 0:
         raise HTTPException(status_code=401, detail="Invalid user")
     return user_id, payload
@@ -703,61 +710,79 @@ async def trigger_outbox_relay(
 # MCP Admin Tool Endpoints dynamically generated from contract
 for tool_name in ADMIN_TOOL_CONTRACT:
 
-    @router.post(
+    def _make_invoke(name: str):
+        async def invoke_admin_tool(payload: JsonObject | None = None) -> JsonObject:
+            if payload is None:
+                payload = {}
+            tool_fn = get_registry().get(name)
+            if not tool_fn:
+                raise HTTPException(status_code=404, detail="Tool not found in registry")
+
+            try:
+                import asyncio
+
+                if hasattr(tool_fn, "ainvoke"):
+                    result = await tool_fn.ainvoke(payload)
+                elif asyncio.iscoroutinefunction(tool_fn) or asyncio.iscoroutinefunction(
+                    getattr(tool_fn, "invoke", None)
+                ):
+                    result = await tool_fn(**payload)
+                elif hasattr(tool_fn, "invoke"):
+                    result = tool_fn.invoke(payload)
+                else:
+                    result = tool_fn(**payload)
+
+                return {"status": "success", "result": result}
+            except Exception:
+                request_id = str(uuid.uuid4())
+                logger.error(
+                    "Admin tool invocation failed",
+                    exc_info=True,
+                    extra={"request_id": request_id, "tool_name": name},
+                )
+                return {
+                    "status": "error",
+                    "message": f"Tool execution failed. request_id={request_id}",
+                }
+
+        invoke_admin_tool.__name__ = f"invoke_admin_tool_{name.replace('.', '_')}"
+        return invoke_admin_tool
+
+    def _make_schema(name: str):
+        async def get_admin_tool_schema() -> JsonObject:
+            return {"name": name, "description": ADMIN_TOOL_CONTRACT.get(name), "parameters": {}}
+
+        get_admin_tool_schema.__name__ = f"get_admin_tool_schema_{name.replace('.', '_')}"
+        return get_admin_tool_schema
+
+    def _make_health(name: str):
+        async def get_admin_tool_health() -> JsonObject:
+            tool_fn = get_registry().get(name)
+            return {"name": name, "status": "healthy" if tool_fn else "unavailable"}
+
+        get_admin_tool_health.__name__ = f"get_admin_tool_health_{name.replace('.', '_')}"
+        return get_admin_tool_health
+
+    router.post(
         f"/api/v1/tools/{tool_name}/invoke",
         tags=["Admin MCP Tools"],
         dependencies=[Depends(require_internal_admin_access)],
-    )
-    async def invoke_admin_tool(payload: JsonObject | None = None, name=tool_name) -> JsonObject:
-        if payload is None:
-            payload = {}
-        tool_fn = get_registry().get(name)
-        if not tool_fn:
-            raise HTTPException(status_code=404, detail="Tool not found in registry")
+        operation_id=f"invoke_tool_{tool_name.replace('.', '_')}",
+    )(_make_invoke(tool_name))
 
-        try:
-            import asyncio
-
-            if hasattr(tool_fn, "ainvoke"):
-                result = await tool_fn.ainvoke(payload)
-            elif asyncio.iscoroutinefunction(tool_fn) or asyncio.iscoroutinefunction(
-                getattr(tool_fn, "invoke", None)
-            ):
-                result = await tool_fn(**payload)
-            elif hasattr(tool_fn, "invoke"):
-                result = tool_fn.invoke(payload)
-            else:
-                result = tool_fn(**payload)
-
-            return {"status": "success", "result": result}
-        except Exception:
-            request_id = str(uuid.uuid4())
-            logger.error(
-                "Admin tool invocation failed",
-                exc_info=True,
-                extra={"request_id": request_id, "tool_name": name},
-            )
-            return {
-                "status": "error",
-                "message": f"Tool execution failed. request_id={request_id}",
-            }
-
-    @router.get(
+    router.get(
         f"/api/v1/tools/{tool_name}/schema",
         tags=["Admin MCP Tools"],
         dependencies=[Depends(require_internal_admin_access)],
-    )
-    async def get_admin_tool_schema(name=tool_name) -> JsonObject:
-        return {"name": name, "description": ADMIN_TOOL_CONTRACT.get(name), "parameters": {}}
+        operation_id=f"get_schema_tool_{tool_name.replace('.', '_')}",
+    )(_make_schema(tool_name))
 
-    @router.get(
+    router.get(
         f"/api/v1/tools/{tool_name}/health",
         tags=["Admin MCP Tools"],
         dependencies=[Depends(require_internal_admin_access)],
-    )
-    async def get_admin_tool_health(name=tool_name) -> JsonObject:
-        tool_fn = get_registry().get(name)
-        return {"name": name, "status": "healthy" if tool_fn else "unavailable"}
+        operation_id=f"get_health_tool_{tool_name.replace('.', '_')}",
+    )(_make_health(tool_name))
 
 
 class ChatRequest(BaseModel):
@@ -805,7 +830,7 @@ async def _create_new_conversation(
     return int(created_id)
 
 
-_last_imported_count: dict[int, int] = {}
+_last_imported_count: TTLCache = TTLCache(maxsize=10_000, ttl=3600)
 
 
 async def _lazy_import_history_with_retry(
@@ -1145,12 +1170,15 @@ async def _stream_chat_langgraph(
     history_messages: list[dict[str, str]] | None = None,
 ) -> None:
     """يشغّل LangGraph الموحد لمسارات البحث والإدارة ويبث الأحداث."""
-    queue: asyncio.Queue[dict[str, object]] = asyncio.Queue()
+    queue: asyncio.Queue[dict[str, object]] = asyncio.Queue(maxsize=256)
     prepared_objective = _augment_ambiguous_objective(objective, history_messages)
 
     async def _runner():
         async def _safe_put(evt: dict[str, object]) -> None:
-            queue.put_nowait(evt)
+            try:
+                queue.put_nowait(evt)
+            except asyncio.QueueFull:
+                logger.warning("[QUEUE_OVERFLOW] dropping event type=%s", evt.get("type"))
 
         try:
             _graph = app_graph or getattr(websocket.app.state, "app_graph", None)
@@ -2103,73 +2131,19 @@ def _serialize_mission(mission: Mission) -> MissionResponse:
     )
 
 
-async def _save_chat_to_db(
-    chat_scope: str,
-    user_id: int,
-    conversation_id: int | None,
-    user_msg: str,
-    ai_msg: str,
-) -> None:
-    """يحفظ رسائل الدردشة ضمن معاملة واحدة ويعيد أي فشل للمنادي بشكل صريح."""
-    is_admin = chat_scope == "admin"
-    async with async_session_factory() as session:
-        try:
-            if conversation_id is None:
-                create_query = (
-                    text(
-                        "INSERT INTO admin_conversations (title, user_id) VALUES (:title, :user_id) RETURNING id"
-                    )
-                    if is_admin
-                    else text(
-                        "INSERT INTO customer_conversations (title, user_id) VALUES (:title, :user_id) RETURNING id"
-                    )
-                )
-                title = user_msg.strip()[:120] or "Super Agent Mission"
-                async with asyncio.timeout(5.0):
-                    res = await session.execute(create_query, {"title": title, "user_id": user_id})
-                created_id = res.scalar_one_or_none()
-                if created_id is not None:
-                    conversation_id = int(created_id)
-
-            if conversation_id is not None:
-                insert_msg_query = (
-                    text(
-                        "INSERT INTO admin_messages (conversation_id, role, content) VALUES (:conversation_id, :role, :content)"
-                    )
-                    if is_admin
-                    else text(
-                        "INSERT INTO customer_messages (conversation_id, role, content) VALUES (:conversation_id, :role, :content)"
-                    )
-                )
-                await session.execute(
-                    insert_msg_query,
-                    {
-                        "conversation_id": conversation_id,
-                        "role": "user",
-                        "content": user_msg.replace("\x00", ""),
-                    },
-                )
-                await session.execute(
-                    insert_msg_query,
-                    {
-                        "conversation_id": conversation_id,
-                        "role": "assistant",
-                        "content": ai_msg.replace("\x00", ""),
-                    },
-                )
-                await session.commit()
-        except Exception as e:
-            await session.rollback()
-            logger.error(f"Chat persistence failed: {e}", exc_info=True)
-            raise
-
-
 @router.post("/agent/chat", summary="Chat with Orchestrator Agent")
-async def chat_with_agent_endpoint(request: ChatRequest, fastapi_req: Request) -> StreamingResponse:
+async def chat_with_agent_endpoint(
+    request: ChatRequest,
+    fastapi_req: Request,
+    authorization: str | None = Header(default=None),
+) -> StreamingResponse:
     """
     Direct chat endpoint for the Orchestrator Agent (Microservice).
     Streams the response chunk by chunk.
     """
+    user_id, auth_payload = _decode_auth_payload_or_401(authorization)
+    request.user_id = user_id  # Override body user_id with JWT user_id
+
     logger.info(f"Agent Chat Request: {request.question[:50]}... User: {request.user_id}")
 
     # Prepare context
@@ -2182,17 +2156,18 @@ async def chat_with_agent_endpoint(request: ChatRequest, fastapi_req: Request) -
         }
     )
 
-    is_admin = (
-        context.get("chat_scope") == "admin"
-        or getattr(request, "chat_scope", "") == "admin"
-        or request.context.get("chat_scope") == "admin"
-    )
+    # Validate admin explicitly from JWT payload
+    is_admin = auth_payload.get("role") == "admin"
 
     if is_admin:
 
         async def _admin_stream() -> AsyncGenerator[str, None]:
             try:
                 admin_app = getattr(fastapi_req.app.state, "admin_app", None)
+                if admin_app is None:
+                    admin_app = create_unified_graph()
+                    logger.warning("[ADMIN_STREAM] admin_app not on app.state — using fresh graph")
+
                 if isinstance(request.context, dict):
                     request.context["is_admin"] = True
                     request.context["role"] = "admin"
@@ -2272,13 +2247,21 @@ async def chat_with_agent_endpoint(request: ChatRequest, fastapi_req: Request) -
                 full_user_message = request.question
                 full_ai_response = response_text
                 try:
-                    await _save_chat_to_db(
-                        chat_scope="admin",
-                        user_id=request.user_id,
-                        conversation_id=request.conversation_id,
-                        user_msg=full_user_message,
-                        ai_msg=full_ai_response,
-                    )
+                    async with async_session_factory() as db_session:
+                        conv_id, _ = await _ensure_conversation(
+                            session=db_session,
+                            conversation_id=request.conversation_id,
+                            user_id=request.user_id,
+                            question=full_user_message,
+                            is_admin_scope=True,
+                            messages=request.history_messages,
+                        )
+                        await _persist_assistant_message(
+                            session=db_session,
+                            conversation_id=conv_id,
+                            is_admin_scope=True,
+                            message=full_ai_response,
+                        )
                     yield await _serialize_stream_frame(
                         {"type": "assistant_delta", "payload": {"content": "\n\n✅ [DB SAVED]"}}
                     )
