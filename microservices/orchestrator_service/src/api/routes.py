@@ -438,15 +438,13 @@ def _canonicalize_mission_event(event: object) -> MissionEventEnvelope | None:
 
 async def _append_telemetry_line(line: str) -> None:
     """يكتب سطر تتبع حرج إلى ملف أدلة قابل للفحص خارج مخرجات الطرفية."""
+    import os
+    import anyio
 
     def write_sync():
-        import os
-
         path = os.path.join(os.getenv("STATE_DIR", "/app"), "telemetry_evidence.txt")
         with open(path, "a", encoding="utf-8") as telemetry_file:
             telemetry_file.write(f"{line}\n")
-
-    import anyio
 
     await anyio.to_thread.run_sync(write_sync)
 
@@ -551,7 +549,7 @@ async def require_internal_admin_access(
     if not _is_admin_payload(payload):
         raise HTTPException(status_code=403, detail="forbidden")
 
-    user_id = decode_user_id(token, settings.SECRET_KEY)
+    user_id = int(payload.get("sub", payload.get("user_id", 0)) or 0)
     if user_id <= 0:
         raise HTTPException(status_code=403, detail="forbidden")
     return user_id
@@ -893,6 +891,7 @@ async def _lazy_import_history_with_retry(
 
 async def _ensure_conversation(
     *,
+    session: AsyncSession,
     chat_scope: str,
     user_id: int,
     question: str,
@@ -979,108 +978,107 @@ async def _ensure_conversation(
     conv_metadata_to_import: dict[str, str] | None = None
     messages_to_import: list[dict[str, str]] = []
 
-    async with async_session_factory() as session:
-        if conversation_id is not None:
+    if conversation_id is not None:
+        try:
+            async with asyncio.timeout(5.0):
+                result = await session.execute(
+                    check_query,
+                    {"conversation_id": conversation_id, "user_id": user_id},
+                )
+        except TimeoutError as e:
+            raise HTTPException(
+                status_code=504, detail="Database timeout checking conversation"
+            ) from e
+        conv_row = result.fetchone()
+        if conv_row is None:
+            raise HTTPException(status_code=403, detail="conversation does not belong to user")
+
+        try:
             try:
                 async with asyncio.timeout(5.0):
-                    result = await session.execute(
-                        check_query,
-                        {"conversation_id": conversation_id, "user_id": user_id},
+                    messages_res = await session.execute(
+                        get_messages_query,
+                        {
+                            "conversation_id": conversation_id,
+                            "history_limit": MAX_HISTORY_MESSAGES,
+                        },
                     )
             except TimeoutError as e:
                 raise HTTPException(
-                    status_code=504, detail="Database timeout checking conversation"
+                    status_code=504, detail="Database timeout retrieving messages"
                 ) from e
-            conv_row = result.fetchone()
-            if conv_row is None:
-                raise HTTPException(status_code=403, detail="conversation does not belong to user")
+            messages_rows = messages_res.fetchall()
 
-            try:
-                try:
-                    async with asyncio.timeout(5.0):
-                        messages_res = await session.execute(
-                            get_messages_query,
-                            {
-                                "conversation_id": conversation_id,
-                                "history_limit": MAX_HISTORY_MESSAGES,
-                            },
-                        )
-                except TimeoutError as e:
-                    raise HTTPException(
-                        status_code=504, detail="Database timeout retrieving messages"
-                    ) from e
-                messages_rows = messages_res.fetchall()
-
-                messages = [
-                    {
-                        "role": str(m.role),
-                        "content": str(m.content),
-                        "created_at": m.created_at.isoformat(),
-                    }
-                    for m in messages_rows
-                ]
-
-                min_id = min(m.id for m in messages_rows) if messages_rows else 0
-                older_messages_rows = []
-                if min_id > 0:
-                    async with asyncio.timeout(5.0):
-                        older_messages_res = await session.execute(
-                            get_older_messages_query,
-                            {
-                                "conversation_id": conversation_id,
-                                "min_recent_id": min_id,
-                                "summary_limit": MAX_HISTORY_SUMMARY_MESSAGES,
-                            },
-                        )
-                    older_messages_rows = list(reversed(older_messages_res.fetchall()))
-                if older_messages_rows:
-                    digest = _build_older_history_digest(older_messages_rows)
-                    if digest:
-                        messages.insert(
-                            0,
-                            {
-                                "role": "assistant",
-                                "content": "ملخص موجز لما سبق في نفس المحادثة:\n" + digest,
-                                "created_at": "",
-                            },
-                        )
-                logger.info(
-                    "[CONV_LIFECYCLE] stage=history_loaded role=%s user=%s conv_id=%s msg_count=%s",
-                    "admin" if is_admin_scope else "customer",
-                    user_id,
-                    conversation_id,
-                    len(messages),
-                )
-                conv_metadata_to_import = {
-                    "title": str(conv_row.title),
-                    "created_at": conv_row.created_at.isoformat(),
+            messages = [
+                {
+                    "role": str(m.role),
+                    "content": str(m.content),
+                    "created_at": m.created_at.isoformat(),
                 }
-                messages_to_import = list(messages)
-            except Exception as e:
-                logger.error(
-                    "[ENSURE_CONV] failed preparing history for import for conversation=%s user=%s; preserving same conversation_id. error=%s",
-                    conversation_id,
-                    user_id,
-                    e,
-                )
-        else:
-            conversation_id = await _create_new_conversation(
-                user_id, question, is_admin_scope, session
-            )
+                for m in messages_rows
+            ]
 
-        try:
-            async with asyncio.timeout(5.0):
-                await session.execute(
-                    insert_message_query,
-                    {
-                        "conversation_id": int(conversation_id),
-                        "role": "user",
-                        "content": question.replace("\x00", ""),
-                    },
-                )
-        except TimeoutError as e:
-            raise HTTPException(status_code=504, detail="Database timeout inserting message") from e
-        await session.commit()
+            min_id = min(m.id for m in messages_rows) if messages_rows else 0
+            older_messages_rows = []
+            if min_id > 0:
+                async with asyncio.timeout(5.0):
+                    older_messages_res = await session.execute(
+                        get_older_messages_query,
+                        {
+                            "conversation_id": conversation_id,
+                            "min_recent_id": min_id,
+                            "summary_limit": MAX_HISTORY_SUMMARY_MESSAGES,
+                        },
+                    )
+                older_messages_rows = list(reversed(older_messages_res.fetchall()))
+            if older_messages_rows:
+                digest = _build_older_history_digest(older_messages_rows)
+                if digest:
+                    messages.insert(
+                        0,
+                        {
+                            "role": "assistant",
+                            "content": "ملخص موجز لما سبق في نفس المحادثة:\n" + digest,
+                            "created_at": "",
+                        },
+                    )
+            logger.info(
+                "[CONV_LIFECYCLE] stage=history_loaded role=%s user=%s conv_id=%s msg_count=%s",
+                "admin" if is_admin_scope else "customer",
+                user_id,
+                conversation_id,
+                len(messages),
+            )
+            conv_metadata_to_import = {
+                "title": str(conv_row.title),
+                "created_at": conv_row.created_at.isoformat(),
+            }
+            messages_to_import = list(messages)
+        except Exception as e:
+            logger.error(
+                "[ENSURE_CONV] failed preparing history for import for conversation=%s user=%s; preserving same conversation_id. error=%s",
+                conversation_id,
+                user_id,
+                e,
+            )
+    else:
+        conversation_id = await _create_new_conversation(
+            user_id, question, is_admin_scope, session
+        )
+
+    try:
+        async with asyncio.timeout(5.0):
+            await session.execute(
+                insert_message_query,
+                {
+                    "conversation_id": int(conversation_id),
+                    "role": "user",
+                    "content": question.replace("\x00", ""),
+                },
+            )
+    except TimeoutError as e:
+        raise HTTPException(status_code=504, detail="Database timeout inserting message") from e
+    await session.commit()
 
     if conv_metadata_to_import is not None and conversation_id is not None:
         try:
@@ -1103,10 +1101,11 @@ async def _ensure_conversation(
 
 async def _persist_assistant_message(
     *,
+    session: AsyncSession,
     chat_scope: str,
     conversation_id: int,
     content: str,
-    mission_id: int | None,
+    mission_id: int | None = None,
 ) -> None:
     """يحفظ رد المساعد النهائي ويربط mission_id بالمحادثة الإدارية عند توفره."""
     is_admin_scope = chat_scope == "admin"
@@ -2164,7 +2163,7 @@ async def chat_with_agent_endpoint(
     )
 
     # Validate admin explicitly from JWT payload
-    is_admin = auth_payload.get("role") == "admin"
+    is_admin = _is_admin_payload(auth_payload)
 
     if is_admin:
 
@@ -2247,9 +2246,6 @@ async def chat_with_agent_endpoint(
                     response_text = await _serialize_json_async(final_resp)
                 else:
                     response_text = str(final_resp or "لا توجد تفاصيل متاحة.")
-                yield await _serialize_stream_frame(
-                    {"type": "assistant_final", "payload": {"content": response_text}}
-                )
 
                 full_user_message = request.question
                 full_ai_response = response_text
@@ -2257,17 +2253,16 @@ async def chat_with_agent_endpoint(
                     async with async_session_factory() as db_session:
                         conv_id, _ = await _ensure_conversation(
                             session=db_session,
-                            conversation_id=request.conversation_id,
+                            chat_scope="admin",
                             user_id=request.user_id,
                             question=full_user_message,
-                            is_admin_scope=True,
-                            messages=request.history_messages,
+                            requested_conversation_id=request.conversation_id,
                         )
                         await _persist_assistant_message(
                             session=db_session,
+                            chat_scope="admin",
                             conversation_id=conv_id,
-                            is_admin_scope=True,
-                            message=full_ai_response,
+                            content=full_ai_response,
                         )
                     yield await _serialize_stream_frame(
                         {"type": "assistant_delta", "payload": {"content": "\n\n✅ [DB SAVED]"}}
@@ -2280,6 +2275,10 @@ async def chat_with_agent_endpoint(
                             "payload": {"content": f"\n\n🚨 **SYSTEM DB ERROR:** {error_msg}"},
                         }
                     )
+
+                yield await _serialize_stream_frame(
+                    {"type": "assistant_final", "payload": {"content": response_text}}
+                )
             except Exception:
                 request_id = str(uuid.uuid4())
                 logger.error(
@@ -2303,19 +2302,23 @@ async def chat_with_agent_endpoint(
         try:
             run_result = agent.run(request.question, context=context)
             ai_chunks = []
+            final_chunk = None
             async for chunk in run_result:
                 if isinstance(chunk, str):
                     ai_chunks.append(chunk)
+                    yield await _serialize_stream_frame(chunk)
                 elif isinstance(chunk, dict) and chunk.get("type") == "assistant_delta":
                     delta_content = chunk.get("payload", {}).get("content", "")
                     if delta_content:
                         ai_chunks.append(str(delta_content))
+                    yield await _serialize_stream_frame(chunk)
                 elif isinstance(chunk, dict) and chunk.get("type") == "assistant_final":
                     final_content = chunk.get("payload", {}).get("content", "")
                     if final_content:
                         ai_chunks.append(str(final_content))
-
-                yield await _serialize_stream_frame(chunk)
+                    final_chunk = chunk
+                else:
+                    yield await _serialize_stream_frame(chunk)
 
             # The run completed successfully, trigger persistence
             full_user_message = request.question
@@ -2325,17 +2328,16 @@ async def chat_with_agent_endpoint(
                     async with async_session_factory() as db_session:
                         conv_id, _ = await _ensure_conversation(
                             session=db_session,
-                            conversation_id=request.conversation_id,
+                            chat_scope="customer",
                             user_id=request.user_id,
                             question=full_user_message,
-                            is_admin_scope=False,
-                            messages=request.history_messages,
+                            requested_conversation_id=request.conversation_id,
                         )
                         await _persist_assistant_message(
                             session=db_session,
+                            chat_scope="customer",
                             conversation_id=conv_id,
-                            is_admin_scope=False,
-                            message=full_ai_response,
+                            content=full_ai_response,
                         )
                     yield await _serialize_stream_frame(
                         {"type": "assistant_delta", "payload": {"content": "\n\n✅ [DB SAVED]"}}
@@ -2348,6 +2350,8 @@ async def chat_with_agent_endpoint(
                             "payload": {"content": f"\n\n🚨 **SYSTEM DB ERROR:** {error_msg}"},
                         }
                     )
+            if final_chunk:
+                yield await _serialize_stream_frame(final_chunk)
 
         except Exception:
             request_id = str(uuid.uuid4())
@@ -2494,7 +2498,16 @@ async def stream_mission_ws(
         return
 
     try:
-        async for event in subscription:
+        while True:
+            try:
+                async with asyncio.timeout(300.0):
+                    event = await anext(subscription)
+            except StopAsyncIteration:
+                break
+            except TimeoutError:
+                await websocket.close(code=1011, reason="Timeout waiting for mission events")
+                break
+
             canonical_event = _canonicalize_mission_event(event)
             if canonical_event is None:
                 continue
