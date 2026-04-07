@@ -439,6 +439,7 @@ def _canonicalize_mission_event(event: object) -> MissionEventEnvelope | None:
 async def _append_telemetry_line(line: str) -> None:
     """يكتب سطر تتبع حرج إلى ملف أدلة قابل للفحص خارج مخرجات الطرفية."""
     import os
+
     import anyio
 
     def write_sync():
@@ -1124,37 +1125,36 @@ async def _persist_assistant_message(
         "UPDATE admin_conversations SET linked_mission_id=:mission_id WHERE id=:conversation_id"
     )
 
-    async with async_session_factory() as session:
+    try:
+        async with asyncio.timeout(5.0):
+            await session.execute(
+                insert_message_query,
+                {
+                    "conversation_id": conversation_id,
+                    "role": "assistant",
+                    "content": content.replace("\x00", ""),
+                },
+            )
+    except TimeoutError as e:
+        raise HTTPException(
+            status_code=504, detail="Database timeout persisting assistant message"
+        ) from e
+
+    if is_admin_scope and mission_id is not None:
         try:
             async with asyncio.timeout(5.0):
                 await session.execute(
-                    insert_message_query,
+                    link_query,
                     {
+                        "mission_id": mission_id,
                         "conversation_id": conversation_id,
-                        "role": "assistant",
-                        "content": content.replace("\x00", ""),
                     },
                 )
         except TimeoutError as e:
             raise HTTPException(
-                status_code=504, detail="Database timeout persisting assistant message"
+                status_code=504, detail="Database timeout linking mission"
             ) from e
-
-        if is_admin_scope and mission_id is not None:
-            try:
-                async with asyncio.timeout(5.0):
-                    await session.execute(
-                        link_query,
-                        {
-                            "mission_id": mission_id,
-                            "conversation_id": conversation_id,
-                        },
-                    )
-            except TimeoutError as e:
-                raise HTTPException(
-                    status_code=504, detail="Database timeout linking mission"
-                ) from e
-        await session.commit()
+    await session.commit()
 
 
 async def _stream_chat_langgraph(
