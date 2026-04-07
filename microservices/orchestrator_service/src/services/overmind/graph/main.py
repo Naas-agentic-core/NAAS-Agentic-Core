@@ -482,7 +482,7 @@ class ChatFallbackNode:
             # Context blindness fix: We must explicitly inject our final response into state.messages
             # so that LangGraph's native Postgres checkpointer natively tracks it as AIMessage
             # without manual extraction from DB for subsequent turns.
-            "messages": [AIMessage(content=json.dumps(final_resp, ensure_ascii=False))],
+            "messages": [AIMessage(content=fallback_response, additional_kwargs={"structured": final_resp})],
         }
 
 
@@ -564,6 +564,16 @@ class QueryRewriterNode:
             content = getattr(message, "content", "")
             if role not in {"human", "user", "ai", "assistant"}:
                 continue
+
+            # Try extracting from structured kwargs first
+            additional = getattr(message, "additional_kwargs", {})
+            if isinstance(additional, dict) and "structured" in additional:
+                structured = additional["structured"]
+                if isinstance(structured, dict):
+                    text = structured.get("الإجابة") or str(structured)
+                    if text and len(text) <= 220:
+                        return text[:220].strip()
+
             if not isinstance(content, str):
                 continue
             text = content.strip()

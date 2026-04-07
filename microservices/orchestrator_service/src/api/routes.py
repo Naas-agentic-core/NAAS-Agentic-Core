@@ -173,15 +173,22 @@ def _build_graph_messages(
 ) -> list[HumanMessage | AIMessage]:
     """يبني رسائل الإدخال للرسم البياني مع مسار احتياطي صريح ضد عمى السياق."""
     latest_user_message = HumanMessage(content=objective)
+
+    if history_messages:
+        seeded_history = _build_langchain_messages(history_messages)
+        seeded_history.append(latest_user_message)
+        logger.info(f"Using injected history: {len(seeded_history)} messages")
+        return seeded_history
+
     if checkpointer_available and checkpoint_has_state:
         # Prevent context amnesia and exponential message duplication in LangGraph
         # by relying purely on the checkpointer to manage history. Do not inject manually.
+        logger.info("Using checkpoint state only")
         return [latest_user_message]
 
-    # عند غياب checkpointer (أو تعطل تهيئته)، نمرّر نافذة تاريخية محدودة صراحةً.
-    seeded_history = _build_langchain_messages(history_messages)
-    seeded_history.append(latest_user_message)
-    return seeded_history
+    # عند غياب checkpointer (أو تعطل تهيئته) وعدم وجود تاريخ مرسل، نمرّر الرسالة الحالية فقط.
+    logger.warning("No context available - cold start")
+    return [latest_user_message]
 
 
 def _question_contains_explicit_entity(question: str) -> bool:
