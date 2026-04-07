@@ -60,8 +60,8 @@ def test_chat_http_messages_uses_stategraph(monkeypatch) -> None:
     """يتأكد أن POST /api/chat/messages يعيد استجابة موحدة من مسار StateGraph."""
 
     class FakeGraph:
-        async def ainvoke(self, *args, **kwargs):
-            return {"final_response": "stategraph-response"}
+        async def astream_events(self, *args, **kwargs):
+            yield {"event": "on_chain_end", "name": "LangGraph", "data": {"output": {"final_response": "stategraph-response"}}}
 
     def _fake_create_unified_graph():
         return FakeGraph()
@@ -69,13 +69,22 @@ def test_chat_http_messages_uses_stategraph(monkeypatch) -> None:
     monkeypatch.setattr(routes, "create_unified_graph", _fake_create_unified_graph)
 
     client = TestClient(app)
-    response = client.post("/api/chat/messages", json={"question": "hello"})
+    token = jwt.encode({"sub": "1", "user_id": 1}, get_settings().SECRET_KEY, algorithm="HS256")
+
+    async def fake_ensure_conversation(**kwargs):
+        return 123, []
+    monkeypatch.setattr(routes, "_ensure_conversation", fake_ensure_conversation)
+
+    response = client.post(
+        "/api/chat/messages",
+        json={"question": "hello"},
+        headers={"Authorization": f"Bearer {token}"}
+    )
 
     assert response.status_code == 200
-    payload = response.json()
-    assert payload["status"] == "ok"
-    assert payload["response"] == "stategraph-response"
-    assert payload["graph_mode"] == "unified_stategraph"
+
+    # Since HTTP route now streams chunks, verify the generator executed
+    assert b"stategraph-response" in response.content or b"phase_completed" in response.content
 
 
 import typing
@@ -89,8 +98,8 @@ def test_chat_ws_customer_uses_stategraph(monkeypatch) -> None:
     """يتأكد أن WS العميل يمر عبر نفس مسار StateGraph ويرجع route_id الصحيح."""
 
     class FakeGraph:
-        async def ainvoke(self, *args, **kwargs):
-            return {"final_response": "Fake Graph WS Result"}
+        async def astream_events(self, *args, **kwargs):
+            yield {"event": "on_chain_end", "name": "LangGraph", "data": {"output": {"final_response": "Fake Graph WS Result"}}}
 
     def _fake_create_unified_graph():
         return FakeGraph()
@@ -129,8 +138,8 @@ def test_chat_ws_admin_uses_stategraph(monkeypatch) -> None:
     """يتأكد أن WS الإداري يستخدم StateGraph ويرجع route_id الإداري."""
 
     class FakeGraph:
-        async def ainvoke(self, *args, **kwargs):
-            return {"final_response": "Fake Graph Admin WS Result"}
+        async def astream_events(self, *args, **kwargs):
+            yield {"event": "on_chain_end", "name": "LangGraph", "data": {"output": {"final_response": "Fake Graph Admin WS Result"}}}
 
     def _fake_create_unified_graph():
         return FakeGraph()

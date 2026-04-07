@@ -60,9 +60,9 @@ def test_agent_chat_admin_path_forwards_aligned_admin_state(monkeypatch) -> None
         def __init__(self) -> None:
             self.last_inputs: dict[str, object] | None = None
 
-        async def ainvoke(self, inputs: dict[str, object], config: dict | None = None):
+        async def astream_events(self, inputs: dict[str, object], config: dict | None = None, version: str = "v2"):
             self.last_inputs = inputs
-            return {"final_response": {"ok": True}}
+            yield {"event": "on_chain_end", "name": "LangGraph", "data": {"output": {"final_response": {"ok": True}}}}
 
     fake_admin = FakeAdminApp()
     app.state.admin_app = fake_admin
@@ -104,9 +104,9 @@ def test_agent_chat_admin_path_is_fail_closed_without_admin_identity(monkeypatch
         def __init__(self) -> None:
             self.last_inputs: dict[str, object] | None = None
 
-        async def ainvoke(self, inputs: dict[str, object], config: dict | None = None):
+        async def astream_events(self, inputs: dict[str, object], config: dict | None = None, version: str = "v2"):
             self.last_inputs = inputs
-            return {"final_response": {"ok": True}}
+            yield {"event": "on_chain_end", "name": "LangGraph", "data": {"output": {"final_response": {"ok": True}}}}
 
     fake_admin = FakeAdminApp()
     app.state.admin_app = fake_admin
