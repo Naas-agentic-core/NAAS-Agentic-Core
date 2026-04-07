@@ -1063,9 +1063,7 @@ async def _ensure_conversation(
                 e,
             )
     else:
-        conversation_id = await _create_new_conversation(
-            user_id, question, is_admin_scope, session
-        )
+        conversation_id = await _create_new_conversation(user_id, question, is_admin_scope, session)
 
     try:
         async with asyncio.timeout(5.0):
@@ -1151,9 +1149,7 @@ async def _persist_assistant_message(
                     },
                 )
         except TimeoutError as e:
-            raise HTTPException(
-                status_code=504, detail="Database timeout linking mission"
-            ) from e
+            raise HTTPException(status_code=504, detail="Database timeout linking mission") from e
     await session.commit()
 
 
