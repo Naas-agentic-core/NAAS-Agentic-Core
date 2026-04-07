@@ -32,7 +32,9 @@ class AIClient:
             api_key=api_key or "dummy-key",
             base_url=base_url,
         )
-        self.default_model = "nvidia/nemotron-3-super-120b-a12b:free"  # Default model, can be overridden
+        self.default_model = (
+            "nvidia/nemotron-3-super-120b-a12b:free"  # Default model, can be overridden
+        )
 
     async def generate(
         self,

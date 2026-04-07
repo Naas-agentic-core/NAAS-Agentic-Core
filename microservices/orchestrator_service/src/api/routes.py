@@ -456,6 +456,7 @@ router = APIRouter(
 
 _conv_service_client: httpx.AsyncClient | None = None
 
+
 async def get_conv_service_client() -> httpx.AsyncClient:
     global _conv_service_client
     if _conv_service_client is None or _conv_service_client.is_closed:
@@ -620,8 +621,7 @@ def _resolve_thread_id(context: ChatRunContext, fallback_conversation_id: int | 
     user_id = context.get("user_id")
     if user_id is None:
         raise ValueError(
-            f"[THREAD_RESOLUTION] user_id required for safe thread binding. "
-            f"conv_id={conv_id!r}"
+            f"[THREAD_RESOLUTION] user_id required for safe thread binding. conv_id={conv_id!r}"
         )
     return f"u{user_id}:c{conv_id}"
 
@@ -648,6 +648,7 @@ async def _serialize_json_async(payload: object) -> str:
 async def _serialize_stream_frame(payload: object) -> str:
     """يبني NDJSON صارمًا لضمان عدم تسريب dict خام إلى عميل البث النصي."""
     return _serialize_stream_frame_sync(payload)
+
 
 def _serialize_stream_frame_sync(payload: object) -> str:
     """سريع، متزامن، آمن لـ event loop."""
@@ -806,6 +807,7 @@ async def _create_new_conversation(
 
 _last_imported_count: dict[int, int] = {}
 
+
 async def _lazy_import_history_with_retry(
     *,
     conversation_id: int,
@@ -833,9 +835,7 @@ async def _lazy_import_history_with_retry(
     for attempt in range(1, max_attempts + 1):
         try:
             client = await get_conv_service_client()
-            resp = await client.post(
-                "/api/v1/conversations/import", json=payload
-            )
+            resp = await client.post("/api/v1/conversations/import", json=payload)
             resp.raise_for_status()
             data = resp.json()
             if data.get("status") not in {"imported", "already_exists"}:
@@ -1448,8 +1448,6 @@ async def _stream_chat_langgraph(
     await websocket.send_json({"type": "complete", "payload": {}})
 
 
-
-
 async def _run_chat_langgraph(
     objective: str,
     context: ChatRunContext,
@@ -1517,11 +1515,7 @@ async def _run_chat_langgraph(
                 )
             if not node_name or node_name == "LangGraph":
                 final_res = event["data"].get("output", {})
-                if (
-                    final_res
-                    and isinstance(final_res, dict)
-                    and "final_response" in final_res
-                ):
+                if final_res and isinstance(final_res, dict) and "final_response" in final_res:
                     final_resp = final_res["final_response"]
                 elif (
                     final_res
@@ -2223,15 +2217,21 @@ async def chat_with_agent_endpoint(request: ChatRequest, fastapi_req: Request) -
 
                 thread_id = _resolve_thread_id(
                     {"user_id": request.user_id, "conversation_id": request.conversation_id},
-                    fallback_conversation_id=str(conversation_id)
+                    fallback_conversation_id=str(conversation_id),
                 )
 
                 final_resp = None
                 config = {"configurable": {"thread_id": thread_id}}
-                async for event in admin_app.astream_events(admin_inputs, config=config, version="v2"):
+                async for event in admin_app.astream_events(
+                    admin_inputs, config=config, version="v2"
+                ):
                     if event["event"] == "on_chain_start":
                         node_name = event.get("name", "")
-                        if node_name and not node_name.startswith("__") and node_name != "LangGraph":
+                        if (
+                            node_name
+                            and not node_name.startswith("__")
+                            and node_name != "LangGraph"
+                        ):
                             yield await _serialize_stream_frame(
                                 {
                                     "type": "phase_start",
@@ -2240,7 +2240,11 @@ async def chat_with_agent_endpoint(request: ChatRequest, fastapi_req: Request) -
                             )
                     elif event["event"] == "on_chain_end":
                         node_name = event.get("name", "")
-                        if node_name and not node_name.startswith("__") and node_name != "LangGraph":
+                        if (
+                            node_name
+                            and not node_name.startswith("__")
+                            and node_name != "LangGraph"
+                        ):
                             yield await _serialize_stream_frame(
                                 {
                                     "type": "phase_completed",

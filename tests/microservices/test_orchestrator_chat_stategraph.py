@@ -61,7 +61,11 @@ def test_chat_http_messages_uses_stategraph(monkeypatch) -> None:
 
     class FakeGraph:
         async def astream_events(self, *args, **kwargs):
-            yield {"event": "on_chain_end", "name": "LangGraph", "data": {"output": {"final_response": "stategraph-response"}}}
+            yield {
+                "event": "on_chain_end",
+                "name": "LangGraph",
+                "data": {"output": {"final_response": "stategraph-response"}},
+            }
 
     def _fake_create_unified_graph():
         return FakeGraph()
@@ -73,12 +77,13 @@ def test_chat_http_messages_uses_stategraph(monkeypatch) -> None:
 
     async def fake_ensure_conversation(**kwargs):
         return 123, []
+
     monkeypatch.setattr(routes, "_ensure_conversation", fake_ensure_conversation)
 
     response = client.post(
         "/api/chat/messages",
         json={"question": "hello"},
-        headers={"Authorization": f"Bearer {token}"}
+        headers={"Authorization": f"Bearer {token}"},
     )
 
     assert response.status_code == 200
@@ -99,7 +104,11 @@ def test_chat_ws_customer_uses_stategraph(monkeypatch) -> None:
 
     class FakeGraph:
         async def astream_events(self, *args, **kwargs):
-            yield {"event": "on_chain_end", "name": "LangGraph", "data": {"output": {"final_response": "Fake Graph WS Result"}}}
+            yield {
+                "event": "on_chain_end",
+                "name": "LangGraph",
+                "data": {"output": {"final_response": "Fake Graph WS Result"}},
+            }
 
     def _fake_create_unified_graph():
         return FakeGraph()
@@ -139,7 +148,11 @@ def test_chat_ws_admin_uses_stategraph(monkeypatch) -> None:
 
     class FakeGraph:
         async def astream_events(self, *args, **kwargs):
-            yield {"event": "on_chain_end", "name": "LangGraph", "data": {"output": {"final_response": "Fake Graph Admin WS Result"}}}
+            yield {
+                "event": "on_chain_end",
+                "name": "LangGraph",
+                "data": {"output": {"final_response": "Fake Graph Admin WS Result"}},
+            }
 
     def _fake_create_unified_graph():
         return FakeGraph()
