@@ -103,8 +103,16 @@ async def init_db() -> None:
         }
         _postgres_pool = AsyncConnectionPool(**pool_kwargs)
         await _postgres_pool.open()
+
+        async with _postgres_pool.connection() as conn:
+            await conn.execute("SELECT 1")
+
         postgres_checkpointer = AsyncPostgresSaver(_postgres_pool)
         await postgres_checkpointer.setup()
+
+        test_config = {"configurable": {"thread_id": "test_init"}}
+        checkpoint = await postgres_checkpointer.aget(test_config)
+        logger.info(f"Checkpointer OK: {checkpoint is not None}")
 
         logger.info("Database initialized successfully.")
     except Exception as e:
