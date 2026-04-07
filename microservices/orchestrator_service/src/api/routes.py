@@ -5,8 +5,9 @@ import os
 import re
 import time
 import uuid
+from collections.abc import AsyncGenerator
 from contextlib import suppress
-from typing import AsyncGenerator, TypedDict
+from typing import TypedDict
 
 import anyio
 import httpx
@@ -820,9 +821,6 @@ async def _lazy_import_history_with_retry(
 
     delta_messages = messages[already_imported:]
 
-    conv_service_url = os.getenv(
-        "CONVERSATION_SERVICE_URL", "http://conversation-service:8010"
-    ).rstrip("/")
     payload = {
         "conversation_id": conversation_id,
         "user_id": user_id,
@@ -1450,7 +1448,7 @@ async def _stream_chat_langgraph(
     await websocket.send_json({"type": "complete", "payload": {}})
 
 
-from collections.abc import AsyncGenerator
+
 
 async def _run_chat_langgraph(
     objective: str,
@@ -2254,7 +2252,7 @@ async def chat_with_agent_endpoint(request: ChatRequest, fastapi_req: Request) -
                             if output_data and isinstance(output_data, dict):
                                 if "final_response" in output_data:
                                     final_resp = output_data["final_response"]
-                                elif "messages" in output_data and output_data["messages"]:
+                                elif output_data.get("messages"):
                                     last_msg = output_data["messages"][-1]
                                     if hasattr(last_msg, "content"):
                                         final_resp = last_msg.content
