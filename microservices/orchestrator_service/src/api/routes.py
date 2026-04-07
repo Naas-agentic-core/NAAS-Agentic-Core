@@ -453,6 +453,18 @@ router = APIRouter(
     tags=["Overmind (Super Agent)"],
 )
 
+_conv_service_client: httpx.AsyncClient | None = None
+
+async def get_conv_service_client() -> httpx.AsyncClient:
+    global _conv_service_client
+    if _conv_service_client is None or _conv_service_client.is_closed:
+        _conv_service_client = httpx.AsyncClient(
+            base_url=os.getenv("CONVERSATION_SERVICE_URL", "http://conversation-service:8010"),
+            timeout=10.0,
+            limits=httpx.Limits(max_connections=20, max_keepalive_connections=10),
+        )
+    return _conv_service_client
+
 
 class OutboxRelayResponse(BaseModel):
     """استجابة تشغيل relay اليدوي لسجلات outbox."""
@@ -599,11 +611,18 @@ def _safe_thread_id(raw_value: object) -> str | None:
 
 def _resolve_thread_id(context: ChatRunContext, fallback_conversation_id: int | str) -> str:
     """يستخرج thread_id ثابتًا من السياق مع عزل المستخدم."""
+    explicit = _safe_thread_id(context.get("thread_id"))
+    if explicit:
+        return explicit
+
     conv_id = context.get("conversation_id", fallback_conversation_id)
     user_id = context.get("user_id")
-    if user_id is not None:
-        return f"u{user_id}:c{conv_id}"
-    return str(conv_id)
+    if user_id is None:
+        raise ValueError(
+            f"[THREAD_RESOLUTION] user_id required for safe thread binding. "
+            f"conv_id={conv_id!r}"
+        )
+    return f"u{user_id}:c{conv_id}"
 
 
 def _decode_auth_payload_or_401(authorization: str | None) -> tuple[int, dict[str, object]]:
@@ -804,12 +823,12 @@ async def _lazy_import_history_with_retry(
     last_error: Exception | None = None
     for attempt in range(1, max_attempts + 1):
         try:
-            async with httpx.AsyncClient(timeout=10.0) as client:
-                resp = await client.post(
-                    f"{conv_service_url}/api/v1/conversations/import", json=payload
-                )
-                resp.raise_for_status()
-                data = resp.json()
+            client = await get_conv_service_client()
+            resp = await client.post(
+                "/api/v1/conversations/import", json=payload
+            )
+            resp.raise_for_status()
+            data = resp.json()
             if data.get("status") not in {"imported", "already_exists"}:
                 raise ValueError(f"Unexpected import status: {data.get('status')}")
             return
@@ -891,8 +910,8 @@ async def _ensure_conversation(
             SELECT id, role, content
             FROM admin_messages
             WHERE conversation_id=:conversation_id
+              AND id < :min_recent_id
             ORDER BY id DESC
-            OFFSET :history_limit
             LIMIT :summary_limit
             """
         )
@@ -902,8 +921,8 @@ async def _ensure_conversation(
             SELECT id, role, content
             FROM customer_messages
             WHERE conversation_id=:conversation_id
+              AND id < :min_recent_id
             ORDER BY id DESC
-            OFFSET :history_limit
             LIMIT :summary_limit
             """
         )
@@ -963,16 +982,20 @@ async def _ensure_conversation(
                     }
                     for m in messages_rows
                 ]
-                async with asyncio.timeout(5.0):
-                    older_messages_res = await session.execute(
-                        get_older_messages_query,
-                        {
-                            "conversation_id": conversation_id,
-                            "history_limit": MAX_HISTORY_MESSAGES,
-                            "summary_limit": MAX_HISTORY_SUMMARY_MESSAGES,
-                        },
-                    )
-                older_messages_rows = list(reversed(older_messages_res.fetchall()))
+
+                min_id = min(m.id for m in messages_rows) if messages_rows else 0
+                older_messages_rows = []
+                if min_id > 0:
+                    async with asyncio.timeout(5.0):
+                        older_messages_res = await session.execute(
+                            get_older_messages_query,
+                            {
+                                "conversation_id": conversation_id,
+                                "min_recent_id": min_id,
+                                "summary_limit": MAX_HISTORY_SUMMARY_MESSAGES,
+                            },
+                        )
+                    older_messages_rows = list(reversed(older_messages_res.fetchall()))
                 if older_messages_rows:
                     digest = _build_older_history_digest(older_messages_rows)
                     if digest:
@@ -1102,6 +1125,19 @@ async def _stream_chat_langgraph(
     prepared_objective = _augment_ambiguous_objective(objective, history_messages)
 
     async def _runner():
+        async def _safe_put(evt: dict[str, object]) -> None:
+            try:
+                await asyncio.wait_for(queue.put(evt), timeout=0.1)
+            except asyncio.TimeoutError:
+                logger.warning("[QUEUE] Consumer too slow, dropping %s", evt.get("type"))
+                if evt.get("type") in ("__DONE__", "__ERROR__"):
+                    if queue.full():
+                        try:
+                            queue.get_nowait()
+                        except asyncio.QueueEmpty:
+                            pass
+                    queue.put_nowait(evt)
+
         try:
             _graph = app_graph or getattr(websocket.app.state, "app_graph", None)
             if not _graph:
@@ -1168,9 +1204,7 @@ async def _stream_chat_langgraph(
                 if event["event"] == "on_chain_start":
                     node_name = event.get("name", "")
                     if node_name and not node_name.startswith("__") and node_name != "LangGraph":
-                        if queue.full():
-                            await queue.get()
-                        await queue.put(
+                        await _safe_put(
                             {
                                 "type": "phase_start",
                                 "payload": {"phase": node_name, "agent": "orchestrator"},
@@ -1179,9 +1213,7 @@ async def _stream_chat_langgraph(
                 elif event["event"] == "on_chain_end":
                     node_name = event.get("name", "")
                     if node_name and not node_name.startswith("__") and node_name != "LangGraph":
-                        if queue.full():
-                            await queue.get()
-                        await queue.put(
+                        await _safe_put(
                             {
                                 "type": "phase_completed",
                                 "payload": {"phase": node_name, "agent": "orchestrator"},
@@ -1228,13 +1260,9 @@ async def _stream_chat_langgraph(
             if not final_res:
                 final_res = {"final_response": "لم يتم العثور على رد من النظام"}
 
-            if queue.full():
-                await queue.get()
-            await queue.put({"type": "__DONE__", "result": final_res})
+            await _safe_put({"type": "__DONE__", "result": final_res})
         except Exception as e:
-            if queue.full():
-                await queue.get()
-            await queue.put({"type": "__ERROR__", "error": str(e)})
+            await _safe_put({"type": "__ERROR__", "error": str(e)})
 
     task = asyncio.create_task(_runner())
     active_background_tasks.add(task)
@@ -1406,13 +1434,15 @@ async def _stream_chat_langgraph(
     await websocket.send_json({"type": "complete", "payload": {}})
 
 
+from collections.abc import AsyncGenerator
+
 async def _run_chat_langgraph(
     objective: str,
     context: ChatRunContext,
     app_graph: object = None,
     admin_payload: dict[str, object] | None = None,
     history_messages: list[dict[str, str]] | None = None,
-) -> dict[str, object]:
+) -> AsyncGenerator[str, None]:
     """يشغّل LangGraph كعمود فقري لرحلة chat ويعيد حمولة موحدة قابلة للبث (HTTP legacy fallback)."""
     if not app_graph:
         app_graph = create_unified_graph()
@@ -1451,21 +1481,60 @@ async def _run_chat_langgraph(
     inputs: dict[str, object] = {"query": prepared_objective, "messages": langchain_msgs}
     inputs = _merge_admin_inputs(inputs, admin_payload)
 
-    res = await app_graph.ainvoke(inputs, config=config)
-    final_resp = res.get("final_response")
+    final_resp = None
+    async for event in app_graph.astream_events(inputs, config=config, version="v2"):
+        if event["event"] == "on_chain_start":
+            node_name = event.get("name", "")
+            if node_name and not node_name.startswith("__") and node_name != "LangGraph":
+                yield await _serialize_stream_frame(
+                    {
+                        "type": "phase_start",
+                        "payload": {"phase": node_name, "agent": "orchestrator"},
+                    }
+                )
+        elif event["event"] == "on_chain_end":
+            node_name = event.get("name", "")
+            if node_name and not node_name.startswith("__") and node_name != "LangGraph":
+                yield await _serialize_stream_frame(
+                    {
+                        "type": "phase_completed",
+                        "payload": {"phase": node_name, "agent": "orchestrator"},
+                    }
+                )
+            if not node_name or node_name == "LangGraph":
+                final_res = event["data"].get("output", {})
+                if (
+                    final_res
+                    and isinstance(final_res, dict)
+                    and "final_response" in final_res
+                ):
+                    final_resp = final_res["final_response"]
+                elif (
+                    final_res
+                    and isinstance(final_res, dict)
+                    and "messages" in final_res
+                    and final_res["messages"]
+                ):
+                    last_msg = final_res["messages"][-1]
+                    if hasattr(last_msg, "content"):
+                        final_resp = last_msg.content
 
     if isinstance(final_resp, dict):
         response_text = await _serialize_json_async(final_resp)
     else:
         response_text = str(final_resp or "لا توجد تفاصيل متاحة.")
 
-    return {
-        "status": "ok",
-        "response": response_text,
-        "run_id": "http-run",
-        "timeline": [],
-        "graph_mode": "unified_stategraph",
-    }
+    yield await _serialize_stream_frame(
+        {
+            "type": "assistant_final",
+            "payload": {
+                "content": response_text,
+                "status": "ok",
+                "run_id": "http-run",
+                "graph_mode": "unified_stategraph",
+            },
+        }
+    )
 
 
 @router.get("/api/chat/messages", summary="Chat Health Endpoint")
@@ -1637,8 +1706,12 @@ async def get_admin_conversation(
 
 
 @router.post("/api/chat/messages", summary="StateGraph Chat Endpoint")
-async def chat_messages_endpoint(payload: dict[str, object], request: Request) -> dict[str, object]:
-    """ينفّذ رسالة chat عبر خدمة LangGraph ويعيد نتيجة تشغيل موحدة."""
+async def chat_messages_endpoint(
+    payload: dict[str, object],
+    request: Request,
+    authorization: str | None = Header(default=None),
+) -> StreamingResponse:
+    """ينفّذ رسالة chat عبر خدمة LangGraph ويعيد نتيجة تشغيل موحدة عبر Stream."""
     objective = _extract_chat_objective(payload)
     if objective is None:
         raise HTTPException(status_code=422, detail="question/objective is required")
@@ -1650,6 +1723,9 @@ async def chat_messages_endpoint(payload: dict[str, object], request: Request) -
             if not isinstance(key, str):
                 continue
             context[key] = value
+
+    user_id, _jwt_payload = _decode_auth_payload_or_401(authorization)
+    context["user_id"] = user_id
 
     requested_conversation_id = _safe_conversation_id(payload.get("conversation_id"))
     if requested_conversation_id is not None:
@@ -1665,12 +1741,13 @@ async def chat_messages_endpoint(payload: dict[str, object], request: Request) -
     if not isinstance(history_messages, list):
         history_messages = []
 
-    return await _run_chat_langgraph(
+    generator = _run_chat_langgraph(
         objective,
         context,
         app_graph=getattr(request.app.state, "app_graph", None),
         history_messages=history_messages,
     )
+    return StreamingResponse(generator, media_type="text/plain")
 
 
 @router.websocket("/api/chat/ws")
