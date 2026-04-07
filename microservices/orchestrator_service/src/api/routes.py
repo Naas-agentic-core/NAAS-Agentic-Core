@@ -269,6 +269,13 @@ def _extract_recent_entity_anchor(history_messages: list[dict[str, str]] | None)
         "عددها",
         "موقعها",
         "مساحتها",
+        "أين",
+        "تقع",
+        "يقع",
+        "توجد",
+        "يوجد",
+        "تقوم",
+        "يقوم",
     }
 
     for message in reversed(history_messages):
@@ -1029,7 +1036,7 @@ async def _ensure_conversation(
                     messages.insert(
                         0,
                         {
-                            "role": "assistant",
+                            "role": "system",
                             "content": "ملخص موجز لما سبق في نفس المحادثة:\n" + digest,
                             "created_at": "",
                         },
@@ -1435,12 +1442,14 @@ async def _stream_chat_langgraph(
 
         if final_content.strip():
             try:
-                await _persist_assistant_message(
-                    chat_scope=chat_scope,
-                    conversation_id=conversation_id,
-                    content=final_content,
-                    mission_id=None,
-                )
+                async with async_session_factory() as db_session:
+                    await _persist_assistant_message(
+                        session=db_session,
+                        chat_scope=chat_scope,
+                        conversation_id=conversation_id,
+                        content=final_content,
+                        mission_id=None,
+                    )
                 await websocket.send_json(
                     {"type": "assistant_delta", "payload": {"content": "\n\n✅ [DB SAVED]"}}
                 )
@@ -1789,17 +1798,10 @@ async def chat_messages_endpoint(
         if final_content:
             try:
                 async with async_session_factory() as db_session:
-                    conv_id, _ = await _ensure_conversation(
-                        session=db_session,
-                        chat_scope=chat_scope,
-                        user_id=user_id,
-                        question=objective,
-                        requested_conversation_id=conversation_id,
-                    )
                     await _persist_assistant_message(
                         session=db_session,
                         chat_scope=chat_scope,
-                        conversation_id=conv_id,
+                        conversation_id=conversation_id,
                         content=final_content,
                     )
             except Exception as e:
@@ -1889,7 +1891,7 @@ async def chat_ws_stategraph(websocket: WebSocket) -> None:
                     len(history_messages),
                 )
                 sticky_conversation_id = conversation_id
-                sticky_thread_id = resolved_thread_id or str(conversation_id)
+                sticky_thread_id = resolved_thread_id or f"u{user_id}:c{conversation_id}"
             except HTTPException as error:
                 await websocket.send_json(
                     {"type": "assistant_error", "payload": {"content": error.detail}}
@@ -2041,7 +2043,7 @@ async def admin_chat_ws_stategraph(websocket: WebSocket) -> None:
                     len(history_messages),
                 )
                 sticky_conversation_id = conversation_id
-                sticky_thread_id = resolved_thread_id or str(conversation_id)
+                sticky_thread_id = resolved_thread_id or f"u{user_id}:c{conversation_id}"
             except HTTPException as error:
                 await websocket.send_json(
                     {"type": "assistant_error", "payload": {"content": error.detail}}
