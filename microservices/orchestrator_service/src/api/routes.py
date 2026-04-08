@@ -24,7 +24,7 @@ from fastapi import (
     WebSocketDisconnect,
 )
 from fastapi.responses import StreamingResponse
-from langchain_core.messages import AIMessage, HumanMessage
+from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from pydantic import BaseModel, Field
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -141,23 +141,25 @@ def _build_older_history_digest(rows: list[object]) -> str:
 
 def _build_langchain_messages(
     source_messages: list[dict[str, str]] | None,
-) -> list[HumanMessage | AIMessage]:
+) -> list[HumanMessage | AIMessage | SystemMessage]:
     """يبني نافذة سياق محدودة ويزيل التكرارات المتجاورة لتقليل تلوث السياق."""
     if not source_messages:
         return []
 
-    normalized_messages: list[HumanMessage | AIMessage] = []
+    normalized_messages: list[HumanMessage | AIMessage | SystemMessage] = []
     last_signature: tuple[str, str] | None = None
     for message in source_messages[-MAX_HISTORY_MESSAGES:]:
         role = message.get("role")
         content = str(message.get("content", "")).strip()
-        if role not in {"user", "assistant"} or not content:
+        if role not in {"user", "assistant", "system"} or not content:
             continue
         signature = (role, content)
         if signature == last_signature:
             continue
         if role == "user":
             normalized_messages.append(HumanMessage(content=content))
+        elif role == "system":
+            normalized_messages.append(SystemMessage(content=content))
         else:
             normalized_messages.append(AIMessage(content=content))
         last_signature = signature
@@ -170,21 +172,20 @@ def _build_graph_messages(
     history_messages: list[dict[str, str]] | None,
     checkpointer_available: bool,
     checkpoint_has_state: bool,
-) -> list[HumanMessage | AIMessage]:
+) -> list[HumanMessage | AIMessage | SystemMessage]:
     """يبني رسائل الإدخال للرسم البياني مع مسار احتياطي صريح ضد عمى السياق."""
     latest_user_message = HumanMessage(content=objective)
+
+    if checkpointer_available and checkpoint_has_state:
+        # Prevent exponential message duplication by relying purely on checkpointer state.
+        logger.info("Using checkpoint state only")
+        return [latest_user_message]
 
     if history_messages:
         seeded_history = _build_langchain_messages(history_messages)
         seeded_history.append(latest_user_message)
         logger.info(f"Using injected history: {len(seeded_history)} messages")
         return seeded_history
-
-    if checkpointer_available and checkpoint_has_state:
-        # Prevent context amnesia and exponential message duplication in LangGraph
-        # by relying purely on the checkpointer to manage history. Do not inject manually.
-        logger.info("Using checkpoint state only")
-        return [latest_user_message]
 
     # عند غياب checkpointer (أو تعطل تهيئته) وعدم وجود تاريخ مرسل، نمرّر الرسالة الحالية فقط.
     logger.warning("No context available - cold start")
@@ -310,8 +311,7 @@ def _extract_recent_entity_anchor(history_messages: list[dict[str, str]] | None)
         if not candidate_tokens:
             continue
 
-        tail = candidate_tokens[-3:]
-        return " ".join(tail)
+        return candidate_tokens[-1]
     return None
 
 
@@ -421,13 +421,7 @@ def _is_ambiguous_followup(query: str) -> bool:
         "عددهم",
         "عددها",
     }
-    if len(tokens) <= 6 and any(token in pronoun_like_terms for token in tokens):
-        return True
-
-    return (
-        any(len(token) > 2 and token.endswith(("ها", "هم")) for token in tokens)
-        and len(tokens) <= 8
-    )
+    return len(tokens) <= 6 and any(token in pronoun_like_terms for token in tokens)
 
 
 def _canonicalize_mission_event(event: object) -> MissionEventEnvelope | None:
@@ -1037,6 +1031,13 @@ async def _ensure_conversation(
                         },
                     )
                 older_messages_rows = list(reversed(older_messages_res.fetchall()))
+
+            conv_metadata_to_import = {
+                "title": str(conv_row.title),
+                "created_at": conv_row.created_at.isoformat(),
+            }
+            messages_to_import = list(messages)
+
             if older_messages_rows:
                 digest = _build_older_history_digest(older_messages_rows)
                 if digest:
@@ -1055,11 +1056,6 @@ async def _ensure_conversation(
                 conversation_id,
                 len(messages),
             )
-            conv_metadata_to_import = {
-                "title": str(conv_row.title),
-                "created_at": conv_row.created_at.isoformat(),
-            }
-            messages_to_import = list(messages)
         except Exception as e:
             logger.error(
                 "[ENSURE_CONV] failed preparing history for import for conversation=%s user=%s; preserving same conversation_id. error=%s",
@@ -1170,7 +1166,8 @@ async def _stream_chat_langgraph(
 ) -> None:
     """يشغّل LangGraph الموحد لمسارات البحث والإدارة ويبث الأحداث."""
     queue: asyncio.Queue[dict[str, object]] = asyncio.Queue(maxsize=256)
-    prepared_objective = _augment_ambiguous_objective(objective, history_messages)
+    safe_history = list(history_messages) if history_messages else []
+    prepared_objective = _augment_ambiguous_objective(objective, safe_history)
 
     async def _runner():
         async def _safe_put(evt: dict[str, object]) -> None:
@@ -1184,7 +1181,7 @@ async def _stream_chat_langgraph(
             if not _graph:
                 _graph = create_unified_graph()
             thread_id = _resolve_thread_id(context, conversation_id)
-            incoming_messages = history_messages or []
+            incoming_messages = safe_history
             await _append_telemetry_line(
                 f"[TELEMETRY] INGRESS | "
                 f"conversation_id={conversation_id!r} | "
@@ -2184,11 +2181,16 @@ async def chat_with_agent_endpoint(
 
                 langchain_msgs: list[HumanMessage | AIMessage] = []
 
+                # Augment the objective for explicit context before sending to LangGraph
+                prepared_objective = _augment_ambiguous_objective(
+                    request.question, request.history_messages
+                )
+
                 # Checkpointer natively handles history now, append only the current human query
-                langchain_msgs.append(HumanMessage(content=request.question))
+                langchain_msgs.append(HumanMessage(content=prepared_objective))
 
                 admin_inputs = _merge_admin_inputs(
-                    {"query": request.question, "messages": langchain_msgs}, admin_payload
+                    {"query": prepared_objective, "messages": langchain_msgs}, admin_payload
                 )
 
                 conversation_id = (
@@ -2301,7 +2303,10 @@ async def chat_with_agent_endpoint(
 
     async def _stream_generator():
         try:
-            run_result = agent.run(request.question, context=context)
+            prepared_objective = _augment_ambiguous_objective(
+                request.question, request.history_messages
+            )
+            run_result = agent.run(prepared_objective, context=context)
             ai_chunks = []
             final_chunk = None
             async for chunk in run_result:
