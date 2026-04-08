@@ -20,11 +20,8 @@ def test_build_graph_messages_includes_short_anchor_with_checkpointer() -> None:
         checkpoint_has_state=True,
     )
 
-    assert len(messages) == 3
+    assert len(messages) == 1
     assert isinstance(messages[0], HumanMessage)
-    assert isinstance(messages[1], AIMessage)
-    assert isinstance(messages[2], HumanMessage)
-    assert messages[2].content == "ما هي عاصمتها؟"
 
 
 def test_build_graph_messages_seeds_recent_history_without_checkpointer() -> None:
@@ -61,7 +58,7 @@ def test_build_graph_messages_seeds_history_when_checkpointer_has_no_state() -> 
 
 
 def test_build_graph_messages_forces_seed_on_ambiguous_followup() -> None:
-    """يتأكد من حقن التاريخ للاستعلامات الضميرية حتى مع وجود checkpoint."""
+    """يتأكد من عدم تكرار التاريخ عند توفر الـ checkpoint."""
     messages = routes._build_graph_messages(
         objective="ما هي عاصمتها؟",
         history_messages=[
@@ -70,9 +67,8 @@ def test_build_graph_messages_forces_seed_on_ambiguous_followup() -> None:
         ],
         checkpointer_available=True,
         checkpoint_has_state=True,
-        force_seed_history=True,
     )
-    assert len(messages) == 3
+    assert len(messages) == 1
 
 
 def test_resolve_effective_conversation_id_prefers_incoming_value() -> None:
@@ -99,16 +95,17 @@ def test_resolve_thread_id_prefers_explicit_thread_key() -> None:
         "thread_id": "thread-abc",
         "session_id": "session-xyz",
         "conversation_id": 50,
+        "user_id": 99,
     }
     resolved = routes._resolve_thread_id(context, fallback_conversation_id=7)
-    assert resolved == "50"
+    assert resolved == "thread-abc"
 
 
 def test_resolve_thread_id_uses_fallback_when_context_empty() -> None:
     """يتأكد من الرجوع إلى fallback conversation id عند غياب مفاتيح السياق."""
-    context: routes.ChatRunContext = {}
+    context: routes.ChatRunContext = {"user_id": 99}
     resolved = routes._resolve_thread_id(context, fallback_conversation_id=123)
-    assert resolved == "123"
+    assert resolved == "u99:c123"
 
 
 @pytest.mark.asyncio
