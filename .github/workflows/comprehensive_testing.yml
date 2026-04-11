@@ -86,7 +86,15 @@ jobs:
             command+=(-m "${{ matrix.suite.marker }}")
           fi
 
-          read -r -a extra_args <<< "${{ matrix.suite.extra_args }}"
+          suite_extra_args="${{ matrix.suite.extra_args }}"
+          if [ "${{ matrix.suite.name }}" = "unit" ] && ! python -m pytest --help | grep -q -- "--cov"; then
+            echo "::warning::pytest-cov plugin is unavailable; removing coverage flags from unit suite."
+            suite_extra_args="${suite_extra_args/--cov=app /}"
+            suite_extra_args="${suite_extra_args/--cov-report=xml:coverage.xml /}"
+            suite_extra_args="${suite_extra_args/--cov-report=term-missing /}"
+          fi
+
+          read -r -a extra_args <<< "${suite_extra_args}"
           command+=("${extra_args[@]}")
 
           "${command[@]}"

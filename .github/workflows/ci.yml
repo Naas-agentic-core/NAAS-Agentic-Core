@@ -150,7 +150,17 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          python -m pytest -v --cov=app --cov-report=xml:coverage.xml --cov-report=term-missing --durations=10 --tb=short
+          if python -m pytest --help | grep -q -- "--cov"; then
+            python -m pytest -v \
+              --cov=app \
+              --cov-report=xml:coverage.xml \
+              --cov-report=term-missing \
+              --durations=10 \
+              --tb=short
+          else
+            echo "::warning::pytest-cov plugin is unavailable; running test suite without coverage."
+            python -m pytest -v --durations=10 --tb=short
+          fi
       - name: Upload coverage artifact
         if: always()
         uses: actions/upload-artifact@v4

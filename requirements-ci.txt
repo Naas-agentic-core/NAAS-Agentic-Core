@@ -45,6 +45,7 @@ llama-index-vector-stores-supabase
 openai
 sentence-transformers
 dspy
+json-repair
 opentelemetry-api
 opentelemetry-sdk
 
