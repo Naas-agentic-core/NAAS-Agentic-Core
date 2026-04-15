@@ -1,7 +1,33 @@
 import logging
 import time
 
-from opentelemetry import trace
+try:
+    from opentelemetry import trace
+except ModuleNotFoundError:
+
+    class _NoOpSpanContext:
+        trace_id = 0
+
+    class _NoOpSpan:
+        def get_span_context(self) -> _NoOpSpanContext:
+            return _NoOpSpanContext()
+
+        def is_recording(self) -> bool:
+            return False
+
+        def add_event(self, *_: object, **__: object) -> None:
+            return None
+
+    class _NoOpTrace:
+        @staticmethod
+        def get_tracer(_: str) -> object:
+            return object()
+
+        @staticmethod
+        def get_current_span() -> _NoOpSpan:
+            return _NoOpSpan()
+
+    trace = _NoOpTrace()  # type: ignore[assignment]
 
 logger = logging.getLogger("graph-telemetry")
 tracer = trace.get_tracer(__name__)
