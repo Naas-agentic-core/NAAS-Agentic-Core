@@ -10,7 +10,7 @@ python-multipart>=0.0.9
 httpx>=0.27.0,<0.28.0
 pyjwt>=2.8.0
 passlib[bcrypt]>=1.7.4
-dspy==2.5.7
+dspy==3.0.4b1
 openai>=1.12.0
 langgraph
 llama-index-core==0.14.13
