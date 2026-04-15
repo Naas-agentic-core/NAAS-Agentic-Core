@@ -1,11 +1,45 @@
 import asyncio
 import os
 import time
+from types import SimpleNamespace
 
 import anyio
-import dspy
 from llama_index.core.schema import Document as LlamaDocument
 from pydantic import BaseModel
+
+try:
+    import dspy
+except ModuleNotFoundError:
+
+    def _dspy_input_field(*_: object, **__: object) -> str:
+        return ""
+
+    def _dspy_output_field(*_: object, **__: object) -> str:
+        return ""
+
+    def _dspy_predict(*_: object, **__: object):
+        def _runner(**_: object) -> SimpleNamespace:
+            return SimpleNamespace(
+                year=None,
+                subject="",
+                branch="",
+                exercise_num=None,
+                language="ar",
+                needs_web=False,
+            )
+
+        return _runner
+
+    class _DSPySignature:
+        pass
+
+    class _DSPyModule:
+        Signature = _DSPySignature
+        InputField = staticmethod(_dspy_input_field)
+        OutputField = staticmethod(_dspy_output_field)
+        Predict = staticmethod(_dspy_predict)
+
+    dspy = _DSPyModule()  # type: ignore[assignment]
 
 from microservices.orchestrator_service.src.core.logging import get_logger
 

@@ -2,8 +2,8 @@ import logging
 import os
 import ssl
 from collections.abc import AsyncGenerator
+from typing import Any
 
-from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 from psycopg_pool import AsyncConnectionPool
 from sqlalchemy.engine.url import make_url
 from sqlalchemy.ext.asyncio import (
@@ -17,6 +17,11 @@ from microservices.orchestrator_service.src.core.config import settings
 from microservices.orchestrator_service.src.models.mission import OrchestratorSQLModel
 
 logger = logging.getLogger(__name__)
+
+try:
+    from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
+except ModuleNotFoundError:
+    AsyncPostgresSaver = None  # type: ignore[assignment,misc]
 
 
 def create_engine() -> AsyncEngine:
@@ -67,10 +72,10 @@ async_session_factory = async_sessionmaker(
 )
 
 _postgres_pool: AsyncConnectionPool | None = None
-postgres_checkpointer: AsyncPostgresSaver | None = None
+postgres_checkpointer: Any | None = None
 
 
-def get_checkpointer() -> AsyncPostgresSaver | None:
+def get_checkpointer() -> Any | None:
     return postgres_checkpointer
 
 
@@ -98,21 +103,29 @@ async def init_db() -> None:
         # Initialize LangGraph Postgres checkpointer pool
         # Need to re-create a proper psycopg string from settings.DATABASE_URL
         # We will use psycopg's kwargs mapping or simple asyncpg string since it is similar
-        pool_kwargs = {
-            "conninfo": settings.DATABASE_URL.replace("postgresql+asyncpg", "postgresql")
-        }
-        _postgres_pool = AsyncConnectionPool(**pool_kwargs)
-        await _postgres_pool.open()
+        if AsyncPostgresSaver is None:
+            logger.warning(
+                "LangGraph postgres checkpointer is unavailable; skipping checkpointer setup."
+            )
+        else:
+            pool_kwargs = {
+                "conninfo": settings.DATABASE_URL.replace(
+                    "postgresql+asyncpg",
+                    "postgresql",
+                )
+            }
+            _postgres_pool = AsyncConnectionPool(**pool_kwargs)
+            await _postgres_pool.open()
 
-        async with _postgres_pool.connection() as conn:
-            await conn.execute("SELECT 1")
+            async with _postgres_pool.connection() as conn:
+                await conn.execute("SELECT 1")
 
-        postgres_checkpointer = AsyncPostgresSaver(_postgres_pool)
-        await postgres_checkpointer.setup()
+            postgres_checkpointer = AsyncPostgresSaver(_postgres_pool)
+            await postgres_checkpointer.setup()
 
-        test_config = {"configurable": {"thread_id": "test_init"}}
-        checkpoint = await postgres_checkpointer.aget(test_config)
-        logger.info(f"Checkpointer OK: {checkpoint is not None}")
+            test_config = {"configurable": {"thread_id": "test_init"}}
+            checkpoint = await postgres_checkpointer.aget(test_config)
+            logger.info(f"Checkpointer OK: {checkpoint is not None}")
 
         logger.info("Database initialized successfully.")
     except Exception as e:
