@@ -6,6 +6,8 @@
 
 ---
 
+> **مرفق إثبات آلي:** راجع التقرير المولد تلقائيًا: `docs/architecture/CONTEXT_BLINDNESS_DEEP_TRACE_REPORT_AR.md` للحصول على سجل أدلة بسطور وملفات محددة.
+
 ## 1) ملخص تنفيذي حاسم (Executive Verdict)
 
 ### الحكم النهائي
