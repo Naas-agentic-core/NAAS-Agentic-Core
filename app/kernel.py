@@ -18,8 +18,9 @@
 """
 
 import logging
+import weakref
 from collections.abc import AsyncGenerator
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, suppress
 from typing import Final
 
 from fastapi import FastAPI
@@ -36,7 +37,6 @@ from app.core.app_blueprint import (
     StaticFilesSpec,
     build_kernel_config,
     build_kernel_spec,
-    is_dev_environment,
 )
 from app.core.asyncapi_contracts import (
     default_asyncapi_contract_path,
@@ -66,6 +66,7 @@ def _apply_middleware(app: FastAPI, stack: list[MiddlewareSpec]) -> FastAPI:
     """
     Combinator: تطبيق قائمة الميدل وير على التطبيق.
     """
+    # Starlette يطبق الميدل وير بنمط LIFO، لذا نعكس القائمة للحفاظ على ترتيب الإعلان FIFO.
     for mw_cls, mw_options in reversed(stack):
         app.add_middleware(mw_cls, **mw_options)
     return app
@@ -80,7 +81,7 @@ def _mount_routers(app: FastAPI, registry: list[RouterSpec]) -> FastAPI:
     return app
 
 
-def _configure_static_files(app: FastAPI, spec: StaticFilesSpec) -> None:
+def _configure_static_files(app: FastAPI, spec: StaticFilesSpec) -> FastAPI:
     """يضبط خدمة الملفات الثابتة بشكل صريح مع احترام وضع API-only."""
 
     if spec.enabled:
@@ -91,6 +92,7 @@ def _configure_static_files(app: FastAPI, spec: StaticFilesSpec) -> None:
         setup_static_files_middleware(app, static_config)
     else:
         logger.info("🚀 Running in API-only mode (no static files)")
+    return app
 
 
 # ==============================================================================
@@ -110,14 +112,14 @@ class RealityKernel:
         self,
         *,
         settings: AppSettings | dict[str, object],
-        enable_static_files: bool = True,
+        enable_static_files: bool = False,
     ) -> None:
         """
         تهيئة النواة.
 
         Args:
             settings (AppSettings | dict[str, object]): الإعدادات.
-            enable_static_files (bool): تفعيل خدمة الملفات الثابتة (افتراضي: True).
+            enable_static_files (bool): تفعيل خدمة الملفات الثابتة (افتراضي: False).
                                        يمكن تعطيله لوضع API-only.
         """
         validate_system_principles()
@@ -126,8 +128,8 @@ class RealityKernel:
             settings,
             enable_static_files=enable_static_files,
         )
-        self.settings_obj = self.kernel_config.settings_obj
-        self.settings_dict = self.kernel_config.settings_dict
+        self.settings_obj: AppSettings = self.kernel_config.settings_obj
+        self.settings_dict: dict[str, object] = self.kernel_config.settings_dict
 
         # بناء التطبيق فور الإنشاء
         self.app: Final[FastAPI] = self._construct_app()
@@ -158,12 +160,11 @@ class RealityKernel:
         app = _apply_middleware(app, kernel_spec.middleware_stack)
         add_error_handlers(app)  # Legacy helper
         app = _mount_routers(app, kernel_spec.router_registry)
-        _validate_contract_alignment(app)
-
         # 4. Static Files (Optional - Frontend Support)
         # Principle: API-First - يمكن تشغيل API بدون frontend
         # يتم الإعداد أخيراً لضمان عدم تداخل المسارات مع API
-        _configure_static_files(app, kernel_spec.static_files_spec)
+        app = _configure_static_files(app, kernel_spec.static_files_spec)
+        _validate_contract_alignment(app)
 
         return app
 
@@ -172,19 +173,28 @@ class RealityKernel:
         إنشاء مثيل FastAPI الخام مع مدير دورة الحياة.
         """
 
+        kernel_ref: weakref.ReferenceType[RealityKernel] = weakref.ref(self)
+
         @asynccontextmanager
-        async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
+        async def lifespan(fastapi_app: FastAPI) -> AsyncGenerator[None, None]:
             """Lifecycle Manager Closure."""
-            apply_app_state(app, build_app_state())
-
-            async for _ in self._handle_lifespan_events():
+            kernel = kernel_ref()
+            if kernel is None:
+                raise RuntimeError("RealityKernel reference is unavailable during lifespan.")
+            lifecycle_events = kernel._handle_lifespan_events()
+            await anext(lifecycle_events)
+            apply_app_state(fastapi_app, build_app_state())
+            try:
                 yield
+            finally:
+                with suppress(StopAsyncIteration):
+                    await anext(lifecycle_events)
 
-        is_dev = is_dev_environment(self.settings_dict)
+        is_dev = self.settings_obj.ENVIRONMENT == "development"
 
         return FastAPI(
-            title=self.settings_dict.get("PROJECT_NAME", "CogniForge"),
-            version=self.settings_dict.get("VERSION", "v4.2-Strict-Core"),
+            title=self.settings_obj.PROJECT_NAME,
+            version=self.settings_obj.VERSION,
             docs_url="/docs" if is_dev else None,
             redoc_url="/redoc" if is_dev else None,
             lifespan=lifespan,
@@ -195,51 +205,53 @@ class RealityKernel:
         معالجة أحداث النظام الحيوية.
         """
         logger.info("🚀 CogniForge System Initializing... (Strict Mode Active)")
+        observability = get_unified_observability()
+        redis_bridge = get_redis_bridge()
 
         try:
             await validate_schema_on_startup()
             logger.info("✅ Database Schema Validated")
-        except Exception as e:
-            logger.warning(f"⚠️ Schema validation warning: {e}")
+        except Exception:
+            logger.warning("⚠️ Schema validation warning", exc_info=True)
 
         try:
             async with async_session_factory() as session:
                 await bootstrap_admin_account(session, settings=self.settings_obj)
                 logger.info("✅ Admin account bootstrapped and validated")
-        except Exception as exc:
-            logger.error(f"❌ Failed to bootstrap admin account: {exc}")
+        except Exception:
+            logger.exception("❌ Failed to bootstrap admin account")
 
         # Start Observability Sync (Metric Stream to Microservice)
         try:
-            await get_unified_observability().start_background_sync()
+            await observability.start_background_sync()
             logger.info("✅ Unified Observability Sync Started")
-        except Exception as e:
-            logger.warning(f"⚠️ Failed to start observability sync: {e}")
+        except Exception:
+            logger.warning("⚠️ Failed to start observability sync", exc_info=True)
 
         # Start Redis Event Bridge (Streaming BFF)
-        redis_bridge = get_redis_bridge()
         try:
             await redis_bridge.start()
-        except Exception as e:
-            logger.warning(f"⚠️ Failed to start Redis Event Bridge: {e}")
+        except Exception:
+            logger.warning("⚠️ Failed to start Redis Event Bridge", exc_info=True)
 
         logger.info("✅ System Ready")
-        yield
-
-        # Shutdown Redis Event Bridge
         try:
-            await redis_bridge.stop()
-        except Exception as e:
-            logger.warning(f"⚠️ Failed to stop Redis Event Bridge: {e}")
+            yield
+        finally:
+            # Shutdown Redis Event Bridge
+            try:
+                await redis_bridge.stop()
+            except Exception:
+                logger.warning("⚠️ Failed to stop Redis Event Bridge", exc_info=True)
 
-        # Stop Observability Sync
-        try:
-            await get_unified_observability().stop_background_sync()
-            logger.info("✅ Unified Observability Sync Stopped")
-        except Exception as e:
-            logger.warning(f"⚠️ Failed to stop observability sync: {e}")
+            # Stop Observability Sync
+            try:
+                await observability.stop_background_sync()
+                logger.info("✅ Unified Observability Sync Stopped")
+            except Exception:
+                logger.warning("⚠️ Failed to stop observability sync", exc_info=True)
 
-        logger.info("👋 CogniForge System Shutting Down...")
+            logger.info("👋 CogniForge System Shutting Down...")
 
 
 def _validate_contract_alignment(app: FastAPI) -> None:
@@ -257,17 +269,20 @@ def _validate_contract_alignment(app: FastAPI) -> None:
         if report.is_clean():
             logger.info("✅ Contract alignment verified against runtime schema.")
         else:
+            violations: list[str] = []
             if report.missing_paths:
-                logger.warning(
-                    "⚠️ مسارات العقد غير موجودة في التشغيل: %s",
-                    sorted(report.missing_paths),
-                )
+                missing_paths = sorted(report.missing_paths)
+                violations.append(f"missing_paths={missing_paths}")
+                logger.error("❌ مسارات العقد غير موجودة في التشغيل: %s", missing_paths)
 
             if report.missing_operations:
                 summary = {
                     path: sorted(methods) for path, methods in report.missing_operations.items()
                 }
-                logger.warning("⚠️ عمليات العقد غير موجودة في التشغيل: %s", summary)
+                violations.append(f"missing_operations={summary}")
+                logger.error("❌ عمليات العقد غير موجودة في التشغيل: %s", summary)
+
+            logger.warning("⚠️ OpenAPI contract validation failed: %s", "; ".join(violations))
 
     asyncapi_report = validate_asyncapi_contract_structure(default_asyncapi_contract_path())
     if not asyncapi_report.is_clean():
