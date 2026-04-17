@@ -1,0 +1,162 @@
+{
+  "summary": {
+    "evidence_hits": 12,
+    "risk_score_0_100": 85,
+    "raw_weight_points": 102,
+    "severity": "حرج جدًا"
+  },
+  "distribution": {
+    "by_risk_group": {
+      "truncation": 3,
+      "identity": 1,
+      "transport": 4,
+      "fallback": 1,
+      "anchor": 2,
+      "drift": 1
+    },
+    "by_layer": {
+      "client": 2,
+      "transport": 4,
+      "server": 3,
+      "semantic": 2,
+      "governance": 1
+    }
+  },
+  "causal_chain": [
+    "client_truncation",
+    "identity_conditional_send",
+    "legacy_transport_instability",
+    "server_history_truncation",
+    "silent_cold_start_fallback",
+    "heuristic_anchor_recovery",
+    "path_drift_risk"
+  ],
+  "evidence": [
+    {
+      "code": "CB-CLI-01",
+      "file": "frontend/app/hooks/useAgentSocket.js",
+      "line": 146,
+      "layer": "client",
+      "risk_group": "truncation",
+      "weight": 8,
+      "description": "قص سياق العميل إلى آخر 30 رسالة.",
+      "snippet": "return normalized.slice(-30);"
+    },
+    {
+      "code": "CB-CLI-02",
+      "file": "frontend/app/hooks/useAgentSocket.js",
+      "line": 328,
+      "layer": "client",
+      "risk_group": "identity",
+      "weight": 10,
+      "description": "إرسال conversation_id مشروط بتوفره في الحالة اللحظية.",
+      "snippet": "if (conversationId !== null && conversationId !== undefined) {"
+    },
+    {
+      "code": "CB-CLI-03",
+      "file": "frontend/public/js/legacy-app.jsx",
+      "line": 446,
+      "layer": "transport",
+      "risk_group": "transport",
+      "weight": 9,
+      "description": "المسار legacy يعيد تدوير socket لكل إرسال.",
+      "snippet": "socketRef.current.close();"
+    },
+    {
+      "code": "CB-CLI-03",
+      "file": "frontend/public/js/legacy-app.jsx",
+      "line": 560,
+      "layer": "transport",
+      "risk_group": "transport",
+      "weight": 9,
+      "description": "المسار legacy يعيد تدوير socket لكل إرسال.",
+      "snippet": "socketRef.current.close();"
+    },
+    {
+      "code": "CB-CLI-03",
+      "file": "frontend/public/js/legacy-app.jsx",
+      "line": 780,
+      "layer": "transport",
+      "risk_group": "transport",
+      "weight": 9,
+      "description": "المسار legacy يعيد تدوير socket لكل إرسال.",
+      "snippet": "socketRef.current.close();"
+    },
+    {
+      "code": "CB-CLI-03",
+      "file": "frontend/public/js/legacy-app.jsx",
+      "line": 903,
+      "layer": "transport",
+      "risk_group": "transport",
+      "weight": 9,
+      "description": "المسار legacy يعيد تدوير socket لكل إرسال.",
+      "snippet": "socketRef.current.close();"
+    },
+    {
+      "code": "CB-SRV-05",
+      "file": "microservices/orchestrator_service/src/api/context_utils.py",
+      "line": 4,
+      "layer": "governance",
+      "risk_group": "drift",
+      "weight": 9,
+      "description": "تحذير صريح من خطر الانجراف بين المسارات.",
+      "snippet": "DO NOT modify without updating the monolith counterpart."
+    },
+    {
+      "code": "CB-SRV-04",
+      "file": "microservices/orchestrator_service/src/api/context_utils.py",
+      "line": 47,
+      "layer": "server",
+      "risk_group": "truncation",
+      "weight": 7,
+      "description": "الدمج النهائي للتاريخ يُقص إلى آخر 80 عنصرًا.",
+      "snippet": "return merged_history[-80:]"
+    },
+    {
+      "code": "CB-SRV-01",
+      "file": "microservices/orchestrator_service/src/api/routes.py",
+      "line": 68,
+      "layer": "server",
+      "risk_group": "truncation",
+      "weight": 8,
+      "description": "نافذة model-input للتاريخ محدودة بـ 24.",
+      "snippet": "MAX_HISTORY_MESSAGES = 24"
+    },
+    {
+      "code": "CB-SRV-02",
+      "file": "microservices/orchestrator_service/src/api/routes.py",
+      "line": 191,
+      "layer": "server",
+      "risk_group": "fallback",
+      "weight": 10,
+      "description": "fallback بارد صامت عند فقد السياق.",
+      "snippet": "logger.warning(\"No context available - cold start\")"
+    },
+    {
+      "code": "CB-SRV-03",
+      "file": "microservices/orchestrator_service/src/api/routes.py",
+      "line": 249,
+      "layer": "semantic",
+      "risk_group": "anchor",
+      "weight": 7,
+      "description": "استرجاع المرساة المرجعية عبر heuristic extraction.",
+      "snippet": "def _extract_recent_entity_anchor(history_messages: list[dict[str, str]] | None) -> str | None:"
+    },
+    {
+      "code": "CB-SRV-03",
+      "file": "microservices/orchestrator_service/src/api/routes.py",
+      "line": 331,
+      "layer": "semantic",
+      "risk_group": "anchor",
+      "weight": 7,
+      "description": "استرجاع المرساة المرجعية عبر heuristic extraction.",
+      "snippet": "anchor = _extract_recent_entity_anchor(history_messages)"
+    }
+  ],
+  "closure_controls": [
+    "enforce_context_continuity_contract",
+    "reject_ambiguous_without_anchor",
+    "disable_legacy_in_prod",
+    "emit_context_contract_violation_metrics"
+  ]
+}

@@ -7,6 +7,7 @@
 ---
 
 > **مرفق إثبات آلي:** راجع التقرير المولد تلقائيًا: `docs/architecture/CONTEXT_BLINDNESS_DEEP_TRACE_REPORT_AR.md` للحصول على سجل أدلة بسطور وملفات محددة.
+> **حزمة جنائية آلية (JSON):** `docs/architecture/CONTEXT_BLINDNESS_FORENSIC_PACK_AR.json` للاستهلاك الآلي في الحوكمة ولوحات المراقبة.
 
 ## 1) ملخص تنفيذي حاسم (Executive Verdict)
 
