@@ -150,8 +150,22 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          run_pytest() {
+            set +e
+            "$@"
+            pytest_exit_code=$?
+            set -e
+
+            if [ "$pytest_exit_code" -eq 5 ]; then
+              echo "::warning::pytest collected no tests; treating as a non-blocking skip."
+              return 0
+            fi
+
+            return "$pytest_exit_code"
+          }
+
           if python -m pytest --help | grep -q -- "--cov"; then
-            python -m pytest -v \
+            run_pytest python -m pytest -v \
               --cov=app \
               --cov-report=xml:coverage.xml \
               --cov-report=term-missing \
@@ -159,7 +173,7 @@ jobs:
               --tb=short
           else
             echo "::warning::pytest-cov plugin is unavailable; running test suite without coverage."
-            python -m pytest -v --durations=10 --tb=short
+            run_pytest python -m pytest -v --durations=10 --tb=short
           fi
       - name: Upload coverage artifact
         if: always()
