@@ -334,6 +334,24 @@ def _augment_ambiguous_objective(
     return f"{normalized}\n\nمرجع سياقي إلزامي: الكيان المقصود في هذا السؤال هو: {anchor}."
 
 
+def _context_gap_reason_for_followup(
+    objective: str,
+    history_messages: list[dict[str, str]] | None,
+) -> str | None:
+    """يكشف فجوة السياق للمتابعات الإحالية ويعيد سببًا صريحًا عند غياب المرساة."""
+    normalized = objective.strip()
+    if not normalized:
+        return "EMPTY_OBJECTIVE"
+    if not _is_ambiguous_followup(normalized):
+        return None
+    if _question_contains_explicit_entity(normalized):
+        return None
+    anchor = _extract_recent_entity_anchor(history_messages)
+    if anchor:
+        return None
+    return "MISSING_ENTITY_ANCHOR"
+
+
 async def _detect_checkpoint_state(thread_id: str) -> tuple[bool, bool]:
     """يفحص توفّر checkpointer ووجود حالة محفوظة للخيط الحالي بشكل آمن."""
     checkpointer = get_checkpointer()
@@ -1167,6 +1185,32 @@ async def _stream_chat_langgraph(
     """يشغّل LangGraph الموحد لمسارات البحث والإدارة ويبث الأحداث."""
     queue: asyncio.Queue[dict[str, object]] = asyncio.Queue(maxsize=256)
     safe_history = list(history_messages) if history_messages else []
+    context_gap_reason = _context_gap_reason_for_followup(objective, safe_history)
+    if context_gap_reason is not None:
+        await websocket.send_json(
+            {
+                "type": "context_missing",
+                "payload": {
+                    "code": context_gap_reason,
+                    "message": "تعذّر تحديد الكيان المرجعي من السياق الحالي.",
+                    "conversation_id": conversation_id,
+                },
+            }
+        )
+        await websocket.send_json(
+            {
+                "type": "assistant_error",
+                "payload": {
+                    "content": "يرجى ذكر الكيان المقصود صراحةً (مثال: ما عاصمة الجزائر؟)."
+                },
+            }
+        )
+        logger.warning(
+            "[CONTEXT_GUARD] blocked ambiguous follow-up without anchor. conv_id=%s reason=%s",
+            conversation_id,
+            context_gap_reason,
+        )
+        return
     prepared_objective = _augment_ambiguous_objective(objective, safe_history)
 
     async def _runner():
