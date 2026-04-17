@@ -1,373 +1,344 @@
-# التشخيص الجنائي العميق لظاهرة «عمى السياق»
-## CogniForge / Overmind — إصدار تشخيصي فائق الدقة (L4 Forensic)
+# التشخيص الفائق لــ «كارثة عمى السياق»
+## CogniForge / Overmind — تقرير جنائي هندسي مستوى Incident Commander (IC-L5)
 
-> هذا التقرير **تشخيص جذري هندسي** (Root-Cause Forensics) وليس توصيات سطحية.  
-> الهدف: تفكيك الانهيار السياقي كمشكلة نظام معقّد (Complex System Failure)، عبر طبقات: الواجهة، النقل اللحظي، هوية المحادثة، إدارة التاريخ، منطق الإحالة اللغوية، وحوكمة التشغيل.
-
----
-
-## 0) تعريف الكارثة بدقة (Problem Framing)
-
-الحالة المرصودة: المستخدم يسأل سؤالًا مرجعيًا قصيرًا مثل «ما هي عاصمتها؟» بعد سؤال سابق يحدد الكيان (مثل «أين تقع الجزائر؟»)، فيُعامل السؤال وكأنه مستقل ويُطلب توضيح جديد.
-
-هذه ليست "هفوة LLM" فقط. هذه **فجوة استمرارية سياق** ناتجة عن:
-
-1. هشاشة ربط الهوية (`conversation_id`, `thread_id`) عبر الزمن.
-2. تعدد قنوات سلوك عميل غير متطابقة (modern/legacy).
-3. انكماش سياق متعدد المراحل قبل وصوله للنموذج.
-4. fallback صامت يحول فشل السياق إلى إجابة طبيعية ظاهريًا.
-5. غياب مؤشرات تشغيل متخصصة لاكتشاف الانهيار قبل أن يراه المستخدم.
+> هذا المستند ليس مقالًا وصفيًا.  
+> هذا **ملف تحقيق هندسي** يصلح لإدارة حادثة إنتاجية في نظام موزع عالي التعقيد، ويحوّل المشكلة إلى أسباب قابلة للقياس، قابلة للاختبار، وقابلة للإغلاق (Closure Criteria).
 
 ---
 
-## 1) حدود التشخيص ومنهجه (Scope & Method)
+## 0) البيان التنفيذي الحاسم
 
-### 1.1 الطبقات التي شملها الفحص
+المشكلة ليست "النموذج لا يفهم".  
+المشكلة هي **انهيار عقدة الاستمرارية السياقية** عبر سلسلة موزعة:
 
-- **Client Composition Layer**: بناء الرسالة والسياق في `useAgentSocket`.
-- **Legacy Client Path**: مسار `legacy-app` وسلوك socket لكل رسالة.
-- **Transport Contract Layer**: WebSocket event envelope / request gating.
-- **Conversation Lifecycle Layer**: `_ensure_conversation` وتحميل التاريخ.
-- **Context Hydration Layer**: merge بين DB history و client context.
-- **Graph Input Layer**: بناء history الفعلي قبل دخول الرسم البياني.
-- **Linguistic Reference Layer**: استخراج anchor وإعادة كتابة الأسئلة الإحالية.
+`Client State -> WS Contract -> Conversation Identity -> Hydration -> Graph Window -> Reference Recovery`
 
-### 1.2 المنهج التحليلي
+أي خلل في هذه السلسلة ينتج مخرجات تبدو "منطقية لغويًا" لكنها "خاطئة سياقيًا".
 
-- **Failure-Mode Decomposition**: تحويل المشكلة إلى أنماط فشل (FM-01..FM-12).
-- **Causal Chain Mapping**: الربط السببي من كل طبقة إلى الأثر المرئي.
-- **Barrier Analysis**: ما الحاجز المفترض؟ ولماذا لم يمنع الفشل؟
-- **Control Gap Analysis**: ما الذي يجب قياسه ولم يُقَس؟
+### الحكم الجنائي النهائي
+
+**Root Cause Thesis:** لا يوجد **عقد سياق قابل للتحقق (Verifiable Context Contract)** مفروض end-to-end مع آليات فشل صريحة.  
+النتيجة: كل طبقة تشتغل "أفضل جهد"، فتتراكم الانحرافات حتى تنهار الإحالة المرجعية.
 
 ---
 
-## 2) نموذج النظام: أين يُفترض أن يعيش السياق؟
+## 1) تعريف الحادثة كما تُدار في أنظمة Mission-Critical
 
-السياق في هذا النظام ليس كيانًا واحدًا. بل أربع نسخ متزامنة:
+### 1.1 اسم الحادثة
+**AFM (Ambiguous Follow-up Misbinding Incident)**
 
-1. **Client Ephemeral Context**: رسائل موجودة في state الواجهة.
-2. **Persisted Context**: تاريخ محفوظ بقاعدة البيانات لكل conversation.
-3. **Hydrated Context**: ناتج دمج (DB + client_context_messages).
-4. **Model-Effective Context**: النافذة النهائية بعد القص/التطبيع قبل LLM.
+### 1.2 تعريف رسمي
+حادثة يحصل فيها Follow-up إحالي (ضميري/مرجعي) بينما النموذج يعمل على سياق لا يحتوي المرساة المرجعية الصحيحة.
 
-**نقطة العطب المركزية:** النظام لا يضمن invariants صارمة تضمن تطابق النسخ الأربع، وبالتالي قد يعمل النموذج على نسخة مختلفة عما يتوقعه المستخدم.
+### 1.3 أعراض الإنتاج
+1. طلب توضيح غير لازم بعد turn واضح سابقًا.
+2. إجابة صحيحة لكن لكيان خاطئ (semantic misbinding).
+3. تفاوت السلوك بين نفس المحادثة على أجهزة/قنوات مختلفة.
+4. إعادة سؤال أساسي وكأن session جديدة.
 
----
-
-## 3) التشخيص السببي العميق (Deep Causal Diagnosis)
-
-## FM-01 — فقد/عدم استقرار هوية المحادثة (Identity Drift)
-
-### الوصف
-استمرارية السياق تعتمد أولًا على استمرارية `conversation_id`. أي تعثر في حمل هذا المعرف عبر الطلبات يؤدي لسلسلة جديدة أو hydration ناقص.
-
-### كيف يحدث
-- client يرسل `conversation_id` بشرط وجوده في state.
-- عند سباق أحداث أو تبديل قناة أو إعادة اتصال غير متزامنة، قد تُرسل رسالة follow-up قبل تثبيت الهوية.
-
-### الأثر
-- history يُحمّل من محادثة خاطئة أو لا يُحمّل.
-- الأسئلة الإحالية تصبح غامضة رغم أنها طبيعية للمستخدم.
-
-### لماذا خطير
-هو فشل "هوية" وليس فشل "فهم لغوي"؛ أي يتكرر بأي نموذج ذكاء مهما كان قويًا.
+### 1.4 شدة الحادثة
+- **P1** إذا كان الخطأ يتكرر على أسئلة إحالية أساسية (>5% من follow-up traffic).
+- **P2** إذا كان متقطعًا لكن قابلًا لإعادة الإنتاج على mobile/reconnect.
+- **P3** إذا كان نادرًا ومحصورًا في legacy path.
 
 ---
 
-## FM-02 — تعدد مسارات العميل بخصائص متعارضة (Behavioral Split-Brain)
+## 2) نموذج الثقة (Trust Model) ومن أين يُفترض أن يأتي السياق
 
-### الوصف
-وجود مسارين عميل (حديث + legacy) مع سلوك socket مختلف جوهريًا.
+السياق ليس حقلًا واحدًا؛ هو 5 طبقات حالة:
 
-### النتيجة
-النظام يملك "شخصيتين" في الإنتاج:
-- شخصية تتعامل بجلسة مستمرة.
-- شخصية تفتح/تغلق socket لكل سؤال.
+1. **Client Visual State**: ما يراه المستخدم على الشاشة.
+2. **Client Sent Context**: ما يرسله العميل فعليًا (`client_context_messages`).
+3. **Server Persisted History**: ما هو محفوظ في DB.
+4. **Hydrated Runtime Context**: الدمج بعد الفلاتر والقص.
+5. **Model Effective Context**: ما دخل فعليًا للـ graph/LLM.
 
-### الأثر
-تباين reproducibility: الخطأ يظهر في بعض البيئات/الأجهزة أكثر من غيرها دون سبب ظاهر للفريق.
-
----
-
-## FM-03 — شلال القص السياقي (Truncation Cascade)
-
-### الوصف
-السياق يُقص مرارًا عبر طبقات مختلفة بحدود مستقلة:
-- client slice.
-- extraction cap.
-- merge cap.
-- graph history cap.
-- digest compression.
-
-### النتيجة
-المستخدم يرى "محادثة طويلة" بينما النموذج يرى "مقتطفًا مبتورًا".
-
-### الأثر
-فقدان الكيان المرجعي الأقدم ولو كان ما زال واضحًا بصريًا في واجهة المستخدم.
+### قاعدة ذهبية
+إذا لم نثبت تطابقًا مقبولًا بين (1) و(5)، فالنظام غير موثوق سياقيًا مهما كانت جودة النموذج.
 
 ---
 
-## FM-04 — fallback صامت (Silent Degradation)
+## 3) سجل الأدلة الجنائي (Evidence Ledger)
 
-### الوصف
-عند غياب checkpointer/history، المسار لا يفشل Failure-Explicit بل يتابع كـ cold start.
+> الهدف هنا: كل ادعاء له نقطة ملاحظة تقنية.
 
-### النتيجة
-- استجابة تبدو صحيحة نحويًا لكن خاطئة سياقيًا.
-- صعوبة اكتشاف الحادث تشغيليًا لأن الـ status غالبًا "نجاح".
+### E-01 — العميل يقص السياق قبل الإرسال
+- `buildClientContextMessages` يحصر آخر 30 رسالة.
+- هذا قرار فقد معلومات مبكر (upstream truncation).
 
-### الأثر
-تحويل "خطأ نظام" إلى "ارتباك مستخدم".
+### E-02 — سياق الهوية مرهون بالحالة اللحظية
+- `conversation_id` لا يُرسل إلا إذا كان متاحًا لحظة الإرسال.
+- عند race/reconnect قد يخرج follow-up بلا هوية مثبتة.
 
----
+### E-03 — مسار legacy بسلوك socket مغاير جذريًا
+- legacy يغلق socket الحالي ثم يفتح socket جديد لكل إرسال.
+- هذا يكسر فرضية session continuity تحت jitter.
 
-## FM-05 — منطق الإحالة heuristic غير محصّن بمستوى كافٍ
+### E-04 — الخادم يعيد بناء التاريخ بحدود قص داخلية
+- حدود قص متعددة (`MAX_HISTORY_MESSAGES` وغيرها).
+- الرسائل الأقدم تتحول إلى digest مضغوط.
 
-### الوصف
-هناك منطق جيد لتعزيز السؤال الإحالي، لكنه يعتمد على توفر history مناسب ويستخدم token heuristics.
+### E-05 — fallback بارد عند غياب checkpointer/history
+- المسار يكمل بالرسالة الحالية فقط (cold-start semantic).
+- لا يوجد protocol-level incident event إلزامي للمستخدم/العميل.
 
-### النتيجة
-في حالة history ناقص/مشوه، augment لا ينقذ السؤال.
+### E-06 — استرجاع الكيان المرجعي heuristic
+- يعتمد على token filters، حساس لتشوه history.
+- لا توجد "ذاكرة مرساة" صريحة مستقلة عن history الخام.
 
-### الأثر
-الضحية هي exactly النوع الأكثر حساسية: short follow-up pronoun queries.
-
----
-
-## FM-06 — ازدواج منطق hydration بين مسارات متوازية (Drift-Prone Duplication)
-
-### الوصف
-وجود شيفرة hydration منسوخة بين orchestrator وcompatibility façade.
-
-### النتيجة
-أي تعديل جزئي في مسار دون الآخر يخلق semantic drift صامت.
-
-### الأثر
-سلوك غير متطابق بين endpoints تبدو متشابهة للمستخدم.
+### E-07 — خطر انجراف المسارات
+- وجود hydration logic في أكثر من مسار (facade/orchestrator) يزيد drift risk.
 
 ---
 
-## FM-07 — الحماية ضد الـrace غير مكتملة عند "الأسئلة السريعة"
+## 4) تحليل أنماط الفشل (FMEA الممتد)
 
-### الوصف
-العميل يملك gating للأحداث، لكنه لا يفرض precondition صارم يمنع follow-up قبل إقرار conversation identity بشكل نهائي.
+## FM-01 — Conversation Identity Drift
+- **Trigger:** follow-up مرسل قبل تثبيت/استعادة conversation identity.
+- **Failure Mechanism:** `_ensure_conversation` قد يبدأ سلسلة/تحميل تاريخ غير مطابق.
+- **Detection Today:** ضعيف.
+- **Containment Needed:** hard precondition + protocol error.
 
-### الأثر
-نافذة سباق صغيرة لكن مؤذية جدًا، خاصة مع الشبكات المتقطعة/الموبايل.
+## FM-02 — Transport Race Under Reconnect
+- **Trigger:** reconnect/jitter/message burst.
+- **Mechanism:** out-of-order perception بين `conversation_init` وturn التالي.
+- **Effect:** misbinding للسياق.
 
----
+## FM-03 — Behavioral Split (Modern vs Legacy)
+- **Trigger:** اختلاف channel/runtime.
+- **Mechanism:** socket lifecycle متعارض.
+- **Effect:** non-deterministic reproducibility.
 
-## FM-08 — عدم وجود "عقدة مرساة سياقية" مستقلة (Anchor Memory Primitive)
+## FM-04 — Multi-Stage Truncation Collapse
+- **Trigger:** محادثات أطول من النافذة.
+- **Mechanism:** قص متسلسل + ضغط digest.
+- **Effect:** anchor dropout.
 
-### الوصف
-الكيان المرجعي الأحدث لا يُخزن ككيان تشغيلي مستقل resilient، بل يُستنتج من history الخام.
+## FM-05 — Silent Cold-Start Degradation
+- **Trigger:** checkpointer unavailable + history absent.
+- **Mechanism:** graceful continuation بلا hard fail.
+- **Effect:** false-success ops signal.
 
-### الأثر
-حين يُقص history أو يتشوه، يضيع anchor بالكامل بدل أن يبقى كـ state بسيط (آخر كيان موضوعي مؤكد).
+## FM-06 — Anchor Recovery Fragility
+- **Trigger:** pronoun-heavy follow-up.
+- **Mechanism:** heuristic extraction دون canonical anchor state.
+- **Effect:** clarify loop أو mis-answer.
 
----
+## FM-07 — Hydration Drift Across Paths
+- **Trigger:** تعديل جزئي في أحد المسارات.
+- **Mechanism:** duplicated logic divergence.
+- **Effect:** endpoint inconsistency.
 
-## FM-09 — عدم وجود SLOs متخصصة للسياق
+## FM-08 — Missing Context SLOs
+- **Trigger:** لا مقاييس متخصصة.
+- **Mechanism:** حادثة تُكتشف من الشكاوى لا telemetry.
+- **Effect:** slow MTTR + recurrence.
 
-### الوصف
-لا توجد مؤشرات تشغيلية تقيس "سلامة السياق" مباشرة.
+## FM-09 — No Incident Taxonomy for Context
+- **Mechanism:** لا مستويات incident context.
+- **Effect:** ad-hoc mitigation.
 
-### أمثلة مؤشرات مفقودة
-- FollowupWithoutAnchorRate
-- ColdStartOnActiveConversationRate
-- ConversationIdMissingOnFollowupRate
-- ContextWindowDropRatio
-- AmbiguousQuestionRecoveredRate
+## FM-10 — UX/Model Reality Mismatch
+- **Mechanism:** المستخدم يرى history كامل، النموذج لا.
+- **Effect:** perceived catastrophic trust breach.
 
-### الأثر
-فريق التشغيل يرى الألم من التذاكر، لا من اللوحات المبكرة.
+## FM-11 — Incomplete Chaos Validation
+- **Mechanism:** اختبارات لا تغطي reconnect/rapid follow-up بصورة منهجية.
+- **Effect:** production-first discovery.
 
----
-
-## FM-10 — غياب تصنيف رسمي للحالات السياقية الحرجة (Context Severity Taxonomy)
-
-### الوصف
-لا توجد مستويات Severity قياسية لحوادث السياق (P1/P2/P3) مرتبطة بخطوات احتواء تلقائي.
-
-### الأثر
-الاستجابة للحوادث تصبح ad-hoc وتختلف باختلاف الشخص المناوب.
-
----
-
-## FM-11 — لا يوجد اختبار Chaos مركّز على إعادة الاتصال والسياق
-
-### الوصف
-اختبارات happy-path موجودة، لكن لا يوجد سيناريو منهجي يحاكي:
-- reconnect أثناء stream،
-- رسالة follow-up فورية بعد init،
-- message burst مع jitter.
-
-### الأثر
-المشكلات تظهر في الإنتاج أولًا.
-
----
-
-## FM-12 — تضارب الإدراك بين UX وModel Reality
-
-### الوصف
-المستخدم يرى سجلًا طويلًا في الواجهة، فيفترض أن النموذج يراه كاملًا.
-
-### الأثر
-حين يطلب النموذج توضيحًا، يتولد شعور "انهيار كارثي" لأن توقع المستخدم منطقي من منظور الواجهة.
+## FM-12 — Contractual Ambiguity of Follow-up
+- **Mechanism:** follow-up لا يحمل proof أنه continuation مع checksum.
+- **Effect:** cannot prove continuity at protocol level.
 
 ---
 
-## 4) السبب الجذري الأعلى (Root Cause of Root Causes)
-
-**السبب الأعلى ليس "فقد رسالة"؛ بل غياب "عقد سياق موحد وقابل للتحقق" (Verifiable Context Contract).**
-
-أي أن النظام يفتقد invariant تشغيلي على شكل:
-
-- نفس `conversation_id` مثبت.
-- نفس `thread_id` مثبت.
-- وجود anchor صالح عند follow-up الإحالي.
-- سبب صريح إذا لم يتحقق أي شرط (بدل استمرار صامت).
-
-بدون هذا العقد، كل طبقة تجتهد محليًا، وتنتج فجوات تراكمية.
-
----
-
-## 5) تحليل شجرة الإخفاق (Failure Tree)
+## 5) شجرة العطب السببية (Fault Tree)
 
 ### Top Event
-**Ambiguous Follow-up Mis-handled (AFM)**
+**AFM = Follow-up understood without required anchor**
 
-### Branch A: Identity Path
-A1. conversation_id missing/invalid  
-A2. sticky conversation not applied  
-A3. reconnect race resets local assumptions
+### Minimal Cut Sets (أمثلة)
+- {Identity drift, no hard fail}
+- {History truncated, no anchor memory}
+- {Reconnect race, out-of-order state}
+- {Cold-start fallback, ambiguous query}
 
-### Branch B: Hydration Path
-B1. DB history short due limits  
-B2. client context absent or sliced  
-B3. merge outputs context where anchor dropped
-
-### Branch C: Graph Input Path
-C1. effective window too short  
-C2. checkpointer unavailable  
-C3. fallback to cold-start message-only
-
-### Branch D: Linguistic Recovery Path
-D1. ambiguous followup detected  
-D2. anchor extraction fails  
-D3. no explicit recovery protocol emitted
-
-إذا تحقق أي مسار من A/B/C + D2/D3 ⇒ **AFM**.
+### النتيجة
+إذا لم نغلق minimal cut sets عبر controls صريحة، الحادثة ستبقى recurring by design.
 
 ---
 
-## 6) مصفوفة المخاطر (Risk Matrix)
+## 6) التحليل التفاضلي (Differential Diagnosis)
 
-| الخطر | الاحتمال | الأثر | مستوى الخطر |
-|------|----------|------|-------------|
-| فقد conversation identity | متوسط-عالٍ | عالٍ | حرج |
-| تعدد client paths | عالٍ | متوسط-عالٍ | عالٍ جدًا |
-| truncation cascade | عالٍ | عالٍ | حرج |
-| silent fallback | متوسط | عالٍ | عالٍ |
-| heuristic anchor limits | متوسط | متوسط | متوسط-عالٍ |
-| hydration drift بين المسارات | متوسط | عالٍ | عالٍ |
-| غياب SLO سياقي | عالٍ | عالٍ | حرج |
+### فرضية H1: المشكلة من LLM فقط
+**مرفوضة جزئيًا** — لأن نفس النموذج قد يعمل جيدًا حين يصل anchor صحيح.
 
----
+### فرضية H2: المشكلة DB فقط
+**مرفوضة جزئيًا** — لأن الفقد يحدث قبل DB أيضًا (client truncation / transport race).
 
-## 7) خطة احتواء فوري (Containment — 72 ساعة)
+### فرضية H3: المشكلة UI فقط
+**مرفوضة جزئيًا** — لأن fallback server-side يمرر cold-start دون incident signal.
 
-## C1 — منع الانهيار الصامت
-- عند سؤال إحالي + لا anchor: أرسل `context_missing` event صريح.
-- امنع تمرير السؤال للنموذج مباشرة قبل محاولة استرجاع مرساة.
-
-## C2 — تشديد عقد الهوية
-- follow-up بدون conversation_id بعد init = protocol error واضح.
-- فرض إعادة مزامنة identity بدل إنشاء محادثة جديدة تلقائيًا.
-
-## C3 — قفل مسار legacy في الإنتاج
-- feature flag إجباري لتعطيل legacy path تدريجيًا.
-
-## C4 — مقاييس طوارئ
-- dashboards عاجلة: MissingConversationId, ColdStartFollowup, AnchorRecoveryFailed.
+### الاستنتاج
+السبب **Systemic Cross-Layer Coupling Failure** وليس سببًا أحاديًا.
 
 ---
 
-## 8) إعادة تصميم متوسطة المدى (Stabilization — 2 إلى 4 أسابيع)
+## 7) تحليل 5-Why الحقيقي
 
-## S1 — Context Contract v2
-إضافة حقول إلزامية لكل رسالة follow-up:
+1. لماذا فشل follow-up؟  
+   لأن anchor لم يكن فعالًا في model input.
+2. لماذا anchor غير فعال؟  
+   لأن history الفعال كان ناقصًا/مبتورًا/غير متزامن.
+3. لماذا history ناقص؟  
+   بسبب truncation cascade + identity/transport race.
+4. لماذا لم يُحتوَ الفشل؟  
+   لأن fallback صامت وليس explicit failure.
+5. لماذا يتكرر؟  
+   لغياب contract قابل للتحقق + غياب SLO/alerts متخصصة.
+
+**السبب الجذري الأعلى:** غياب Context Reliability Architecture وليس خطأ prompt فقط.
+
+---
+
+## 8) هندسة الاحتواء الفوري (0–72 ساعة)
+
+## C-1: Stop Silent Fail
+- إدخال event إلزامي `context_missing` عند ambiguous + no anchor.
+- منع تمرير الطلب للـ LLM قبل محاولة recovery policy.
+
+## C-2: Enforce Identity Preconditions
+- follow-up بعد init دون `conversation_id` => reject + re-sync handshake.
+- لا إنشاء سلسلة جديدة صامتًا في هذا السيناريو.
+
+## C-3: Freeze Legacy Path for Critical Environments
+- إغلاق legacy في production الحساسة عبر feature flag.
+
+## C-4: Hot Telemetry
+- Counters فورية:
+  - `conversation_id_missing_followup_total`
+  - `cold_start_followup_total`
+  - `anchor_recovery_failed_total`
+
+## C-5: Operator Runbook
+- إذا ارتفع `cold_start_followup_total` فوق threshold لمدة 5 دقائق:
+  1) force sticky identity mode
+  2) disable legacy
+  3) activate verbose context traces
+
+---
+
+## 9) برنامج التثبيت (2–4 أسابيع)
+
+## S-1: Context Contract v2 (إلزامي)
+حقول follow-up الإلزامية:
 - `conversation_id`
 - `thread_id`
 - `turn_index`
+- `continuation_of_turn`
 - `context_checksum`
 
-## S2 — Anchor Memory Primitive
-تخزين آخر كيان مؤكد لكل conversation كحالة صغيرة مستقلة، تحدث عند كل turn، وتستخدم قبل heuristic extraction.
+## S-2: Anchor Memory Primitive
+- خزن آخر Entity Anchor مؤكد لكل conversation بشكل مستقل عن message window.
+- استخدمه أولًا قبل heuristic extraction.
 
-## S3 — Relevance-Aware Windowing
-استبدال الحدود الثابتة بسياسة اختيار مرجحة (recency + entity relevance + unresolved refs).
+## S-3: Relevance Windowing Engine
+- recency + anchor relevance + unresolved references.
+- لا تعتمد solely على fixed slice.
 
-## S4 — Contract Tests ضد drift
-اختبارات تطابق سلوك hydration بين orchestrator وcompatibility façades.
+## S-4: Contract Tests Between Paths
+- نفس payload عبر façade/orchestrator يجب أن ينتج نفس hydrated context.
 
-## S5 — Chaos Context Suite
-مجموعة اختبارات تحاكي jitter/reconnect/out-of-order/rapid follow-up.
-
----
-
-## 9) خارطة إصلاح استراتيجية (Hardening — 1 إلى 2 ربع سنوي)
-
-1. **توحيد قناة عميل وحيدة** production-grade.
-2. **Context Service مركزي** بدل منطق سياق موزع داخل handlers.
-3. **Event Sourcing خفيف للسياق** لتتبع لماذا ومن أين ضاع anchor.
-4. **SLO رسمي للسياق** ضمن reliability objectives للمنصة.
-5. **Postmortem template سياقي** إلزامي لكل حادث follow-up failure.
+## S-5: Chaos Suite (Mandatory)
+- reconnect منتصف stream.
+- rapid follow-up (<500ms بعد init).
+- out-of-order events.
+- mobile jitter profile.
 
 ---
 
-## 10) مؤشرات قبول النجاح (Definition of Done)
+## 10) التحصين الاستراتيجي (1–2 Quarter)
 
-- انخفاض `FollowupWithoutAnchorRate` بنسبة ≥ 80%.
-- `ColdStartOnFollowupRate` أقل من 1%.
-- تطابق نتائج hydration عبر المسارات = 100% في contract tests.
-- عدم ظهور طلبات توضيح غير لازمة في سيناريوهات pronoun follow-up القياسية.
-- وجود إنذار آلي خلال < 5 دقائق عند تجاوز عتبة الانهيار السياقي.
-
----
-
-## 11) خلاصة تنفيذية حاسمة
-
-المشكلة **ليست سطحية** وليست "ذكاء اصطناعي نسي"؛ إنها عطب معماري تشغيلي متعدد الطبقات.  
-بالتالي الحل الحقيقي هو:
-
-- Contract صارم للهوية والسياق،
-- مسار عميل موحد،
-- إدارة نافذة سياق قائمة على الصلة،
-- fallback صريح بدل الصمت،
-- مراقبة Reliability مخصصة للسياق.
-
-**من دون ذلك، ستتكرر الكارثة حتى لو تم تبديل النموذج.**
+1. **Context Reliability Budget** مثل error budget لكن للسياق.
+2. **Central Context Service** (single source of truth) بدل منطق مبعثر.
+3. **Context Event Sourcing** لتفسير سبب فقد anchor زمنيًا.
+4. **Formal Context Incident Template** في كل postmortem.
+5. **Release Gate** يمنع الإطلاق إذا فشلت اختبارات AFM الحرجة.
 
 ---
 
-## 12) ملاحق تنفيذية سريعة
+## 11) مؤشرات القياس والقبول (SLO/SLI/DoD)
 
-### A) قائمة قرارات لا تقبل التأجيل
-- [ ] منع follow-up بلا conversation identity.
-- [ ] تفعيل `context_missing` event.
-- [ ] تعطيل legacy path في بيئات الإنتاج الحساسة.
-- [ ] إطلاق 3 لوحات مراقبة سياقية خلال 72 ساعة.
+## SLI المقترحة
+- `FollowupWithoutAnchorRate`
+- `ColdStartOnFollowupRate`
+- `IdentityMismatchRate`
+- `AnchorRecoverySuccessRate`
+- `HydrationParityRate`
 
-### B) قائمة فحوص قبل كل release
-- [ ] test: rapid follow-up after init.
-- [ ] test: reconnect during stream + follow-up.
-- [ ] test: mixed Arabic pronoun references.
-- [ ] test: long conversation with forced truncation.
+## أهداف SLO
+- `ColdStartOnFollowupRate < 1%`
+- `AnchorRecoverySuccessRate > 98%`
+- `HydrationParityRate = 100%`
+- `P1 AFM incidents = 0` خلال نافذة 30 يومًا
 
-### C) كتالوج حوادث يجب التقاطه تلقائيًا
-- ContextDropIncident
-- IdentityMismatchIncident
-- AnchorRecoveryFailureIncident
-- SilentColdStartIncident
+## Definition of Done
+- نجاح suite AFM بالكامل.
+- dashboard + alerts فعالة.
+- runbook مجرب في تمرين محاكاة.
+- لا clarify غير لازم في سيناريوهات pronoun القياسية.
+
+---
+
+## 12) بروتوكول إعادة الإنتاج المختبري (Repro Lab)
+
+### سيناريو R1 — Rapid Follow-up Race
+1. أرسل سؤال baseline يحدد كيانًا.
+2. فور استقبال أول دلتا، أرسل follow-up إحالي.
+3. راقب هل وصل `conversation_id` و`thread_id` فعليًا.
+4. افحص model input snapshot.
+
+### سيناريو R2 — Reconnect Mid-Conversation
+1. اقطع WS بعد `conversation_init` مباشرة.
+2. أعد الاتصال خلال نافذة jitter.
+3. أرسل follow-up إحالي.
+4. تحقق من sticky identity continuity.
+
+### سيناريو R3 — Long Context Truncation
+1. ابنِ محادثة أطول من حدود القص الحالية.
+2. ضع anchor مبكرًا ثم follow-up لاحقًا.
+3. افحص إن كان anchor survived إلى model-effective context.
+
+---
+
+## 13) اختبار صحة الفرضية (Hypothesis Verification)
+
+لكي نثبت أن العلاج صحيح، يجب أن نرى:
+
+1. انخفاض فوري في `conversation_id_missing_followup_total` بعد C-2.
+2. انخفاض `cold_start_followup_total` بعد C-1.
+3. ارتفاع `AnchorRecoverySuccessRate` بعد S-2.
+4. اختفاء التباين channel-based بعد C-3/S-4.
+
+إذا لم تتحسن هذه المؤشرات، فالعلاج غير كافٍ أو التشخيص ناقص.
+
+---
+
+## 14) قرارات تنفيذية لا تقبل التأجيل
+
+- [ ] إعلان AFM كفئة incident رسمية.
+- [ ] تطبيق Context Contract v2 كمتطلب release.
+- [ ] تعطيل legacy path في البيئات الحرجة الآن.
+- [ ] تفعيل 5 مقاييس سياقية خلال 72 ساعة.
+- [ ] تشغيل Chaos Context Suite قبل أي نشر كبير.
+
+---
+
+## 15) الخلاصة التي يجب أن تعتمدها الإدارة الهندسية
+
+هذه الحادثة ليست bug صغيرًا، ولا prompt tweak.  
+هذه **قضية موثوقية سياق** (Context Reliability) في نظام موزع.  
+من دون تحويلها إلى discipline رسمي (Contracts + Telemetry + Chaos + Gates)، ستتكرر بأشكال مختلفة مهما تغير النموذج أو الصياغة.
+
+**القرار الصحيح:** اعتبر عمى السياق SRE-grade reliability domain، لا issue عابرة.
 
