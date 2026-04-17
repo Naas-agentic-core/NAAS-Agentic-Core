@@ -20,8 +20,12 @@ def test_build_graph_messages_includes_short_anchor_with_checkpointer() -> None:
         checkpoint_has_state=True,
     )
 
-    assert len(messages) == 1
+    assert len(messages) == 3
     assert isinstance(messages[0], HumanMessage)
+    assert isinstance(messages[1], AIMessage)
+    assert isinstance(messages[2], HumanMessage)
+    assert "الجزائر" in messages[0].content
+    assert messages[2].content == "ما هي عاصمتها؟"
 
 
 def test_build_graph_messages_seeds_recent_history_without_checkpointer() -> None:
@@ -58,7 +62,7 @@ def test_build_graph_messages_seeds_history_when_checkpointer_has_no_state() -> 
 
 
 def test_build_graph_messages_forces_seed_on_ambiguous_followup() -> None:
-    """يتأكد من عدم تكرار التاريخ عند توفر الـ checkpoint."""
+    """يتأكد من تمرير مرساة قصيرة مع checkpoint عند السؤال الإحالي."""
     messages = routes._build_graph_messages(
         objective="ما هي عاصمتها؟",
         history_messages=[
@@ -68,7 +72,44 @@ def test_build_graph_messages_forces_seed_on_ambiguous_followup() -> None:
         checkpointer_available=True,
         checkpoint_has_state=True,
     )
+    assert len(messages) == 3
+    assert isinstance(messages[0], HumanMessage)
+    assert isinstance(messages[1], AIMessage)
+    assert isinstance(messages[2], HumanMessage)
+    assert "فرنسا" in messages[0].content
+
+
+def test_build_graph_messages_uses_checkpoint_only_for_explicit_queries() -> None:
+    """يتأكد من إبقاء النمط الأحادي عند السؤال الصريح حتى مع وجود تاريخ."""
+    messages = routes._build_graph_messages(
+        objective="ما هي عاصمة فرنسا؟",
+        history_messages=[
+            {"role": "user", "content": "أين تقع فرنسا؟"},
+            {"role": "assistant", "content": "تقع فرنسا في أوروبا الغربية."},
+        ],
+        checkpointer_available=True,
+        checkpoint_has_state=True,
+    )
     assert len(messages) == 1
+    assert isinstance(messages[0], HumanMessage)
+    assert messages[0].content == "ما هي عاصمة فرنسا؟"
+
+
+def test_build_graph_messages_avoids_duplicate_latest_user_turn() -> None:
+    """يتأكد من عدم تكرار الرسالة الحالية إذا كانت موجودة بآخر التاريخ."""
+    messages = routes._build_graph_messages(
+        objective="ما هي عاصمة فرنسا؟",
+        history_messages=[
+            {"role": "user", "content": "أين تقع فرنسا؟"},
+            {"role": "assistant", "content": "تقع فرنسا في أوروبا الغربية."},
+            {"role": "user", "content": "ما هي عاصمة فرنسا؟"},
+        ],
+        checkpointer_available=False,
+        checkpoint_has_state=False,
+    )
+    assert len(messages) == 3
+    assert isinstance(messages[-1], HumanMessage)
+    assert messages[-1].content == "ما هي عاصمة فرنسا؟"
 
 
 def test_resolve_effective_conversation_id_prefers_incoming_value() -> None:
@@ -108,6 +149,11 @@ def test_resolve_thread_id_uses_fallback_when_context_empty() -> None:
     assert resolved == "u99:c123"
 
 
+def test_build_conversation_thread_id_is_deterministic() -> None:
+    """يتأكد من بناء معرف خيط ثابت للمحادثة بغض النظر عن session/client hints."""
+    assert routes._build_conversation_thread_id(17, 320) == "u17:c320"
+
+
 @pytest.mark.asyncio
 async def test_detect_checkpoint_state_when_unavailable(monkeypatch) -> None:
     """يتأكد من الإرجاع الآمن عند غياب checkpointer."""
@@ -129,6 +175,44 @@ async def test_detect_checkpoint_state_when_state_exists(monkeypatch) -> None:
     available, has_state = await routes._detect_checkpoint_state("thread-1")
     assert available is True
     assert has_state is True
+
+
+@pytest.mark.asyncio
+async def test_extract_checkpoint_history_normalizes_langchain_messages(monkeypatch) -> None:
+    """يتأكد من استرجاع تاريخ checkpointer وتطبيعه إلى أدوار user/assistant."""
+
+    class _FakeMessage:
+        def __init__(self, role: str, content: str) -> None:
+            self.type = role
+            self.content = content
+
+    class _FakeCheckpoint:
+        def __init__(self) -> None:
+            self.channel_values = {
+                "messages": [
+                    _FakeMessage("human", "أين تقع فرنسا؟"),
+                    _FakeMessage("ai", "تقع فرنسا في غرب أوروبا."),
+                ]
+            }
+
+    class _FakeCheckpointer:
+        async def aget(self, _config: dict[str, object]) -> _FakeCheckpoint:
+            return _FakeCheckpoint()
+
+    monkeypatch.setattr(routes, "get_checkpointer", _FakeCheckpointer)
+    history = await routes._extract_checkpoint_history("u7:c12", max_messages=4)
+    assert history == [
+        {"role": "user", "content": "أين تقع فرنسا؟"},
+        {"role": "assistant", "content": "تقع فرنسا في غرب أوروبا."},
+    ]
+
+
+@pytest.mark.asyncio
+async def test_extract_checkpoint_history_returns_empty_without_checkpointer(monkeypatch) -> None:
+    """يتأكد من السلوك الآمن عندما لا يتوفر checkpointer."""
+    monkeypatch.setattr(routes, "get_checkpointer", lambda: None)
+    history = await routes._extract_checkpoint_history("u7:c12")
+    assert history == []
 
 
 def test_is_ambiguous_followup_detects_capital_pronoun() -> None:

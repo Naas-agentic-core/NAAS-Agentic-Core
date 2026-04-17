@@ -176,14 +176,36 @@ def _build_graph_messages(
     """يبني رسائل الإدخال للرسم البياني مع مسار احتياطي صريح ضد عمى السياق."""
     latest_user_message = HumanMessage(content=objective)
 
+    def _append_latest_if_missing(
+        seeded: list[HumanMessage | AIMessage | SystemMessage],
+    ) -> list[HumanMessage | AIMessage | SystemMessage]:
+        """يضيف رسالة المستخدم الحالية فقط إذا لم تكن مكررة في نهاية القائمة."""
+        if seeded:
+            tail = seeded[-1]
+            if isinstance(tail, HumanMessage):
+                tail_content = str(getattr(tail, "content", "")).strip()
+                if tail_content == objective.strip():
+                    return seeded
+        seeded.append(latest_user_message)
+        return seeded
+
     if checkpointer_available and checkpoint_has_state:
-        # Prevent exponential message duplication by relying purely on checkpointer state.
+        if history_messages and _is_ambiguous_followup(objective):
+            anchor_seed = _build_langchain_messages(history_messages[-MAX_CHECKPOINT_ANCHOR_MESSAGES:])
+            if anchor_seed:
+                seeded_history = _append_latest_if_missing(anchor_seed)
+                logger.info(
+                    "Using checkpoint state with anchor seed: %s messages",
+                    len(seeded_history),
+                )
+                return seeded_history
+        # Default mode: prevent exponential message duplication by relying on checkpoint state.
         logger.info("Using checkpoint state only")
         return [latest_user_message]
 
     if history_messages:
         seeded_history = _build_langchain_messages(history_messages)
-        seeded_history.append(latest_user_message)
+        seeded_history = _append_latest_if_missing(seeded_history)
         logger.info(f"Using injected history: {len(seeded_history)} messages")
         return seeded_history
 
@@ -370,6 +392,101 @@ async def _detect_checkpoint_state(thread_id: str) -> tuple[bool, bool]:
             exc,
         )
         return False, False
+
+
+def _normalize_checkpoint_role(raw_role: object) -> str | None:
+    """يوحد تسمية الدور القادمة من checkpointer إلى user/assistant/system."""
+    if not isinstance(raw_role, str):
+        return None
+    normalized = raw_role.strip().casefold()
+    if normalized in {"human", "user"}:
+        return "user"
+    if normalized in {"ai", "assistant"}:
+        return "assistant"
+    if normalized == "system":
+        return "system"
+    return None
+
+
+def _normalize_checkpoint_content(raw_content: object) -> str:
+    """يحوّل محتوى رسالة checkpointer إلى نص بسيط قابل للتمرير للسياق."""
+    if isinstance(raw_content, str):
+        return raw_content.strip()
+    if isinstance(raw_content, list):
+        chunks: list[str] = []
+        for item in raw_content:
+            if isinstance(item, str):
+                text = item.strip()
+                if text:
+                    chunks.append(text)
+                continue
+            if isinstance(item, dict):
+                raw_text = item.get("text")
+                if isinstance(raw_text, str):
+                    text = raw_text.strip()
+                    if text:
+                        chunks.append(text)
+        return " ".join(chunks).strip()
+    return ""
+
+
+def _normalize_checkpoint_message(message: object) -> dict[str, str] | None:
+    """يستخرج role/content من رسالة checkpointer مع توافق لأشكال LangChain المختلفة."""
+    role = _normalize_checkpoint_role(getattr(message, "type", None))
+    if role is None and isinstance(message, dict):
+        role = _normalize_checkpoint_role(message.get("role"))
+    if role is None:
+        role = _normalize_checkpoint_role(getattr(message, "role", None))
+    if role is None:
+        return None
+
+    content = _normalize_checkpoint_content(getattr(message, "content", None))
+    if not content and isinstance(message, dict):
+        content = _normalize_checkpoint_content(message.get("content"))
+    if not content:
+        return None
+
+    return {"role": role, "content": content}
+
+
+async def _extract_checkpoint_history(
+    thread_id: str,
+    max_messages: int = MAX_HISTORY_MESSAGES,
+) -> list[dict[str, str]]:
+    """يقرأ سجل الرسائل من checkpointer ليُستخدم كنسخة احتياطية عند فقدان التاريخ المحقون."""
+    checkpointer = get_checkpointer()
+    if checkpointer is None:
+        return []
+
+    try:
+        checkpoint_config = {"configurable": {"thread_id": thread_id}}
+        async with asyncio.timeout(1.5):
+            checkpoint = await checkpointer.aget(checkpoint_config)
+    except Exception as exc:
+        logger.warning(
+            "[CHECKPOINTER] history extraction failed for thread_id=%s; reason=%s",
+            thread_id,
+            exc,
+        )
+        return []
+
+    if checkpoint is None:
+        return []
+
+    raw_channel_values = getattr(checkpoint, "channel_values", None)
+    if not isinstance(raw_channel_values, dict):
+        return []
+    raw_messages = raw_channel_values.get("messages")
+    if not isinstance(raw_messages, list):
+        return []
+
+    normalized_history: list[dict[str, str]] = []
+    for raw_message in raw_messages[-max_messages:]:
+        normalized = _normalize_checkpoint_message(raw_message)
+        if normalized is None:
+            continue
+        normalized_history.append(normalized)
+    return normalized_history
 
 
 def _is_ambiguous_followup(query: str) -> bool:
@@ -654,6 +771,11 @@ def _resolve_thread_id(context: ChatRunContext, fallback_conversation_id: int | 
             f"[THREAD_RESOLUTION] user_id required for safe thread binding. conv_id={conv_id!r}"
         )
     return f"u{user_id}:c{conv_id}"
+
+
+def _build_conversation_thread_id(user_id: int, conversation_id: int | str) -> str:
+    """يبني معرف خيط حتمي خاص بالمحادثة لضمان ثبات checkpointer بين الأدوار."""
+    return f"u{user_id}:c{conversation_id}"
 
 
 def _decode_auth_payload_or_401(authorization: str | None) -> tuple[int, dict[str, object]]:
@@ -1184,7 +1306,13 @@ async def _stream_chat_langgraph(
 ) -> None:
     """يشغّل LangGraph الموحد لمسارات البحث والإدارة ويبث الأحداث."""
     queue: asyncio.Queue[dict[str, object]] = asyncio.Queue(maxsize=256)
+    thread_id = _resolve_thread_id(context, conversation_id)
     safe_history = list(history_messages) if history_messages else []
+    if not safe_history:
+        safe_history = await _extract_checkpoint_history(
+            thread_id=thread_id,
+            max_messages=MAX_CHECKPOINT_ANCHOR_MESSAGES * 2,
+        )
     context_gap_reason = _context_gap_reason_for_followup(objective, safe_history)
     if context_gap_reason is not None:
         await websocket.send_json(
@@ -1224,7 +1352,6 @@ async def _stream_chat_langgraph(
             _graph = app_graph or getattr(websocket.app.state, "app_graph", None)
             if not _graph:
                 _graph = create_unified_graph()
-            thread_id = _resolve_thread_id(context, conversation_id)
             incoming_messages = safe_history
             await _append_telemetry_line(
                 f"[TELEMETRY] INGRESS | "
@@ -1236,7 +1363,7 @@ async def _stream_chat_langgraph(
             checkpointer_available, checkpoint_has_state = await _detect_checkpoint_state(thread_id)
             langchain_msgs = _build_graph_messages(
                 objective=prepared_objective,
-                history_messages=history_messages,
+                history_messages=safe_history,
                 checkpointer_available=checkpointer_available,
                 checkpoint_has_state=checkpoint_has_state,
             )
@@ -1892,8 +2019,6 @@ async def chat_ws_stategraph(websocket: WebSocket) -> None:
                 continue
 
             requested_conversation_id = incoming.get("conversation_id")
-            requested_thread_id = _safe_thread_id(incoming.get("thread_id"))
-            requested_session_id = _safe_thread_id(incoming.get("session_id"))
 
             logger.info(
                 "[CONV_LIFECYCLE] stage=ws_received role=customer user=%s conv_id=%s type=%s",
@@ -1910,7 +2035,6 @@ async def chat_ws_stategraph(websocket: WebSocket) -> None:
                 and requested_conversation_id != sticky_conversation_id
             ):
                 sticky_thread_id = None
-            resolved_thread_id = requested_thread_id or requested_session_id or sticky_thread_id
             logger.info(
                 "[CONV_LIFECYCLE] stage=parsed role=customer user=%s conv_id=%s type=%s",
                 user_id,
@@ -1939,7 +2063,7 @@ async def chat_ws_stategraph(websocket: WebSocket) -> None:
                     len(history_messages),
                 )
                 sticky_conversation_id = conversation_id
-                sticky_thread_id = resolved_thread_id or f"u{user_id}:c{conversation_id}"
+                sticky_thread_id = _build_conversation_thread_id(user_id, conversation_id)
             except HTTPException as error:
                 await websocket.send_json(
                     {"type": "assistant_error", "payload": {"content": error.detail}}
@@ -2044,8 +2168,6 @@ async def admin_chat_ws_stategraph(websocket: WebSocket) -> None:
                 continue
 
             requested_conversation_id = incoming.get("conversation_id")
-            requested_thread_id = _safe_thread_id(incoming.get("thread_id"))
-            requested_session_id = _safe_thread_id(incoming.get("session_id"))
 
             logger.info(
                 "[CONV_LIFECYCLE] stage=ws_received role=admin user=%s conv_id=%s type=%s",
@@ -2062,7 +2184,6 @@ async def admin_chat_ws_stategraph(websocket: WebSocket) -> None:
                 and requested_conversation_id != sticky_conversation_id
             ):
                 sticky_thread_id = None
-            resolved_thread_id = requested_thread_id or requested_session_id or sticky_thread_id
             logger.info(
                 "[CONV_LIFECYCLE] stage=parsed role=admin user=%s conv_id=%s type=%s",
                 user_id,
@@ -2091,7 +2212,7 @@ async def admin_chat_ws_stategraph(websocket: WebSocket) -> None:
                     len(history_messages),
                 )
                 sticky_conversation_id = conversation_id
-                sticky_thread_id = resolved_thread_id or f"u{user_id}:c{conversation_id}"
+                sticky_thread_id = _build_conversation_thread_id(user_id, conversation_id)
             except HTTPException as error:
                 await websocket.send_json(
                     {"type": "assistant_error", "payload": {"content": error.detail}}
