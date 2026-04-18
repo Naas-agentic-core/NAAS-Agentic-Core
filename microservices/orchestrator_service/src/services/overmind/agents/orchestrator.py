@@ -129,7 +129,12 @@ class OrchestratorAgent:
     def refactor_agent(self, value: RefactorAgent) -> None:
         self.admin_agent.refactor_agent = value
 
-    def run(self, question: str, context: dict[str, object] | None = None, history_messages: list | None = None) -> OrchestratorRunResult:
+    def run(
+        self,
+        question: str,
+        context: dict[str, object] | None = None,
+        history_messages: list | None = None,
+    ) -> OrchestratorRunResult:
         """
         Unified entrypoint for streaming processing.
         """
@@ -662,13 +667,12 @@ class OrchestratorAgent:
         messages = [{"role": "system", "content": final_prompt}]
         if history_messages:
             for msg in history_messages:
-                if hasattr(msg, 'type') and msg.type == 'human':
+                if hasattr(msg, "type") and msg.type == "human":
                     messages.append({"role": "user", "content": str(msg.content)})
-                elif hasattr(msg, 'type') and msg.type == 'ai':
+                elif hasattr(msg, "type") and msg.type == "ai":
                     messages.append({"role": "assistant", "content": str(msg.content)})
         else:
             messages.append({"role": "user", "content": question})
-
 
         async for chunk in self._stream_ai_chunks(messages):
             if hasattr(chunk, "choices"):

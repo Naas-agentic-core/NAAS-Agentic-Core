@@ -321,9 +321,7 @@ def render_markdown(
     out.append("## 7) مقتطفات دليل خام")
     out.append("")
     for hit in ordered_hits:
-        out.append(
-            f"- `{hit.code}` @ `{hit.file_path}:{hit.line_number}` → `{hit.snippet}`"
-        )
+        out.append(f"- `{hit.code}` @ `{hit.file_path}:{hit.line_number}` → `{hit.snippet}`")
     out.append("")
 
     out.append("## 8) تشخيص جذري نهائي")

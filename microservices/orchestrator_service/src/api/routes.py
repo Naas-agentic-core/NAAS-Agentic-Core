@@ -1320,9 +1320,7 @@ async def _stream_chat_langgraph(
         await websocket.send_json(
             {
                 "type": "assistant_error",
-                "payload": {
-                    "content": "يرجى ذكر الكيان المقصود صراحةً (مثال: ما عاصمة الجزائر؟)."
-                },
+                "payload": {"content": "يرجى ذكر الكيان المقصود صراحةً (مثال: ما عاصمة الجزائر؟)."},
             }
         )
         logger.warning(
@@ -2343,12 +2341,18 @@ async def chat_with_agent_endpoint(
                 )
 
                 # Use _build_graph_messages to safely build context avoiding context blindness
-                conversation_id_fallback = request.conversation_id if getattr(request, "conversation_id", None) else str(uuid.uuid4())
+                conversation_id_fallback = (
+                    request.conversation_id
+                    if getattr(request, "conversation_id", None)
+                    else str(uuid.uuid4())
+                )
                 thread_id = _resolve_thread_id(
                     {"user_id": request.user_id, "conversation_id": request.conversation_id},
                     fallback_conversation_id=str(conversation_id_fallback),
                 )
-                checkpointer_available, checkpoint_has_state = await _detect_checkpoint_state(thread_id)
+                checkpointer_available, checkpoint_has_state = await _detect_checkpoint_state(
+                    thread_id
+                )
                 langchain_msgs = _build_graph_messages(
                     objective=prepared_objective,
                     history_messages=request.history_messages,
@@ -2475,20 +2479,26 @@ async def chat_with_agent_endpoint(
             )
 
             # Use _build_graph_messages to properly seed history for the agent context
-            conversation_id_fallback = request.conversation_id if getattr(request, "conversation_id", None) else str(uuid.uuid4())
+            conversation_id_fallback = (
+                request.conversation_id
+                if getattr(request, "conversation_id", None)
+                else str(uuid.uuid4())
+            )
             thread_id = _resolve_thread_id(
                 {"user_id": request.user_id, "conversation_id": request.conversation_id},
                 fallback_conversation_id=str(conversation_id_fallback),
             )
             checkpointer_available, checkpoint_has_state = await _detect_checkpoint_state(thread_id)
             langchain_msgs = _build_graph_messages(
-                    objective=prepared_objective,
-                    history_messages=request.history_messages,
-                    checkpointer_available=checkpointer_available,
-                    checkpoint_has_state=checkpoint_has_state,
-                )
+                objective=prepared_objective,
+                history_messages=request.history_messages,
+                checkpointer_available=checkpointer_available,
+                checkpoint_has_state=checkpoint_has_state,
+            )
 
-            run_result = agent.run(prepared_objective, context=context, history_messages=langchain_msgs)
+            run_result = agent.run(
+                prepared_objective, context=context, history_messages=langchain_msgs
+            )
             ai_chunks = []
             final_chunk = None
             async for chunk in run_result:
