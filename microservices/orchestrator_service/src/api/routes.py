@@ -189,25 +189,15 @@ def _build_graph_messages(
         seeded.append(latest_user_message)
         return seeded
 
-    if checkpointer_available and checkpoint_has_state:
-        if history_messages and _is_ambiguous_followup(objective):
-            anchor_seed = _build_langchain_messages(history_messages[-MAX_CHECKPOINT_ANCHOR_MESSAGES:])
-            if anchor_seed:
-                seeded_history = _append_latest_if_missing(anchor_seed)
-                logger.info(
-                    "Using checkpoint state with anchor seed: %s messages",
-                    len(seeded_history),
-                )
-                return seeded_history
-        # Default mode: prevent exponential message duplication by relying on checkpoint state.
-        logger.info("Using checkpoint state only")
-        return [latest_user_message]
-
     if history_messages:
         seeded_history = _build_langchain_messages(history_messages)
         seeded_history = _append_latest_if_missing(seeded_history)
         logger.info(f"Using injected history: {len(seeded_history)} messages")
         return seeded_history
+
+    if checkpointer_available and checkpoint_has_state:
+        logger.info("Using checkpoint state only")
+        return [latest_user_message]
 
     # عند غياب checkpointer (أو تعطل تهيئته) وعدم وجود تاريخ مرسل، نمرّر الرسالة الحالية فقط.
     logger.warning("No context available - cold start")

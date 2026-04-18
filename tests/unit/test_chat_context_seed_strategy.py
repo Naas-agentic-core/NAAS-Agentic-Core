@@ -90,9 +90,9 @@ def test_build_graph_messages_uses_checkpoint_only_for_explicit_queries() -> Non
         checkpointer_available=True,
         checkpoint_has_state=True,
     )
-    assert len(messages) == 1
-    assert isinstance(messages[0], HumanMessage)
-    assert messages[0].content == "ما هي عاصمة فرنسا؟"
+    assert len(messages) == 3
+    assert isinstance(messages[2], HumanMessage)
+    assert messages[2].content == "ما هي عاصمة فرنسا؟"
 
 
 def test_build_graph_messages_avoids_duplicate_latest_user_turn() -> None:
