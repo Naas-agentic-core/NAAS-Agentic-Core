@@ -16,9 +16,16 @@ from microservices.orchestrator_service.src.services.overmind.agents import (
 
 def test_agent_chat_mission_complex_stream_is_text_encodable(monkeypatch) -> None:
     """يتأكد أن /agent/chat يعيد chunks نصية قابلة للترميز حتى مع أحداث mission dict."""
-    async def fake_persist_assistant_message(*args, **kwargs) -> None: pass
-    async def fake_ensure_conversation(*args, **kwargs) -> tuple[str, bool]: return "fake_id", False
-    def fake_decode_auth(*args, **kwargs) -> tuple[int, dict]: return 7, {"role": "customer"}
+
+    async def fake_persist_assistant_message(*args, **kwargs) -> None:
+        pass
+
+    async def fake_ensure_conversation(*args, **kwargs) -> tuple[str, bool]:
+        return "fake_id", False
+
+    def fake_decode_auth(*args, **kwargs) -> tuple[int, dict]:
+        return 7, {"role": "customer"}
+
     monkeypatch.setattr(routes, "_persist_assistant_message", fake_persist_assistant_message)
     monkeypatch.setattr(routes, "_ensure_conversation", fake_ensure_conversation)
     monkeypatch.setattr(routes, "_decode_auth_payload_or_401", fake_decode_auth)
@@ -38,7 +45,8 @@ def test_agent_chat_mission_complex_stream_is_text_encodable(monkeypatch) -> Non
     client = TestClient(app)
     with client.stream(
         "POST",
-        "/agent/chat", headers={"Authorization": "Bearer fake"},
+        "/agent/chat",
+        headers={"Authorization": "Bearer fake"},
         json={
             "question": "run mission",
             "user_id": 7,
@@ -56,9 +64,16 @@ def test_agent_chat_mission_complex_stream_is_text_encodable(monkeypatch) -> Non
 
 def test_agent_chat_admin_path_forwards_aligned_admin_state(monkeypatch) -> None:
     """يتأكد أن مسار /agent/chat الإداري يمرر حقول العقد المتوافقة مع بوابة الإدارة."""
-    async def fake_persist_assistant_message(*args, **kwargs) -> None: pass
-    async def fake_ensure_conversation(*args, **kwargs) -> tuple[str, bool]: return "fake_id", False
-    def fake_decode_auth(*args, **kwargs) -> tuple[int, dict]: return 11, {"role": "admin"}
+
+    async def fake_persist_assistant_message(*args, **kwargs) -> None:
+        pass
+
+    async def fake_ensure_conversation(*args, **kwargs) -> tuple[str, bool]:
+        return "fake_id", False
+
+    def fake_decode_auth(*args, **kwargs) -> tuple[int, dict]:
+        return 11, {"role": "admin"}
+
     monkeypatch.setattr(routes, "_persist_assistant_message", fake_persist_assistant_message)
     monkeypatch.setattr(routes, "_ensure_conversation", fake_ensure_conversation)
     monkeypatch.setattr(routes, "_decode_auth_payload_or_401", fake_decode_auth)
@@ -83,7 +98,8 @@ def test_agent_chat_admin_path_forwards_aligned_admin_state(monkeypatch) -> None
     client = TestClient(app)
     with client.stream(
         "POST",
-        "/agent/chat", headers={"Authorization": "Bearer fake"},
+        "/agent/chat",
+        headers={"Authorization": "Bearer fake"},
         json={
             "question": "count python files",
             "user_id": 11,
@@ -107,9 +123,16 @@ def test_agent_chat_admin_path_forwards_aligned_admin_state(monkeypatch) -> None
 
 def test_agent_chat_admin_path_is_fail_closed_without_admin_identity(monkeypatch) -> None:
     """يتأكد أن مسار /agent/chat الإداري لا يمرر وصولاً إدارياً ضمنياً دون إثبات."""
-    async def fake_persist_assistant_message(*args, **kwargs) -> None: pass
-    async def fake_ensure_conversation(*args, **kwargs) -> tuple[str, bool]: return "fake_id", False
-    def fake_decode_auth(*args, **kwargs) -> tuple[int, dict]: return 12, {"role": "customer"} # Fail closed
+
+    async def fake_persist_assistant_message(*args, **kwargs) -> None:
+        pass
+
+    async def fake_ensure_conversation(*args, **kwargs) -> tuple[str, bool]:
+        return "fake_id", False
+
+    def fake_decode_auth(*args, **kwargs) -> tuple[int, dict]:
+        return 12, {"role": "customer"}  # Fail closed
+
     monkeypatch.setattr(routes, "_persist_assistant_message", fake_persist_assistant_message)
     monkeypatch.setattr(routes, "_ensure_conversation", fake_ensure_conversation)
     monkeypatch.setattr(routes, "_decode_auth_payload_or_401", fake_decode_auth)
@@ -134,7 +157,8 @@ def test_agent_chat_admin_path_is_fail_closed_without_admin_identity(monkeypatch
     client = TestClient(app)
     with client.stream(
         "POST",
-        "/agent/chat", headers={"Authorization": "Bearer fake"},
+        "/agent/chat",
+        headers={"Authorization": "Bearer fake"},
         json={
             "question": "count python files",
             "user_id": 12,
