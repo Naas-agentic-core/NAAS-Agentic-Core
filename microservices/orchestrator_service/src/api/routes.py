@@ -190,17 +190,12 @@ def _build_graph_messages(
         return seeded
 
     if history_messages:
-        seeded_history = _build_langchain_messages(history_messages)
-        seeded_history = _append_latest_if_missing(seeded_history)
-        logger.info(f"Using injected history: {len(seeded_history)} messages")
-        return seeded_history
+        seeded = _build_langchain_messages(history_messages)
+        return _append_latest_if_missing(seeded)
 
     if checkpointer_available and checkpoint_has_state:
-        logger.info("Using checkpoint state only")
         return [latest_user_message]
 
-    # عند غياب checkpointer (أو تعطل تهيئته) وعدم وجود تاريخ مرسل، نمرّر الرسالة الحالية فقط.
-    logger.warning("No context available - cold start")
     return [latest_user_message]
 
 
