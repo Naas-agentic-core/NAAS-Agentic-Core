@@ -129,16 +129,17 @@ class OrchestratorAgent:
     def refactor_agent(self, value: RefactorAgent) -> None:
         self.admin_agent.refactor_agent = value
 
-    def run(self, question: str, context: dict[str, object] | None = None) -> OrchestratorRunResult:
+    def run(self, question: str, context: dict[str, object] | None = None, history_messages: list | None = None) -> OrchestratorRunResult:
         """
         Unified entrypoint for streaming processing.
         """
-        return OrchestratorRunResult(self._run_stream(question, context))
+        return OrchestratorRunResult(self._run_stream(question, context, history_messages))
 
     async def _run_stream(
         self,
         question: str,
         context: dict[str, object] | None = None,
+        history_messages: list | None = None,
     ) -> AsyncGenerator[str, None]:
         logger.info(f"Orchestrator received: {question}")
         normalized = question.strip()
@@ -204,7 +205,7 @@ class OrchestratorAgent:
 
             else:
                 async for chunk in self._as_json_event(
-                    self._handle_chat_fallback(normalized, context)
+                    self._handle_chat_fallback(normalized, context, history_messages)
                 ):
                     yield chunk
 
@@ -615,7 +616,7 @@ class OrchestratorAgent:
                 yield content
 
     async def _handle_chat_fallback(
-        self, question: str, context: dict
+        self, question: str, context: dict, history_messages: list | None = None
     ) -> AsyncGenerator[str, None]:
         # NEW GUARD: Admin metrics must NEVER reach Smart Tutor
         intent_val = context.get("intent")
@@ -658,11 +659,16 @@ class OrchestratorAgent:
         if personalization_context:
             personalization_block = f"\nمرجع الجودة:\n{personalization_context}"
         final_prompt = f"{base_prompt}\n{strict_instruction}{personalization_block}\n{system_context}\n{history_text}"
+        messages = [{"role": "system", "content": final_prompt}]
+        if history_messages:
+            for msg in history_messages:
+                if hasattr(msg, 'type') and msg.type == 'human':
+                    messages.append({"role": "user", "content": str(msg.content)})
+                elif hasattr(msg, 'type') and msg.type == 'ai':
+                    messages.append({"role": "assistant", "content": str(msg.content)})
+        else:
+            messages.append({"role": "user", "content": question})
 
-        messages = [
-            {"role": "system", "content": final_prompt},
-            {"role": "user", "content": question},
-        ]
 
         async for chunk in self._stream_ai_chunks(messages):
             if hasattr(chunk, "choices"):
