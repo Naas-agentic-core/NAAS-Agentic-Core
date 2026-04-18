@@ -213,10 +213,10 @@ def _question_contains_explicit_entity(question: str) -> bool:
     if re.search(r"\b(?:france|algeria|egypt|morocco|tunisia|germany|spain)\b", normalized, re.I):
         return True
 
-    arabic_tokens = [
+    arabic_tokens_raw = [
         token.strip("؟،.!:؛") for token in re.findall(r"[\u0600-\u06FF]+", normalized) if token
     ]
-    arabic_tokens = [token for token in arabic_tokens if token]
+    arabic_tokens = [token for token in arabic_tokens_raw if token]
     if not arabic_tokens:
         return False
 
@@ -290,6 +290,8 @@ def _extract_recent_entity_anchor(history_messages: list[dict[str, str]] | None)
         "موقعها",
         "مساحتها",
         "أين",
+        "اين",
+        "ايه",
         "تقع",
         "يقع",
         "توجد",
