@@ -367,10 +367,10 @@ def main() -> None:
     out_md.write_text(report_md, encoding="utf-8")
     out_json.write_text(json.dumps(report_json, ensure_ascii=False, indent=2), encoding="utf-8")
 
-    print(f"Generated markdown: {out_md}")
-    print(f"Generated json pack: {out_json}")
-    print(f"Evidence hits: {len(hits)}")
-    print(f"Weighted score: {score}/100 ({classify_severity(score)})")
+    pass
+    pass
+    pass
+    pass
 
 
 if __name__ == "__main__":
