@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 import uuid
 from ast import literal_eval
 from collections.abc import AsyncGenerator
@@ -169,6 +170,124 @@ class OrchestratorClient:
         if not clean_response:
             return None
         return clean_response
+
+    @staticmethod
+    def _build_local_history_digest(history_messages: list[dict[str, str]] | None) -> str:
+        """يبني ملخصاً موجزاً لتاريخ الحوار كي لا يعمل fallback المحلي بشكل عديم السياق."""
+        if not history_messages:
+            return ""
+
+        normalized_rows: list[str] = []
+        for item in history_messages[-12:]:
+            role = item.get("role")
+            content = str(item.get("content", "")).replace("\x00", "").strip()
+            if role not in {"user", "assistant"} or not content:
+                continue
+            label = "المستخدم" if role == "user" else "المساعد"
+            compact = " ".join(content.split())
+            if len(compact) > 240:
+                compact = f"{compact[:240]}…"
+            normalized_rows.append(f"- {label}: {compact}")
+
+        return "\n".join(normalized_rows)
+
+    @staticmethod
+    def _is_ambiguous_followup_question(question: str) -> bool:
+        """يكشف السؤال الإحالي القصير الذي يحتاج مرجعاً صريحاً."""
+        normalized = question.strip().casefold()
+        if not normalized:
+            return False
+        triggers = (
+            "عاصمتها",
+            "عاصمته",
+            "عاصمتهم",
+            "ما هي عاصمتها",
+            "ما عاصمتها",
+            "موقعها",
+            "عدد سكانها",
+            "كم سكانها",
+            "ما هي",
+            "وما هي",
+            "where is its",
+            "what is its",
+        )
+        if any(token in normalized for token in triggers):
+            return True
+        return len(normalized.split()) <= 4 and any(
+            token in normalized for token in ("ها", "his", "her", "its")
+        )
+
+    @staticmethod
+    def _history_has_entity_anchor(history_messages: list[dict[str, str]] | None) -> bool:
+        """يتحقق من وجود كيان واضح داخل سجل المستخدم الأخير لتثبيت الضمائر الإحالية."""
+        if not history_messages:
+            return False
+
+        entity_regex = re.compile(
+            r"\b(?:france|algeria|egypt|morocco|tunisia|germany|spain|niger|nigeria)\b",
+            flags=re.IGNORECASE,
+        )
+        for item in reversed(history_messages[-12:]):
+            if item.get("role") != "user":
+                continue
+            content = str(item.get("content", "")).strip()
+            if not content:
+                continue
+            if entity_regex.search(content):
+                return True
+            arabic_tokens = [
+                token.strip("؟،.!:؛")
+                for token in re.findall(r"[\u0600-\u06FF]+", content)
+                if token
+            ]
+            if any(len(token) > 2 and token not in {"ما", "من", "هي", "هو", "عاصمتها"} for token in arabic_tokens):
+                return True
+        return False
+
+    async def _build_local_general_chat_response_with_history(
+        self,
+        question: str,
+        history_messages: list[dict[str, str]] | None,
+    ) -> str | None:
+        """ينفذ fallback محلي واعٍ بالسياق ويمنع انهيار المتابعات الإحالية عند تعطل orchestrator."""
+        sanitized_question = question.replace("\x00", "").strip()
+        if not sanitized_question:
+            return None
+
+        if self._is_ambiguous_followup_question(sanitized_question) and not self._history_has_entity_anchor(
+            history_messages
+        ):
+            return (
+                "لضمان الدقة: السؤال الإحالي الحالي لا يحتوي مرجعًا كافيًا. "
+                "يرجى ذكر الكيان صراحةً (مثال: ما عاصمة النيجر؟)."
+            )
+
+        context_digest = self._build_local_history_digest(history_messages)
+        if not context_digest:
+            return await self._build_local_general_chat_response(sanitized_question)
+
+        ai_client = get_ai_client()
+        contextual_system_prompt = (
+            "أنت مساعد عربي احترافي. استخدم سجل الحوار التالي كمرجع إلزامي قبل الإجابة. "
+            "إذا كان السؤال الحالي إحاليًا (ضمائر مثل: عاصمتها/موقعها) فاستخرج مرجعه من السياق."
+        )
+        composed_user_prompt = (
+            "سجل الحوار الأخير:\n"
+            f"{context_digest}\n\n"
+            "السؤال الحالي:\n"
+            f"{sanitized_question}"
+        )
+
+        try:
+            response_text = await ai_client.send_message(contextual_system_prompt, composed_user_prompt)
+        except Exception:
+            logger.warning("local_general_chat_contextual_fallback_failed", exc_info=True)
+            return await self._build_local_general_chat_response(sanitized_question)
+
+        clean_response = response_text.replace("\x00", "").strip()
+        if clean_response:
+            return clean_response
+        return await self._build_local_general_chat_response(sanitized_question)
 
     @staticmethod
     def _sanitize_text_for_user(content: str) -> str:
@@ -412,8 +531,9 @@ class OrchestratorClient:
             is_file_intelligence = self._file_intelligence_decision(question)[0]
             is_exercise_retrieval = self._exercise_retrieval_decision(question)
             if not is_file_intelligence and not is_exercise_retrieval:
-                local_general_chat_response = await self._build_local_general_chat_response(
-                    question
+                local_general_chat_response = await self._build_local_general_chat_response_with_history(
+                    question,
+                    history_messages,
                 )
                 if local_general_chat_response:
                     yield local_general_chat_response

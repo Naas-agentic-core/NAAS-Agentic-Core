@@ -55,6 +55,7 @@ async def test_user_facing_error_is_sanitized(monkeypatch: pytest.MonkeyPatch) -
 async def test_local_fallback_still_works_for_file_count(monkeypatch: pytest.MonkeyPatch) -> None:
     """يحافظ على مسار التدهور المحلي الحالي عندما يكون السؤال من نمط عدّ الملفات."""
     monkeypatch.setenv("ORCHESTRATOR_SERVICE_URL", "http://orchestrator-service:8006")
+    monkeypatch.setenv("ORCHESTRATOR_LOCAL_FALLBACK_ENABLED", "1")
     client = OrchestratorClient(base_url="http://orchestrator-service:8006")
 
     async def fake_get_client():
@@ -80,6 +81,7 @@ async def test_local_fallback_supports_generic_extension_file_count(
 ) -> None:
     """يتحقق أن مسار التدهور يدعم صيغ ملفات متعددة لخدمة عدّ الملفات الإدارية."""
     monkeypatch.setenv("ORCHESTRATOR_SERVICE_URL", "http://orchestrator-service:8006")
+    monkeypatch.setenv("ORCHESTRATOR_LOCAL_FALLBACK_ENABLED", "1")
     client = OrchestratorClient(base_url="http://orchestrator-service:8006")
 
     async def fake_get_client():
@@ -107,6 +109,7 @@ async def test_local_retrieval_fallback_for_exercise_request(
 ) -> None:
     """يستخدم مسار الاسترجاع المحلي عند تعطل control-plane لطلب تمرين تعليمي."""
     monkeypatch.setenv("ORCHESTRATOR_SERVICE_URL", "http://orchestrator-service:8006")
+    monkeypatch.setenv("ORCHESTRATOR_LOCAL_FALLBACK_ENABLED", "1")
     client = OrchestratorClient(base_url="http://orchestrator-service:8006")
 
     async def fake_get_client():
@@ -136,6 +139,7 @@ async def test_local_general_chat_fallback_when_specialized_fallbacks_miss(
 ) -> None:
     """يضمن استمرار الدردشة العامة عند تعطل orchestrator وعدم انطباق fallback المتخصص."""
     monkeypatch.setenv("ORCHESTRATOR_SERVICE_URL", "http://orchestrator-service:8006")
+    monkeypatch.setenv("ORCHESTRATOR_LOCAL_FALLBACK_ENABLED", "1")
     client = OrchestratorClient(base_url="http://orchestrator-service:8006")
 
     async def fake_get_client():
@@ -147,13 +151,13 @@ async def test_local_general_chat_fallback_when_specialized_fallbacks_miss(
     async def no_retrieval(_question: str):
         return None
 
-    async def local_general_chat(_question: str):
+    async def local_general_chat(_question: str, _history_messages: list[dict[str, str]] | None):
         return "مرحبًا! هذه إجابة محلية عامة لضمان استمرارية الدردشة."
 
     monkeypatch.setattr(client, "_get_client", fake_get_client)
     monkeypatch.setattr(client, "_build_local_file_count_response", no_file_count)
     monkeypatch.setattr(client, "_build_local_retrieval_response", no_retrieval)
-    monkeypatch.setattr(client, "_build_local_general_chat_response", local_general_chat)
+    monkeypatch.setattr(client, "_build_local_general_chat_response_with_history", local_general_chat)
 
     results: list[str] = []
     async for item in client.chat_with_agent(question="السلام عليكم", user_id=7):
@@ -173,13 +177,16 @@ async def test_local_fallback_can_be_disabled_with_flag(monkeypatch: pytest.Monk
     async def fake_get_client():
         return _AlwaysFailClient()
 
-    async def local_fallback(_question: str):
+    async def local_fallback(
+        _question: str,
+        _history_messages: list[dict[str, str]] | None = None,
+    ):
         return "عدد ملفات بايثون في المشروع هو: 99 ملف."
 
     monkeypatch.setattr(client, "_get_client", fake_get_client)
     monkeypatch.setattr(client, "_build_local_file_count_response", local_fallback)
     monkeypatch.setattr(client, "_build_local_retrieval_response", local_fallback)
-    monkeypatch.setattr(client, "_build_local_general_chat_response", local_fallback)
+    monkeypatch.setattr(client, "_build_local_general_chat_response_with_history", local_fallback)
 
     chunks: list[str] = []
     async for item in client.chat_with_agent(question="كم عدد ملفات بايثون؟", user_id=1):
@@ -192,11 +199,70 @@ async def test_local_fallback_can_be_disabled_with_flag(monkeypatch: pytest.Monk
 
 
 @pytest.mark.asyncio
+async def test_contextual_local_fallback_receives_history_messages(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """يتحقق من تمرير history_messages إلى fallback المحلي لمنع عمى السياق الإحالي."""
+    monkeypatch.setenv("ORCHESTRATOR_SERVICE_URL", "http://orchestrator-service:8006")
+    monkeypatch.setenv("ORCHESTRATOR_LOCAL_FALLBACK_ENABLED", "1")
+    client = OrchestratorClient(base_url="http://orchestrator-service:8006")
+
+    async def fake_get_client():
+        return _AlwaysFailClient()
+
+    async def no_file_count(_question: str):
+        return None
+
+    async def no_retrieval(_question: str):
+        return None
+
+    seen: dict[str, object] = {}
+
+    async def contextual_local_chat(
+        _question: str,
+        history_messages: list[dict[str, str]] | None,
+    ) -> str:
+        seen["history_messages"] = history_messages
+        return "تمت الإجابة باستخدام fallback سياقي."
+
+    monkeypatch.setattr(client, "_get_client", fake_get_client)
+    monkeypatch.setattr(client, "_build_local_file_count_response", no_file_count)
+    monkeypatch.setattr(client, "_build_local_retrieval_response", no_retrieval)
+    monkeypatch.setattr(client, "_build_local_general_chat_response_with_history", contextual_local_chat)
+
+    history_messages = [
+        {"role": "user", "content": "أين تقع النيجر؟"},
+        {"role": "assistant", "content": "تقع في غرب إفريقيا."},
+    ]
+    results: list[str] = []
+    async for item in client.chat_with_agent(
+        question="ما هي عاصمتها؟",
+        user_id=5,
+        history_messages=history_messages,
+    ):
+        if isinstance(item, str):
+            results.append(item)
+
+    assert results == ["تمت الإجابة باستخدام fallback سياقي."]
+    assert seen["history_messages"] == history_messages
+
+
+def test_chat_routing_policy_disables_local_fallback_by_default(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """يتحقق أن fallback المحلي الافتراضي مغلق لمنع ردود عديمة السياق في الإنتاج."""
+    monkeypatch.delenv("ORCHESTRATOR_LOCAL_FALLBACK_ENABLED", raising=False)
+    policy = ChatRoutingPolicy.from_environment("http://orchestrator-service:8006")
+    assert policy.fallback_enabled is False
+
+
+@pytest.mark.asyncio
 async def test_local_fallback_supports_csv_and_json_file_count(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """يتحقق من دعم CSV/JSON كصيغ مطلوبة ضمن ذكاء الملفات الإداري."""
     monkeypatch.setenv("ORCHESTRATOR_SERVICE_URL", "http://orchestrator-service:8006")
+    monkeypatch.setenv("ORCHESTRATOR_LOCAL_FALLBACK_ENABLED", "1")
     client = OrchestratorClient(base_url="http://orchestrator-service:8006")
 
     async def fake_get_client():
@@ -311,6 +377,7 @@ async def test_file_intelligence_fallback_concurrency_smoke(
     import asyncio
 
     monkeypatch.setenv("ORCHESTRATOR_SERVICE_URL", "http://orchestrator-service:8006")
+    monkeypatch.setenv("ORCHESTRATOR_LOCAL_FALLBACK_ENABLED", "1")
     client = OrchestratorClient(base_url="http://orchestrator-service:8006")
 
     async def fake_get_client():
@@ -341,6 +408,7 @@ async def test_exercise_retrieval_fallback_concurrency_smoke(
     import asyncio
 
     monkeypatch.setenv("ORCHESTRATOR_SERVICE_URL", "http://orchestrator-service:8006")
+    monkeypatch.setenv("ORCHESTRATOR_LOCAL_FALLBACK_ENABLED", "1")
     client = OrchestratorClient(base_url="http://orchestrator-service:8006")
 
     async def fake_get_client():

@@ -6,6 +6,7 @@
 """
 
 import asyncio
+import re
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect
@@ -142,6 +143,66 @@ def _extract_client_context_messages(payload: dict[str, object]) -> list[dict[st
     return sanitized
 
 
+def _is_ambiguous_followup_question(question: str) -> bool:
+    """يتحقق من كون السؤال متابعة إحالية قصيرة تتطلب مرساة كيان صريحة."""
+    normalized = question.strip().casefold()
+    if not normalized:
+        return False
+    triggers = (
+        "عاصمتها",
+        "عاصمته",
+        "عاصمتهم",
+        "موقعها",
+        "عدد سكانها",
+        "كم سكانها",
+        "what is its",
+        "where is its",
+    )
+    if any(trigger in normalized for trigger in triggers):
+        return True
+    return len(normalized.split()) <= 4 and any(token in normalized for token in ("ها", "his", "her", "its"))
+
+
+def _has_entity_anchor(messages: list[dict[str, str]]) -> bool:
+    """يفحص وجود مرساة كيان في رسائل العميل لتأمين استمرارية السياق."""
+    if not messages:
+        return False
+
+    entity_regex = re.compile(
+        r"\b(?:france|algeria|egypt|morocco|tunisia|germany|spain|niger|nigeria)\b",
+        flags=re.IGNORECASE,
+    )
+    blocked_tokens = {
+        "ما",
+        "من",
+        "هي",
+        "هو",
+        "عاصمتها",
+        "عاصمته",
+        "موقعها",
+        "عددها",
+        "كم",
+        "أين",
+    }
+
+    for message in reversed(messages[-20:]):
+        if message.get("role") != "user":
+            continue
+        content = str(message.get("content", "")).strip()
+        if not content:
+            continue
+        if entity_regex.search(content):
+            return True
+        arabic_tokens = [
+            token.strip("؟،.!:؛")
+            for token in re.findall(r"[\u0600-\u06FF]+", content)
+            if token
+        ]
+        if any(len(token) > 2 and token not in blocked_tokens for token in arabic_tokens):
+            return True
+    return False
+
+
 def _merge_history_with_client_context(
     persisted_history: list[dict[str, str]],
     client_context: list[dict[str, str]],
@@ -239,6 +300,29 @@ async def chat_stream_ws(
                 metadata["client_context_messages"] = client_context_messages
 
             original_conversation_id = payload.get("conversation_id")
+            if (
+                original_conversation_id is None
+                and _is_ambiguous_followup_question(question)
+                and not _has_entity_anchor(client_context_messages)
+            ):
+                await websocket.send_json(
+                    _bind_stream_metadata(
+                        normalize_streaming_event(
+                            {
+                                "type": "assistant_error",
+                                "payload": {
+                                    "content": (
+                                        "السؤال الحالي إحالي بدون مرجع سياقي واضح. "
+                                        "يرجى ذكر الكيان صراحةً (مثال: ما عاصمة النيجر؟)."
+                                    )
+                                },
+                            }
+                        ),
+                        None,
+                        stream_request_id,
+                    )
+                )
+                continue
             local_conversation_id: int | None = None
             history_messages: list[dict[str, str]] = []
 

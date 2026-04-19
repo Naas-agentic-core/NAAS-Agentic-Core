@@ -16,7 +16,12 @@ def test_safe_conversation_id_parses_string_and_int() -> None:
 def test_frontend_no_longer_forces_string_conversation_id() -> None:
     source = Path("frontend/app/hooks/useAgentSocket.js").read_text(encoding="utf-8")
     assert "payload.conversation_id = String(conversationId)" not in source
-    assert "Number.parseInt(String(conversationId), 10)" in source
+    assert "Number.parseInt(String(effectiveConversationId), 10)" in source
+    assert "const effectiveConversationId =" in source
+    assert "activeConversationIdRef.current = payload.conversation_id;" in source
+    assert "return normalized.slice(-60);" in source
+    assert "isAmbiguousFollowupQuestion(text)" in source
+    assert "hasEntityAnchorInMessages(messages)" in source
 
 
 def test_gateway_has_explicit_admin_conversation_routes_before_admin_catch_all() -> None:

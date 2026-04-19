@@ -143,7 +143,46 @@ const buildClientContextMessages = (messages, currentQuestion) => {
         normalized.push({ role: 'user', content: questionText });
     }
 
-    return normalized.slice(-30);
+    return normalized.slice(-60);
+};
+
+const isAmbiguousFollowupQuestion = (text) => {
+    const normalized = typeof text === 'string' ? text.trim().toLowerCase() : '';
+    if (!normalized) return false;
+    const triggers = [
+        'عاصمتها',
+        'عاصمته',
+        'عاصمتهم',
+        'موقعها',
+        'عدد سكانها',
+        'كم سكانها',
+        'what is its',
+        'where is its',
+    ];
+    if (triggers.some((item) => normalized.includes(item))) return true;
+    return normalized.split(/\s+/).length <= 4 && ['ها', 'his', 'her', 'its'].some((item) => normalized.includes(item));
+};
+
+const hasEntityAnchorInMessages = (messages) => {
+    const safeMessages = Array.isArray(messages) ? messages : [];
+    const anchorRegex = /\b(?:france|algeria|egypt|morocco|tunisia|germany|spain|niger|nigeria)\b/i;
+    const blocked = new Set(['ما', 'من', 'هي', 'هو', 'عاصمتها', 'عاصمته', 'موقعها', 'كم', 'أين']);
+
+    for (let idx = safeMessages.length - 1; idx >= 0; idx -= 1) {
+        const item = safeMessages[idx];
+        if (!item || item.role !== 'user') continue;
+        const content = typeof item.content === 'string' ? item.content.trim() : '';
+        if (!content) continue;
+        if (anchorRegex.test(content)) return true;
+
+        const arabicTokens = (content.match(/[\u0600-\u06FF]+/g) || [])
+            .map((token) => token.replace(/[؟،.!:؛]/g, '').trim())
+            .filter((token) => token.length > 0);
+        if (arabicTokens.some((token) => token.length > 2 && !blocked.has(token))) {
+            return true;
+        }
+    }
+    return false;
 };
 
 export const useAgentSocket = (endpoint, token, onConversationUpdate) => {
@@ -229,6 +268,7 @@ export const useAgentSocket = (endpoint, token, onConversationUpdate) => {
 
             if (type === 'conversation_init') {
                 if (payload?.conversation_id) {
+                    activeConversationIdRef.current = payload.conversation_id;
                     setConversationId(payload.conversation_id);
                 }
                 refreshConversationHistory();
@@ -325,10 +365,26 @@ export const useAgentSocket = (endpoint, token, onConversationUpdate) => {
             client_context_messages: buildClientContextMessages(messages, text),
             ...metadata,
         };
-        if (conversationId !== null && conversationId !== undefined) {
-            const normalizedConversationId = Number.parseInt(String(conversationId), 10);
+        const effectiveConversationId =
+            activeConversationIdRef.current !== null && activeConversationIdRef.current !== undefined
+                ? activeConversationIdRef.current
+                : conversationId;
+
+        if (
+            effectiveConversationId === null
+            && isAmbiguousFollowupQuestion(text)
+            && !hasEntityAnchorInMessages(messages)
+        ) {
+            const advisory = 'السؤال الحالي إحالي بدون مرجع واضح. اذكر الكيان صراحةً (مثال: ما عاصمة النيجر؟).';
+            notifyAgentError(advisory);
+            addMessage({ id: generateId(), role: 'assistant', content: advisory, isComplete: true, isError: true });
+            activeRequestIdRef.current = null;
+            return;
+        }
+        if (effectiveConversationId !== null && effectiveConversationId !== undefined) {
+            const normalizedConversationId = Number.parseInt(String(effectiveConversationId), 10);
             payload.conversation_id = Number.isNaN(normalizedConversationId)
-                ? conversationId
+                ? effectiveConversationId
                 : normalizedConversationId;
         }
 

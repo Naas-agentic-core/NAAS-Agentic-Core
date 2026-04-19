@@ -35,7 +35,7 @@ class ChatRoutingPolicy:
 
         return cls(
             candidate_bases=deduped,
-            fallback_enabled=os.getenv("ORCHESTRATOR_LOCAL_FALLBACK_ENABLED", "1") != "0",
+            fallback_enabled=os.getenv("ORCHESTRATOR_LOCAL_FALLBACK_ENABLED", "0") != "0",
             breakglass_multi_target=breakglass_multi_target,
             contract_version=os.getenv("CHAT_CONTRACT_VERSION", "v1"),
         )
