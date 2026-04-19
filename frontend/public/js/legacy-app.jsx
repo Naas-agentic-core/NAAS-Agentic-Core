@@ -579,8 +579,6 @@ const { useState, useEffect, useRef, useCallback, memo } = React;
             const handleSend = async () => {
                 if (!input.trim()) return;
 
-                // Removed socket close
-
                 const userMsgId = generateId();
                 const question = input;
                 safeSetMessages(prev => [...prev, { id: userMsgId, role: 'user', content: question }]);
@@ -609,7 +607,8 @@ const { useState, useEffect, useRef, useCallback, memo } = React;
                 const wsUrl = `${wsBase}/api/chat/ws`;
 
                 let socket = socketRef.current;
-                const isNewSocket = !socket || socket.readyState !== WebSocket.OPEN;
+                const isNewSocket = !socket || (socket.readyState === WebSocket.CLOSED || socket.readyState === WebSocket.CLOSING);
+
                 if (isNewSocket) {
                     socket = new WebSocket(wsUrl, ['jwt', token]);
                     socketRef.current = socket;
@@ -625,11 +624,20 @@ const { useState, useEffect, useRef, useCallback, memo } = React;
                     socket.isNewMessage = true;
                     socket.lastUpdateTimestamp = 0;
                     socket.assistantMsgId = generateId();
-                    socket.send(JSON.stringify(payload));
+                    if (socket.readyState === WebSocket.OPEN) {
+                        socket.send(JSON.stringify(payload));
+                    } else if (socket.readyState === WebSocket.CONNECTING) {
+                        // Wait for open
+                        const oldOnOpen = socket.onopen;
+                        socket.onopen = (e) => {
+                            if (oldOnOpen) oldOnOpen(e);
+                            socket.send(JSON.stringify(payload));
+                        };
+                    }
                     return; // Skip attaching event listeners again
                 }
 
-                socket.onopen = () => {
+                socket.onopen = (e) => {
                     socket.send(JSON.stringify(payload));
                 };
 
@@ -645,6 +653,7 @@ const { useState, useEffect, useRef, useCallback, memo } = React;
                                 setConversationId(initPayload.conversation_id);
                             }
                             socket.isNewMessage = true;
+
                             const refreshToken = localStorage.getItem('token');
                             fetch(apiUrl('/api/chat/conversations'), {
                                 headers: { 'Authorization': `Bearer ${refreshToken}` }
@@ -666,6 +675,9 @@ const { useState, useEffect, useRef, useCallback, memo } = React;
                             } else {
                                 if (socket.assistantMessage.length < 50000) {
                                     socket.assistantMessage += content;
+                                } else if (!socket.assistantMessage.endsWith("... [Truncated by Browser Safeguard]")) {
+                                    socket.assistantMessage += "\n\n... [Truncated by Browser Safeguard]";
+                                    console.warn("Stream truncated to prevent browser crash (50k limit reached)");
                                 }
 
                                 const now = Date.now();
@@ -689,7 +701,7 @@ const { useState, useEffect, useRef, useCallback, memo } = React;
                                     )
                                 );
                             }
-                            // socket.close(); removed to persist connection
+                            // socket.close() removed to persist connection
                             return;
                         }
 
@@ -939,11 +951,9 @@ const { useState, useEffect, useRef, useCallback, memo } = React;
             const handleSend = async () => {
                 if (!input.trim()) return;
 
-                // Removed socket close
-
                 const userMsgId = generateId();
                 const question = input;
-                safeSetMessages(prev => [...prev, { id: userMsgId, role: 'user', content: input }]);
+                safeSetMessages(prev => [...prev, { id: userMsgId, role: 'user', content: question }]);
                 setInput('');
 
                 const token = localStorage.getItem('token');
@@ -969,7 +979,8 @@ const { useState, useEffect, useRef, useCallback, memo } = React;
                 const wsUrl = `${wsBase}/admin/api/chat/ws`;
 
                 let socket = socketRef.current;
-                const isNewSocket = !socket || socket.readyState !== WebSocket.OPEN;
+                const isNewSocket = !socket || (socket.readyState === WebSocket.CLOSED || socket.readyState === WebSocket.CLOSING);
+
                 if (isNewSocket) {
                     socket = new WebSocket(wsUrl, ['jwt', token]);
                     socketRef.current = socket;
@@ -985,15 +996,24 @@ const { useState, useEffect, useRef, useCallback, memo } = React;
                     socket.isNewMessage = true;
                     socket.lastUpdateTimestamp = 0;
                     socket.assistantMsgId = generateId();
-                    socket.send(JSON.stringify(payload));
+                    if (socket.readyState === WebSocket.OPEN) {
+                        socket.send(JSON.stringify(payload));
+                    } else if (socket.readyState === WebSocket.CONNECTING) {
+                        // Wait for open
+                        const oldOnOpen = socket.onopen;
+                        socket.onopen = (e) => {
+                            if (oldOnOpen) oldOnOpen(e);
+                            socket.send(JSON.stringify(payload));
+                        };
+                    }
                     return; // Skip attaching event listeners again
                 }
 
-                socket.onopen = () => {
+                socket.onopen = (e) => {
                     socket.send(JSON.stringify(payload));
                 };
 
-                socket.onmessage = (event) => {
+                socket.onmessage = async (event) => {
                     try {
                         const parsed = JSON.parse(event.data);
                         if (parsed.type === 'status') {
@@ -1004,9 +1024,14 @@ const { useState, useEffect, useRef, useCallback, memo } = React;
                             if (initPayload.conversation_id) {
                                 setConversationId(initPayload.conversation_id);
                             }
-                            safeSetMessages(prev => [...prev, { id: generateId(), role: 'init', content: `Conversation ${initPayload.conversation_id} - ${initPayload.title || ''}` }]);
                             socket.isNewMessage = true;
-                            fetchConversations();
+                            safeSetMessages(prev => [...prev, { id: generateId(), role: 'init', content: `Conversation ${initPayload.conversation_id} - ${initPayload.title || ''}` }]);
+                            const refreshToken = localStorage.getItem('token');
+                            fetch(apiUrl('/api/chat/conversations'), {
+                                headers: { 'Authorization': `Bearer ${refreshToken}` }
+                            }).then(res => res.ok ? res.json() : [])
+                              .then(data => setConversations(Array.isArray(data) ? data : []))
+                              .catch(() => {});
                             return;
                         }
 
@@ -1048,7 +1073,7 @@ const { useState, useEffect, useRef, useCallback, memo } = React;
                                     )
                                 );
                             }
-                            // socket.close(); removed to persist connection
+                            // socket.close() removed to persist connection
                             return;
                         }
 
@@ -1056,16 +1081,13 @@ const { useState, useEffect, useRef, useCallback, memo } = React;
                             const details = parsed?.payload?.details || 'Unexpected error.';
                             safeSetMessages(prev => [...prev, { id: generateId(), role: 'assistant', content: `Error: ${details}` }]);
                         }
-                    } catch (e) {
-                        console.error('Error parsing stream data:', e);
+                    } catch (parseError) {
+                        console.error('Parse error:', parseError);
                     }
                 };
 
                 socket.onerror = () => {
-                    safeSetMessages(prev => [
-                        ...prev,
-                        { id: generateId(), role: 'assistant', content: 'Sorry, I encountered a connection error.' }
-                    ]);
+                    safeSetMessages(prev => [...prev, { id: generateId(), role: 'assistant', content: 'Sorry, I encountered a connection error.' }]);
                 };
 
                 socket.onclose = () => {
