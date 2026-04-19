@@ -189,13 +189,21 @@ def _build_graph_messages(
         seeded.append(latest_user_message)
         return seeded
 
+    import logging
+
+    local_logger = logging.getLogger("routes")
+
+    history_len = len(history_messages) if history_messages else 0
+    local_logger.warning(
+        f"[_build_graph_messages] checkpointer_available={checkpointer_available}, "
+        f"checkpoint_has_state={checkpoint_has_state}, history_messages_len={history_len}"
+    )
+
     if history_messages:
         seeded = _build_langchain_messages(history_messages)
         return _append_latest_if_missing(seeded)
 
-    if checkpointer_available and checkpoint_has_state:
-        return [latest_user_message]
-
+    # Fallback to rely purely on checkpointer ONLY if history is absent
     return [latest_user_message]
 
 
