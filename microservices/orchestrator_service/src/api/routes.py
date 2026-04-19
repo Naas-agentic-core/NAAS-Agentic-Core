@@ -295,13 +295,7 @@ def _extract_recent_entity_anchor(history_messages: list[dict[str, str]] | None)
         "يقوم",
     }
 
-    for message in reversed(history_messages):
-        if message.get("role") != "user":
-            continue
-        content = str(message.get("content", "")).strip()
-        if not content:
-            continue
-
+    def _extract_from_text(content: str) -> str | None:
         english_entities = re.findall(
             r"\b(?:France|Algeria|Egypt|Morocco|Tunisia|Germany|Spain)\b",
             content,
@@ -317,10 +311,30 @@ def _extract_recent_entity_anchor(history_messages: list[dict[str, str]] | None)
         candidate_tokens = [
             token for token in arabic_tokens if len(token) > 2 and token not in stop_words
         ]
-        if not candidate_tokens:
-            continue
+        if candidate_tokens:
+            return candidate_tokens[-1]
+        return None
 
-        return candidate_tokens[-1]
+    for message in reversed(history_messages):
+        if message.get("role") != "user":
+            continue
+        content = str(message.get("content", "")).strip()
+        if not content:
+            continue
+        extracted = _extract_from_text(content)
+        if extracted:
+            return extracted
+
+    # Forensic fallback: if user turns were trimmed/lost, use assistant turns as a backup anchor source.
+    for message in reversed(history_messages):
+        if message.get("role") != "assistant":
+            continue
+        content = str(message.get("content", "")).strip()
+        if not content:
+            continue
+        extracted = _extract_from_text(content)
+        if extracted:
+            return extracted
     return None
 
 
@@ -1302,6 +1316,15 @@ async def _stream_chat_langgraph(
         )
     context_gap_reason = _context_gap_reason_for_followup(objective, safe_history)
     if context_gap_reason is not None:
+        history_size = len(safe_history)
+        logger.warning(
+            "[CONTEXT_GUARD] blocked ambiguous follow-up without anchor. conv_id=%s thread_id=%s reason=%s history_size=%s objective=%s",
+            conversation_id,
+            thread_id,
+            context_gap_reason,
+            history_size,
+            objective[:120],
+        )
         await websocket.send_json(
             {
                 "type": "context_missing",
@@ -1309,19 +1332,21 @@ async def _stream_chat_langgraph(
                     "code": context_gap_reason,
                     "message": "تعذّر تحديد الكيان المرجعي من السياق الحالي.",
                     "conversation_id": conversation_id,
+                    "thread_id": thread_id,
+                    "history_size": history_size,
+                    "source": "orchestrator.context_guard",
                 },
             }
         )
         await websocket.send_json(
             {
                 "type": "assistant_error",
-                "payload": {"content": "يرجى ذكر الكيان المقصود صراحةً (مثال: ما عاصمة الجزائر؟)."},
+                "payload": {
+                    "content": "يرجى ذكر الكيان المقصود صراحةً (مثال: ما عاصمة الجزائر؟).",
+                    "code": context_gap_reason,
+                    "source": "orchestrator.context_guard",
+                },
             }
-        )
-        logger.warning(
-            "[CONTEXT_GUARD] blocked ambiguous follow-up without anchor. conv_id=%s reason=%s",
-            conversation_id,
-            context_gap_reason,
         )
         return
     prepared_objective = _augment_ambiguous_objective(objective, safe_history)

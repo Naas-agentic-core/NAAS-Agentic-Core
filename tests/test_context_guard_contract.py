@@ -33,3 +33,11 @@ def test_france_followup_is_augmented_with_anchor() -> None:
     rewritten = _augment_ambiguous_objective("ما هي عاصمتها؟", history)
     assert "فرنسا" in rewritten
     assert "مرجع سياقي إلزامي" in rewritten
+
+
+def test_context_gap_uses_assistant_anchor_when_user_turn_missing() -> None:
+    history = [
+        {"role": "assistant", "content": "تقع فرنسا في غرب أوروبا وحدودها مع بلجيكا وألمانيا."},
+    ]
+    reason = _context_gap_reason_for_followup("ما هي عاصمتها؟", history_messages=history)
+    assert reason is None
