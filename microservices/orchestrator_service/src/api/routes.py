@@ -1371,6 +1371,7 @@ async def _stream_chat_langgraph(
             )
             config = {"configurable": {"thread_id": thread_id}}
             checkpointer_available, checkpoint_has_state = await _detect_checkpoint_state(thread_id)
+            logger.warning(f"HISTORY SIZE: {len(history_messages) if history_messages else 0}")
             langchain_msgs = _build_graph_messages(
                 objective=prepared_objective,
                 history_messages=safe_history,
