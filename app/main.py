@@ -53,4 +53,6 @@ def create_app(
         static_config = StaticFilesConfig(static_dir=static_dir)
         setup_static_files_middleware(application, static_config)
 
+    application.state._kernel = kernel
+
     return application
