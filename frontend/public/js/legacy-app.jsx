@@ -154,6 +154,29 @@ const { useState, useEffect, useRef, useCallback, memo } = React;
         // Helper to generate unique IDs
         const generateId = () => Math.random().toString(36).substr(2, 9) + Date.now().toString(36);
 
+        const buildClientContextMessages = (messages, currentQuestion, maxItems = 30) => {
+            const safeMessages = Array.isArray(messages) ? messages : [];
+            const normalizedHistory = safeMessages
+                .filter(
+                    (item) =>
+                        item &&
+                        (item.role === 'user' || item.role === 'assistant') &&
+                        typeof item.content === 'string' &&
+                        item.content.trim().length > 0
+                )
+                .map((item) => ({
+                    role: item.role,
+                    content: item.content.trim(),
+                }));
+
+            const questionText = typeof currentQuestion === 'string' ? currentQuestion.trim() : '';
+            if (questionText.length > 0) {
+                normalizedHistory.push({ role: 'user', content: questionText });
+            }
+
+            return normalizedHistory.slice(-maxItems);
+        };
+
         const App = () => {
             const [token, setToken] = useState(localStorage.getItem('token'));
             const [user, setUser] = useState(null);
@@ -571,7 +594,12 @@ const { useState, useEffect, useRef, useCallback, memo } = React;
                     return;
                 }
 
-                const payload = { question };
+                const clientContextMessages = buildClientContextMessages(messages, question);
+
+                const payload = {
+                    question,
+                    client_context_messages: clientContextMessages,
+                };
                 if (conversationId !== null && conversationId !== undefined) {
                     const normalizedConversationId = Number.parseInt(String(conversationId), 10);
                     payload.conversation_id = Number.isNaN(normalizedConversationId)
@@ -914,7 +942,12 @@ const { useState, useEffect, useRef, useCallback, memo } = React;
                     return;
                 }
 
-                const payload = { question };
+                const clientContextMessages = buildClientContextMessages(messages, question);
+
+                const payload = {
+                    question,
+                    client_context_messages: clientContextMessages,
+                };
                 if (conversationId !== null && conversationId !== undefined) {
                     const normalizedConversationId = Number.parseInt(String(conversationId), 10);
                     payload.conversation_id = Number.isNaN(normalizedConversationId)
