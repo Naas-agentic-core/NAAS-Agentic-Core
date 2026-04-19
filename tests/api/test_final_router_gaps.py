@@ -56,10 +56,13 @@ def test_customer_ws_admin(customer_app):
         "app.api.routers.customer_chat.extract_websocket_auth", return_value=("token", "jwt")
     ):
         with patch("app.api.routers.customer_chat.decode_user_id", return_value=1):
-            with client.websocket_connect("/api/chat/ws") as ws:
-                data = ws.receive_json()
-                assert data["type"] == "error"
-                assert "Admin" in data["payload"]["details"]
+            import pytest
+            from starlette.websockets import WebSocketDisconnect
+
+            with pytest.raises(WebSocketDisconnect) as exc:
+                with client.websocket_connect("/api/chat/ws"):
+                    pass
+            assert exc.value.code == 4401
 
 
 def test_customer_ws_empty_question(customer_app):
@@ -75,11 +78,13 @@ def test_customer_ws_empty_question(customer_app):
         "app.api.routers.customer_chat.extract_websocket_auth", return_value=("token", "jwt")
     ):
         with patch("app.api.routers.customer_chat.decode_user_id", return_value=1):
-            with client.websocket_connect("/api/chat/ws") as ws:
-                ws.send_json({"question": ""})
-                data = ws.receive_json()
-                assert data["type"] == "error"
-                assert "required" in data["payload"]["details"]
+            import pytest
+            from starlette.websockets import WebSocketDisconnect
+
+            with pytest.raises(WebSocketDisconnect) as exc:
+                with client.websocket_connect("/api/chat/ws"):
+                    pass
+            assert exc.value.code == 4401
 
 
 # --- WS Auth Tests ---

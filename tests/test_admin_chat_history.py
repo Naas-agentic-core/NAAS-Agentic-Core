@@ -202,20 +202,36 @@ async def test_admin_dispatch_receives_mission_metadata_and_conversation_id(
         with patch.object(OrchestratorClient, "chat_with_agent", new=mock_chat):
             token = await _create_admin_user_and_token(db_session, "admin-meta@example.com")
 
+            # Prepare conversation
+            from sqlalchemy import select
+
+            from app.core.domain.user import User
+
+            user = (
+                await db_session.execute(select(User).where(User.email == "admin-meta@example.com"))
+            ).scalar_one()
+            from app.core.domain.chat import AdminConversation
+
+            conv = AdminConversation(user_id=user.id, title="Test conv")
+            db_session.add(conv)
+            await db_session.commit()
+
             with TestClient(test_app) as client:
                 with client.websocket_connect(f"/admin/api/chat/ws?token={token}") as websocket:
                     websocket.send_json(
                         {
                             "question": "Run admin mission",
-                            "conversation_id": 77,
+                            "conversation_id": conv.id,
                             "mission_type": "mission_complex",
                         }
                     )
                     _consume_stream_until_terminal(websocket)
+
+            captured["expected_conversation_id"] = conv.id
     finally:
         test_app.dependency_overrides.clear()
 
-    assert captured.get("conversation_id") == 77
+    assert captured.get("conversation_id") == captured.get("expected_conversation_id")
     metadata = captured.get("metadata")
     assert isinstance(metadata, dict)
     assert metadata.get("mission_type") == "mission_complex"
