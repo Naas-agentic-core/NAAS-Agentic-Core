@@ -363,12 +363,10 @@ def _augment_ambiguous_objective(
         return normalized
 
     try:
-        from microservices.orchestrator_service.src.core.config import get_settings
         from microservices.orchestrator_service.src.services.llm.client import get_ai_client
 
         ai_client = get_ai_client()
-        response = ai_client.chat.completions.create(
-            model=get_settings().LLM_MODEL,
+        response = ai_client.generate_sync(
             messages=[
                 {
                     "role": "user",

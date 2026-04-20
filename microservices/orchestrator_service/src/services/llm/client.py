@@ -21,14 +21,25 @@ class AIClient:
     """
 
     def __init__(self) -> None:
+        from openai import AsyncOpenAI, OpenAI
+
         settings = get_settings()
-        api_key = settings.OPENAI_API_KEY or settings.OPENROUTER_API_KEY
-        base_url = "https://openrouter.ai/api/v1" if settings.OPENROUTER_API_KEY else None
+        if settings.OPENROUTER_API_KEY:
+            api_key = settings.OPENROUTER_API_KEY
+            base_url = "https://openrouter.ai/api/v1"
+        else:
+            api_key = settings.OPENAI_API_KEY
+            base_url = None
 
         if not api_key:
             logger.warning("No API Key found for AI Client. AI features will fail.")
 
         self.client = AsyncOpenAI(
+            api_key=api_key or "dummy-key",
+            base_url=base_url,
+        )
+
+        self.sync_client = OpenAI(
             api_key=api_key or "dummy-key",
             base_url=base_url,
         )
@@ -89,6 +100,29 @@ class AIClient:
         """Helper for simple text generation."""
         response = await self.generate(prompt=prompt, **kwargs)
         return response.choices[0].message.content or ""
+
+    def generate_sync(
+        self,
+        model: str | None = None,
+        messages: list[dict[str, str]] | None = None,
+        **kwargs: object,
+    ) -> object:
+        """
+        Generate a complete response synchronously.
+        """
+        target_model = model or self.default_model
+        if not messages:
+            messages = [{"role": "user", "content": kwargs.get("prompt", "")}]
+
+        try:
+            return self.sync_client.chat.completions.create(
+                model=target_model,
+                messages=messages,
+                **kwargs,
+            )
+        except Exception as e:
+            logger.error(f"AI Sync Generation failed: {e}")
+            raise
 
 
 # Singleton instance
