@@ -346,38 +346,49 @@ def _extract_recent_entity_anchor(history_messages: list[dict[str, str]] | None)
     return None
 
 
-async def _rewrite_with_entity(query: str, entity: str) -> str:
-    prompt = f"""أعد صياغة السؤال التالي بحل الإحالة.
-السؤال: {query}
-الكيان: {entity}
-أخرج فقط السؤال النهائي بدون أي شرح."""
+def _augment_ambiguous_objective(
+    objective: str,
+    history_messages: list[dict[str, str]] | None,
+) -> str:
+    normalized = objective.strip()
+    if not normalized:
+        return normalized
+    if not _is_ambiguous_followup(normalized):
+        return normalized
+    if _question_contains_explicit_entity(normalized):
+        return normalized
 
-    from microservices.orchestrator_service.src.services.llm.client import get_ai_client
+    anchor = _extract_recent_entity_anchor(history_messages)
+    if not anchor:
+        return normalized
 
-    client = get_ai_client()
     try:
-        result = await client.generate_text(prompt=prompt)
+        from microservices.orchestrator_service.src.core.config import get_settings
+        from microservices.orchestrator_service.src.services.llm.client import get_ai_client
+
+        ai_client = get_ai_client()
+        response = ai_client.chat.completions.create(
+            model=get_settings().LLM_MODEL,
+            messages=[
+                {
+                    "role": "user",
+                    "content": (
+                        f"أعد صياغة السؤال بحل الإحالة.\n"
+                        f"السؤال: {normalized}\n"
+                        f"الكيان: {anchor}\n"
+                        f"أخرج السؤال فقط."
+                    ),
+                }
+            ],
+            max_tokens=100,
+        )
+        result = response.choices[0].message.content.strip()
+        if result and len(result) <= 200:
+            return result
     except Exception:
-        return query
+        pass
 
-    if not isinstance(result, str):
-        return query
-
-    cleaned = result.strip()
-
-    if len(cleaned) == 0 or len(cleaned) > 200:
-        return query
-
-    return cleaned
-
-
-async def _augment_ambiguous_objective(query: str, history: list) -> str:
-    entity = _extract_recent_entity_anchor(history)
-
-    if not entity:
-        return query
-
-    return await _rewrite_with_entity(query, entity)
+    return normalized
 
 
 def _context_gap_reason_for_followup(
@@ -1372,7 +1383,7 @@ async def _stream_chat_langgraph(
             }
         )
         return
-    prepared_objective = await _augment_ambiguous_objective(objective, safe_history)
+    prepared_objective = _augment_ambiguous_objective(objective, safe_history)
 
     async def _runner():
         async def _safe_put(evt: dict[str, object]) -> None:
@@ -1695,7 +1706,7 @@ async def _run_chat_langgraph(
         safe_conversation_id if safe_conversation_id is not None else str(uuid.uuid4())
     )
     thread_id = _resolve_thread_id(context, conversation_id)
-    prepared_objective = await _augment_ambiguous_objective(objective, history_messages)
+    prepared_objective = _augment_ambiguous_objective(objective, history_messages)
     config = {"configurable": {"thread_id": thread_id}}
     logger.info(
         "[THREAD_BINDING] channel=http thread_id=%s source=%s conversation_id=%s",
@@ -2380,7 +2391,7 @@ async def chat_with_agent_endpoint(
                 langchain_msgs: list[HumanMessage | AIMessage] = []
 
                 # Augment the objective for explicit context before sending to LangGraph
-                prepared_objective = await _augment_ambiguous_objective(
+                prepared_objective = _augment_ambiguous_objective(
                     request.question, request.history_messages
                 )
 
@@ -2518,7 +2529,7 @@ async def chat_with_agent_endpoint(
 
     async def _stream_generator():
         try:
-            prepared_objective = await _augment_ambiguous_objective(
+            prepared_objective = _augment_ambiguous_objective(
                 request.question, request.history_messages
             )
 
