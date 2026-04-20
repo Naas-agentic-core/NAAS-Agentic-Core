@@ -21,7 +21,7 @@ class AIClient:
     """
 
     def __init__(self) -> None:
-        from openai import AsyncOpenAI, OpenAI
+        from openai import OpenAI
 
         settings = get_settings()
         if settings.OPENROUTER_API_KEY:
