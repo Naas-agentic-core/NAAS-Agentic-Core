@@ -350,7 +350,6 @@ def _augment_ambiguous_objective(
     objective: str,
     history_messages: list[dict[str, str]] | None,
 ) -> str:
-    """يعزّز السؤال الإحالي بمرساة كيان صريحة قبل تمريره للنموذج."""
     normalized = objective.strip()
     if not normalized:
         return normalized
@@ -362,7 +361,31 @@ def _augment_ambiguous_objective(
     anchor = _extract_recent_entity_anchor(history_messages)
     if not anchor:
         return normalized
-    return f"{normalized}\n\nمرجع سياقي إلزامي: الكيان المقصود في هذا السؤال هو: {anchor}."
+
+    try:
+        ai_client = get_ai_client()
+        response = ai_client.chat.completions.create(
+            model=get_settings().LLM_MODEL,
+            messages=[
+                {
+                    "role": "user",
+                    "content": (
+                        f"أعد صياغة السؤال بحل الإحالة.\n"
+                        f"السؤال: {normalized}\n"
+                        f"الكيان: {anchor}\n"
+                        f"أخرج السؤال فقط."
+                    ),
+                }
+            ],
+            max_tokens=100,
+        )
+        result = response.choices[0].message.content.strip()
+        if result and len(result) <= 200:
+            return result
+    except Exception:
+        pass
+
+    return normalized
 
 
 def _context_gap_reason_for_followup(
