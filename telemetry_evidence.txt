@@ -52,3 +52,57 @@
 [TELEMETRY] INGRESS | conversation_id=999 | thread_id='u1:c999' | messages_in_request=0
 [TELEMETRY] PRE-INVOKE | messages type=list | count=1 | last_msg=content='hello' additional_kwargs={} response_metadata={}
 [TELEMETRY] CHECKPOINTER NOT IN SCOPE
+[TELEMETRY] INGRESS | conversation_id=123 | thread_id='u1:c123' | messages_in_request=0
+[TELEMETRY] PRE-INVOKE | messages type=list | count=1 | last_msg=content='hello' additional_kwargs={} response_metadata={}
+[TELEMETRY] CHECKPOINTER NOT IN SCOPE
+[TELEMETRY] INGRESS | conversation_id=456 | thread_id='u1:c456' | messages_in_request=0
+[TELEMETRY] PRE-INVOKE | messages type=list | count=1 | last_msg=content='hello' additional_kwargs={} response_metadata={}
+[TELEMETRY] CHECKPOINTER NOT IN SCOPE
+[TELEMETRY] INGRESS | conversation_id=999 | thread_id='u1:c999' | messages_in_request=0
+[TELEMETRY] PRE-INVOKE | messages type=list | count=1 | last_msg=content='hello' additional_kwargs={} response_metadata={}
+[TELEMETRY] CHECKPOINTER NOT IN SCOPE
+[TELEMETRY] INGRESS | conversation_id=123 | thread_id='u1:c123' | messages_in_request=0
+[TELEMETRY] PRE-INVOKE | messages type=list | count=1 | last_msg=content='hello' additional_kwargs={} response_metadata={}
+[TELEMETRY] CHECKPOINTER NOT IN SCOPE
+[TELEMETRY] INGRESS | conversation_id=456 | thread_id='u1:c456' | messages_in_request=0
+[TELEMETRY] PRE-INVOKE | messages type=list | count=1 | last_msg=content='hello' additional_kwargs={} response_metadata={}
+[TELEMETRY] CHECKPOINTER NOT IN SCOPE
+[TELEMETRY] INGRESS | conversation_id=999 | thread_id='u1:c999' | messages_in_request=0
+[TELEMETRY] PRE-INVOKE | messages type=list | count=1 | last_msg=content='hello' additional_kwargs={} response_metadata={}
+[TELEMETRY] CHECKPOINTER NOT IN SCOPE
+[TELEMETRY] INGRESS | conversation_id=123 | thread_id='u1:c123' | messages_in_request=0
+[TELEMETRY] PRE-INVOKE | messages type=list | count=1 | last_msg=content='hello' additional_kwargs={} response_metadata={}
+[TELEMETRY] CHECKPOINTER NOT IN SCOPE
+[TELEMETRY] INGRESS | conversation_id=456 | thread_id='u1:c456' | messages_in_request=0
+[TELEMETRY] PRE-INVOKE | messages type=list | count=1 | last_msg=content='hello' additional_kwargs={} response_metadata={}
+[TELEMETRY] CHECKPOINTER NOT IN SCOPE
+[TELEMETRY] INGRESS | conversation_id=999 | thread_id='u1:c999' | messages_in_request=0
+[TELEMETRY] PRE-INVOKE | messages type=list | count=1 | last_msg=content='hello' additional_kwargs={} response_metadata={}
+[TELEMETRY] CHECKPOINTER NOT IN SCOPE
+[TELEMETRY] INGRESS | conversation_id=123 | thread_id='u1:c123' | messages_in_request=0
+[TELEMETRY] PRE-INVOKE | messages type=list | count=1 | last_msg=content='hello' additional_kwargs={} response_metadata={}
+[TELEMETRY] CHECKPOINTER NOT IN SCOPE
+[TELEMETRY] INGRESS | conversation_id=456 | thread_id='u1:c456' | messages_in_request=0
+[TELEMETRY] PRE-INVOKE | messages type=list | count=1 | last_msg=content='hello' additional_kwargs={} response_metadata={}
+[TELEMETRY] CHECKPOINTER NOT IN SCOPE
+[TELEMETRY] INGRESS | conversation_id=999 | thread_id='u1:c999' | messages_in_request=0
+[TELEMETRY] PRE-INVOKE | messages type=list | count=1 | last_msg=content='hello' additional_kwargs={} response_metadata={}
+[TELEMETRY] CHECKPOINTER NOT IN SCOPE
+[TELEMETRY] INGRESS | conversation_id=123 | thread_id='u1:c123' | messages_in_request=0
+[TELEMETRY] PRE-INVOKE | messages type=list | count=1 | last_msg=content='hello' additional_kwargs={} response_metadata={}
+[TELEMETRY] CHECKPOINTER NOT IN SCOPE
+[TELEMETRY] INGRESS | conversation_id=456 | thread_id='u1:c456' | messages_in_request=0
+[TELEMETRY] PRE-INVOKE | messages type=list | count=1 | last_msg=content='hello' additional_kwargs={} response_metadata={}
+[TELEMETRY] CHECKPOINTER NOT IN SCOPE
+[TELEMETRY] INGRESS | conversation_id=999 | thread_id='u1:c999' | messages_in_request=0
+[TELEMETRY] PRE-INVOKE | messages type=list | count=1 | last_msg=content='hello' additional_kwargs={} response_metadata={}
+[TELEMETRY] CHECKPOINTER NOT IN SCOPE
+[TELEMETRY] INGRESS | conversation_id=123 | thread_id='u1:c123' | messages_in_request=0
+[TELEMETRY] PRE-INVOKE | messages type=list | count=1 | last_msg=content='hello' additional_kwargs={} response_metadata={}
+[TELEMETRY] CHECKPOINTER NOT IN SCOPE
+[TELEMETRY] INGRESS | conversation_id=456 | thread_id='u1:c456' | messages_in_request=0
+[TELEMETRY] PRE-INVOKE | messages type=list | count=1 | last_msg=content='hello' additional_kwargs={} response_metadata={}
+[TELEMETRY] CHECKPOINTER NOT IN SCOPE
+[TELEMETRY] INGRESS | conversation_id=999 | thread_id='u1:c999' | messages_in_request=0
+[TELEMETRY] PRE-INVOKE | messages type=list | count=1 | last_msg=content='hello' additional_kwargs={} response_metadata={}
+[TELEMETRY] CHECKPOINTER NOT IN SCOPE
