@@ -400,8 +400,10 @@ def _configure_dspy() -> None:
 
 class IntentClassifier(dspy.Signature):
     """Classify if conversation needs admin system metrics, general chat/greetings, general knowledge, or educational search.
-    Follow-up questions about previous exercises/topics are educational searches.
-    General knowledge questions (e.g., population, capitals, history, unrelated to current subject) are general_knowledge.
+    educational: ONLY BAC exercises, school curriculum, exams.
+    general_knowledge: ALL real-world questions (geography, capitals,
+    history, science) even if follow-ups.
+    Classify by DOMAIN, not by whether it is a follow-up.
     """
 
     history: str = dspy.InputField(
