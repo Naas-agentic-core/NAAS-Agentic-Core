@@ -10,6 +10,6 @@ dspy-ai==2.5.43
 llama-index-core==0.14.13
 llama-index-embeddings-openai
 dspy==2.5.7
-litellm==1.50.0
+litellm==1.83.0
 asyncpg>=0.29.0
 psycopg2-binary>=2.9.9
