@@ -95,9 +95,7 @@ class IntentClassifier(dspy.Signature):
 
     history: str = dspy.InputField(desc="Previous conversation context to resolve pronouns.")
     question: str = dspy.InputField(desc="Current user question.")
-    intent: str = dspy.OutputField(
-        desc="One of: educational | general_knowledge | admin | chat"
-    )
+    intent: str = dspy.OutputField(desc="One of: educational | general_knowledge | admin | chat")
     confidence: float = dspy.OutputField(desc="Confidence score from 0.0 to 1.0")
     resolved_question: str = dspy.OutputField(
         desc="Question rewritten with explicit entities resolved from history."
