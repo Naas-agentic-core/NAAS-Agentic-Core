@@ -115,7 +115,7 @@ class SupervisorNode:
         history = format_conversation_history(messages)
 
         if not query:
-            return {"intent": "educational", "query": query}
+            return {"intent": "general_knowledge", "query": query}
 
         try:
             result = await asyncio.to_thread(
@@ -136,4 +136,4 @@ class SupervisorNode:
         except Exception as exc:
             logger.debug("Supervisor intent classification failed: %s", exc)
 
-        return {"intent": "educational", "query": query}
+        return {"intent": "general_knowledge", "query": query}

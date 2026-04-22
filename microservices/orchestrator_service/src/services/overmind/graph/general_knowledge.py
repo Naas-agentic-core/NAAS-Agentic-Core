@@ -82,13 +82,8 @@ class GeneralKnowledgeNode:
 
             emit_telemetry(node_name="GeneralKnowledgeNode", start_time=start_time, state=state)
             return {
-                "final_response": final_resp,
-                "messages": [
-                    AIMessage(
-                        content=response_content.strip(),
-                        additional_kwargs={"structured": final_resp},
-                    )
-                ],
+                "final_response": response_content.strip(),
+                "messages": [AIMessage(content=response_content.strip())]
             }
 
         except Exception as error:
@@ -102,10 +97,6 @@ class GeneralKnowledgeNode:
                 node_name="GeneralKnowledgeNode", start_time=start_time, state=state, error=error
             )
             return {
-                "final_response": final_resp,
-                "messages": [
-                    AIMessage(
-                        content=fallback_response, additional_kwargs={"structured": final_resp}
-                    )
-                ],
+                "final_response": fallback_response,
+                "messages": [AIMessage(content=fallback_response)]
             }

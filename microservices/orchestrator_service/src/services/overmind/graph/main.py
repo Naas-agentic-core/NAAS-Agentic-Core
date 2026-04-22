@@ -545,13 +545,8 @@ class ChatFallbackNode:
         from langchain_core.messages import AIMessage
 
         return {
-            "final_response": final_resp,
-            # Context blindness fix: We must explicitly inject our final response into state.messages
-            # so that LangGraph's native Postgres checkpointer natively tracks it as AIMessage
-            # without manual extraction from DB for subsequent turns.
-            "messages": [
-                AIMessage(content=fallback_response, additional_kwargs={"structured": final_resp})
-            ],
+            "final_response": fallback_response,
+            "messages": [AIMessage(content=fallback_response)],
         }
 
 
