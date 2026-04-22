@@ -401,20 +401,23 @@ def _configure_dspy() -> None:
 class IntentClassifier(dspy.Signature):
     """Classify if conversation needs admin system metrics, general chat/greetings, general knowledge, or educational search.
     educational: ONLY BAC exercises, school curriculum, exams.
-    general_knowledge: ALL real-world questions (geography, capitals,
-    history, science) even if follow-ups.
+    general_knowledge: Includes ALL factual questions including follow-ups that depend on history (e.g., pronouns like 'عاصمتها').
+    admin: system metrics, service counts, operational information.
+    chat: Only greetings and small talk. NEVER factual questions.
     Classify by DOMAIN, not by whether it is a follow-up.
     """
 
     history: str = dspy.InputField(
         desc="Previous conversation context to resolve pronouns and context"
     )
-    question: str = dspy.InputField()
-    intent: str = dspy.OutputField(desc="One of: educational, general_knowledge, admin, chat")
-    confidence: float = dspy.OutputField()
+    question: str = dspy.InputField(
+        desc="If the question contains pronouns or implicit entities, you MUST resolve them using history BEFORE classification."
+    )
     resolved_question: str = dspy.OutputField(
         desc="The question rewritten with pronouns resolved using history"
     )
+    intent: str = dspy.OutputField(desc="One of: educational, general_knowledge, admin, chat")
+    confidence: float = dspy.OutputField()
 
 
 class SupervisorNode:

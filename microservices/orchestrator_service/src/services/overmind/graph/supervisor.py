@@ -88,18 +88,20 @@ class IntentClassifier(dspy.Signature):
     """Classify the user's intent into one of four mutually exclusive classes.
 
     - educational: BAC exercises, lessons, subjects, branches, school-years.
-    - general_knowledge: general facts outside BAC content (geography, history, science, language).
+    - general_knowledge: Includes ALL factual questions including follow-ups that depend on history (e.g., pronouns like 'عاصمتها').
     - admin: system metrics, service counts, operational information.
-    - chat: greetings, thanks, small talk, no real question.
+    - chat: Only greetings and small talk. NEVER factual questions.
     """
 
     history: str = dspy.InputField(desc="Previous conversation context to resolve pronouns.")
-    question: str = dspy.InputField(desc="Current user question.")
-    intent: str = dspy.OutputField(desc="One of: educational | general_knowledge | admin | chat")
-    confidence: float = dspy.OutputField(desc="Confidence score from 0.0 to 1.0")
+    question: str = dspy.InputField(
+        desc="If the question contains pronouns or implicit entities, you MUST resolve them using history BEFORE classification."
+    )
     resolved_question: str = dspy.OutputField(
         desc="Question rewritten with explicit entities resolved from history."
     )
+    intent: str = dspy.OutputField(desc="One of: educational | general_knowledge | admin | chat")
+    confidence: float = dspy.OutputField(desc="Confidence score from 0.0 to 1.0")
 
 
 class SupervisorNode:
