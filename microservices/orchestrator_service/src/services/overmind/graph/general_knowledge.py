@@ -75,11 +75,6 @@ class GeneralKnowledgeNode:
                 messages=formatted_msgs, temperature=0.3
             )
 
-            final_resp = {
-                "الإجابة": response_content.strip(),
-                "المصدر": "general_knowledge",
-            }
-
             emit_telemetry(node_name="GeneralKnowledgeNode", start_time=start_time, state=state)
             return {
                 "final_response": response_content.strip(),
@@ -89,10 +84,6 @@ class GeneralKnowledgeNode:
         except Exception as error:
             logger.error(f"GeneralKnowledgeNode failed: {error}", exc_info=True)
             fallback_response = "عذراً، لم أتمكن من استرجاع هذه المعلومة الآن."
-            final_resp = {
-                "الإجابة": fallback_response,
-                "المصدر": "general_knowledge_fallback",
-            }
             emit_telemetry(
                 node_name="GeneralKnowledgeNode", start_time=start_time, state=state, error=error
             )

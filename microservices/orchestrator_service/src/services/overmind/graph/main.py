@@ -537,10 +537,6 @@ class ChatFallbackNode:
             )
 
         emit_telemetry(node_name="ChatFallbackNode", start_time=start_time, state=state)
-        final_resp = {
-            "الإجابة": fallback_response,
-            "المصدر": "chat_fallback",
-        }
 
         from langchain_core.messages import AIMessage
 
