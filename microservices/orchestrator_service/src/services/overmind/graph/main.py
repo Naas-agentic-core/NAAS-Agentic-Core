@@ -517,11 +517,22 @@ class ChatFallbackNode:
         start_time = time.time()
         query = state.get("query", "")
         messages = state.get("messages", [])
-        formatted_history = format_conversation_history(messages[:-1])
+        formatted_history = format_conversation_history(messages[:-1]) if messages else ""
+
+        # FORENSIC PRINTS
+        print("RAW QUERY:", messages[-1].content if messages else "")
+        print("STATE QUERY:", query)
+        print("HISTORY:", formatted_history)
+
         fallback_response = (
             "وعليكم السلام! أنا هنا للمساعدة. أخبرني بما تحتاجه وسأتابع معك خطوة بخطوة."
         )
         try:
+            # MANDATORY FORENSIC PRINTS BEFORE LLM CALL
+            print("=== FINAL LLM INPUT ===")
+            print("HISTORY:", formatted_history)
+            print("QUERY:", query)
+
             prediction = await asyncio.to_thread(
                 self.generator, history=formatted_history, question=query
             )
