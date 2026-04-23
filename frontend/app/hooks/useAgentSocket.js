@@ -42,12 +42,6 @@ const getWsBase = () => {
          return `${protocol}://${hostname}:8000`;
     }
 
-    // Cloud workspace fallback (e.g. GitHub Codespaces) where port is empty and host includes -3000
-    if (hostname.includes('-3000')) {
-         const backendHostname = hostname.replace('-3000', '-8000');
-         return `${protocol}://${backendHostname}`;
-    }
-
     const host = window.location.host;
     return `${protocol}://${host}`;
 };
@@ -55,8 +49,10 @@ const getWsBase = () => {
 const buildWebSocketUrlSafe = (baseUrl, endpoint, token) => {
     try {
         const wsUrl = new URL(endpoint, baseUrl);
-        // Token is passed in header/protocol by useRealtimeConnection.
-        // REMOVED query param appending to prevent "double method" drift.
+        // Fallback: Append token to URL as Next.js rewrites may strip Sec-WebSocket-Protocol
+        if (token) {
+            wsUrl.searchParams.append("token", token);
+        }
         return wsUrl.toString();
     } catch (error) {
         errorTracker.reportError(error, { message: 'Invalid WebSocket URL parts' });
