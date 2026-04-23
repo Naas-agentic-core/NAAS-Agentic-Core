@@ -812,6 +812,18 @@ def _build_conversation_thread_id(user_id: int, conversation_id: int | str) -> s
     return f"u{user_id}:c{conversation_id}"
 
 
+def _conversation_id_from_scoped_thread(thread_id: str, user_id: int) -> int | None:
+    """يستخرج conversation_id من thread_id مقيّد بالمستخدم: u<uid>:c<cid>."""
+    normalized = thread_id.strip()
+    match = re.fullmatch(r"u(\d+):c(\d+)", normalized)
+    if not match:
+        return None
+    scoped_user_id = int(match.group(1))
+    if scoped_user_id != user_id:
+        return None
+    return int(match.group(2))
+
+
 def _decode_auth_payload_or_401(authorization: str | None) -> tuple[int, dict[str, object]]:
     """يفك JWT من ترويسة Authorization ويعيد user_id والحمولة مع فشل مغلق."""
     token = extract_bearer_token(authorization)
@@ -1985,6 +1997,15 @@ async def chat_messages_endpoint(
     chat_scope = "customer"
 
     requested_conversation_id = _safe_conversation_id(payload.get("conversation_id"))
+    if requested_conversation_id is None:
+        scoped_thread = _safe_thread_id(context.get("thread_id"))
+        if scoped_thread is None:
+            scoped_thread = _safe_thread_id(context.get("session_id"))
+        if scoped_thread is not None:
+            requested_conversation_id = _conversation_id_from_scoped_thread(
+                thread_id=scoped_thread,
+                user_id=user_id,
+            )
 
     async with async_session_factory() as session:
         conversation_id, history_messages = await _ensure_conversation(
