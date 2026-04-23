@@ -307,13 +307,9 @@ def _tokenize_query(query: str) -> list[str]:
     return [token for token in tokens if token]
 
 
-def _query_has_resolved_entity(query: str) -> bool:
-    """يتحقق بشكل تقريبي من احتواء السؤال على كيان صريح بدل الإحالة الضميرية فقط."""
-    words = [word.strip("؟?,.!؛:") for word in query.split() if word.strip("؟?,.!؛:")]
-    if len(words) < 2:
-        return False
-
-    non_entity_tokens = {
+def _extract_recent_entity_anchor(messages: list[object]) -> str | None:
+    """يستخرج مرساة كيان حديثة من رسائل المستخدم لتوسيع الأسئلة الإحالية."""
+    stop_words = {
         "ما",
         "ماذا",
         "من",
@@ -328,23 +324,68 @@ def _query_has_resolved_entity(query: str) -> bool:
         "متى",
         "كيف",
         "لماذا",
+        "تقع",
+        "عاصمة",
+        "عاصمتها",
+        "عاصمته",
     }
-    for word in words:
-        if word in non_entity_tokens:
+    for message in reversed(messages[:-1]):
+        role = getattr(message, "type", getattr(message, "role", "user"))
+        if role not in {"human", "user"}:
             continue
-        if word.endswith("ها") or word.endswith("هم") or word.endswith("هن"):
+        content = str(getattr(message, "content", "")).strip(" ؟?.,!؛:")
+        if not content:
             continue
-        if len(word) >= 3:
-            return True
-    return False
+        tokens = _tokenize_query(content)
+        candidates = [
+            token
+            for token in tokens
+            if len(token) > 2 and token not in stop_words and not token.endswith(("ها", "هم", "هن"))
+        ]
+        if candidates:
+            return candidates[-1]
+    return None
 
 
-def _assert_query_integrity(query: str) -> None:
-    """يفرض ثبات مصدر السؤال ويكشف أي تسريب إحالة ضميرية قبل استدعاء النماذج."""
-    assert "?" in query or "؟" in query or len(query.strip()) > 0
-    if "ها" in query and not _query_has_resolved_entity(query):
-        print("🚨 RAW PRONOUN LEAK DETECTED")
-        raise AssertionError("Unresolved pronoun detected in query")
+def _rewrite_with_entity_anchor(query: str, anchor: str) -> str:
+    """يعيد كتابة السؤال الإحالي بصيغة صريحة تحافظ على نية المستخدم."""
+    normalized = query.strip()
+    if not normalized:
+        return normalized
+
+    replacements = {
+        "عاصمتها": f"عاصمة {anchor}",
+        "عاصمته": f"عاصمة {anchor}",
+        "عاصمتهم": f"عاصمة {anchor}",
+        "عاصمتها؟": f"عاصمة {anchor}؟",
+    }
+    rewritten = normalized
+    for source, target in replacements.items():
+        rewritten = rewritten.replace(source, target)
+
+    if rewritten != normalized:
+        return rewritten
+    return f"{normalized} (المقصود: {anchor})"
+
+
+def _resolve_query_from_history(query: str, messages: list[object]) -> str:
+    """يفك الإحالة الضميرية باستخدام سياق المحادثة قبل المرور لمسار الإجابة النهائي."""
+    normalized = query.strip()
+    if not normalized:
+        return normalized
+    query_tokens = _tokenize_query(normalized)
+    has_pronoun_suffix = any(
+        token.endswith(suffix) and len(token) > len(suffix) + 1
+        for token in query_tokens
+        for suffix in ARABIC_PRONOUN_SUFFIXES
+    )
+    if not _contains_anaphora_indicator(normalized) and not has_pronoun_suffix:
+        return normalized
+
+    anchor = _extract_recent_entity_anchor(messages)
+    if not anchor:
+        return normalized
+    return _rewrite_with_entity_anchor(normalized, anchor)
 
 
 def _contains_compound_indicator(query: str, indicators: list[str]) -> bool:
@@ -476,6 +517,10 @@ class SupervisorNode:
         print("QUERY:", query)
         messages = state.get("messages", [])
         formatted_history = format_conversation_history(messages[:-1])
+        resolved_q = _resolve_query_from_history(query=query, messages=messages)
+        if resolved_q != query:
+            print("RESOLVED QUERY:", resolved_q)
+        query = resolved_q
 
         if emergency_intent_guard(query):
             intent = "admin"
@@ -492,9 +537,7 @@ class SupervisorNode:
                 emit_telemetry(node_name="SupervisorNode", start_time=start_time, state=state)
                 return {"intent": "admin", "query": query}
 
-        resolved_q = query
         try:
-            _assert_query_integrity(query)
             result = await asyncio.to_thread(
                 self.dspy_classifier, history=formatted_history, question=query
             )
@@ -577,7 +620,6 @@ class ChatFallbackNode:
             "وعليكم السلام! أنا هنا للمساعدة. أخبرني بما تحتاجه وسأتابع معك خطوة بخطوة."
         )
         try:
-            _assert_query_integrity(query)
             prediction = await asyncio.to_thread(
                 self.generator, history=formatted_history, question=query
             )
@@ -753,7 +795,6 @@ class QueryRewriterNode:
 
         rewritten_query = query
         try:
-            _assert_query_integrity(query)
             result = await asyncio.to_thread(
                 self.rewriter,
                 conversation_history=history,
