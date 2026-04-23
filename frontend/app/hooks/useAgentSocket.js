@@ -42,6 +42,12 @@ const getWsBase = () => {
          return `${protocol}://${hostname}:8000`;
     }
 
+    // Cloud workspace fallback (e.g. GitHub Codespaces) where port is empty and host includes -3000
+    if (hostname.includes('-3000')) {
+         const backendHostname = hostname.replace('-3000', '-8000');
+         return `${protocol}://${backendHostname}`;
+    }
+
     const host = window.location.host;
     return `${protocol}://${host}`;
 };
