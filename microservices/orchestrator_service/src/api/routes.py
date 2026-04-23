@@ -1996,12 +1996,8 @@ async def chat_messages_endpoint(
         )
     context["conversation_id"] = conversation_id
 
-    requested_thread_id = _safe_thread_id(payload.get("thread_id"))
-    if requested_thread_id is not None:
-        context["thread_id"] = requested_thread_id
-    requested_session_id = _safe_thread_id(payload.get("session_id"))
-    if requested_session_id is not None:
-        context["session_id"] = requested_session_id
+    # حماية عزل السياق: يمنع قبول thread/session معرفَين من العميل حتى لا تختلط محادثات مستقلة.
+    context["thread_id"] = _build_conversation_thread_id(user_id, conversation_id)
 
     async def _generator_with_persistence() -> AsyncGenerator[str, None]:
         generator = _run_chat_langgraph(
