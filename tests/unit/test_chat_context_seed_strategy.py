@@ -154,6 +154,16 @@ def test_build_conversation_thread_id_is_deterministic() -> None:
     assert routes._build_conversation_thread_id(17, 320) == "u17:c320"
 
 
+def test_conversation_id_from_scoped_thread_extracts_when_user_matches() -> None:
+    """يتأكد من اشتقاق conversation_id من thread scoped صحيح."""
+    assert routes._conversation_id_from_scoped_thread("u17:c320", 17) == 320
+
+
+def test_conversation_id_from_scoped_thread_rejects_user_mismatch() -> None:
+    """يتأكد من رفض thread_id عند اختلاف user_id لمنع تسرب السياق."""
+    assert routes._conversation_id_from_scoped_thread("u17:c320", 18) is None
+
+
 @pytest.mark.asyncio
 async def test_detect_checkpoint_state_when_unavailable(monkeypatch) -> None:
     """يتأكد من الإرجاع الآمن عند غياب checkpointer."""
