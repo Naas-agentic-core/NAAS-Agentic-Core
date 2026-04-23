@@ -42,6 +42,12 @@ const getWsBase = () => {
          return `${protocol}://${hostname}:8000`;
     }
 
+    // Cloud IDE fallback (e.g. GitHub Codespaces, Gitpod) where port is empty and embedded in hostname
+    if (!port && hostname.includes('-3000.')) {
+        const newHostname = hostname.replace('-3000.', '-8000.');
+        return `${protocol}://${newHostname}`;
+    }
+
     const host = window.location.host;
     return `${protocol}://${host}`;
 };
