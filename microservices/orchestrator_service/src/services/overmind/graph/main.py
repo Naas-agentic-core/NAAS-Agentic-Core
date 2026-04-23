@@ -490,7 +490,7 @@ class SupervisorNode:
             emit_telemetry(node_name="SupervisorNode", start_time=start_time, state=state)
             return {"intent": "chat", "query": query}
 
-        intent = "educational"
+        intent = "general_knowledge"
         emit_telemetry(node_name="SupervisorNode", start_time=start_time, state=state)
         return {"intent": intent, "query": query}
 
