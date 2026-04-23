@@ -307,6 +307,46 @@ def _tokenize_query(query: str) -> list[str]:
     return [token for token in tokens if token]
 
 
+def _query_has_resolved_entity(query: str) -> bool:
+    """يتحقق بشكل تقريبي من احتواء السؤال على كيان صريح بدل الإحالة الضميرية فقط."""
+    words = [word.strip("؟?,.!؛:") for word in query.split() if word.strip("؟?,.!؛:")]
+    if len(words) < 2:
+        return False
+
+    non_entity_tokens = {
+        "ما",
+        "ماذا",
+        "من",
+        "هي",
+        "هو",
+        "في",
+        "على",
+        "عن",
+        "هل",
+        "كم",
+        "أين",
+        "متى",
+        "كيف",
+        "لماذا",
+    }
+    for word in words:
+        if word in non_entity_tokens:
+            continue
+        if word.endswith("ها") or word.endswith("هم") or word.endswith("هن"):
+            continue
+        if len(word) >= 3:
+            return True
+    return False
+
+
+def _assert_query_integrity(query: str) -> None:
+    """يفرض ثبات مصدر السؤال ويكشف أي تسريب إحالة ضميرية قبل استدعاء النماذج."""
+    assert "?" in query or "؟" in query or len(query.strip()) > 0
+    if "ها" in query and not _query_has_resolved_entity(query):
+        print("🚨 RAW PRONOUN LEAK DETECTED")
+        raise AssertionError("Unresolved pronoun detected in query")
+
+
 def _contains_compound_indicator(query: str, indicators: list[str]) -> bool:
     # CONTEXT_FIX: كشف العبارات متعددة الكلمات مع حدود كلمة صريحة.
     """يتحقق من وجود عبارات كاملة مع حدود كلمة لتجنّب الإيجابيات الكاذبة."""
@@ -431,7 +471,9 @@ class SupervisorNode:
         from .telemetry import emit_telemetry
 
         start_time = time.time()
-        query = state.get("query", "")
+        query = str(state.get("query", "")).strip()
+        print("NODE:", "SupervisorNode")
+        print("QUERY:", query)
         messages = state.get("messages", [])
         formatted_history = format_conversation_history(messages[:-1])
 
@@ -452,6 +494,7 @@ class SupervisorNode:
 
         resolved_q = query
         try:
+            _assert_query_integrity(query)
             result = await asyncio.to_thread(
                 self.dspy_classifier, history=formatted_history, question=query
             )
@@ -515,13 +558,26 @@ class ChatFallbackNode:
         from .telemetry import emit_telemetry
 
         start_time = time.time()
-        query = state.get("query", "")
         messages = state.get("messages", [])
+        query = str(state.get("query", "")).strip()
+        print("NODE:", "ChatFallbackNode")
+        print("QUERY:", query)
         formatted_history = format_conversation_history(messages[:-1])
+        print("RAW QUERY:", query)
+        print("STATE QUERY:", query)
+        print("HISTORY:", formatted_history)
+        print("=== FINAL LLM INPUT ===")
+        print("HISTORY:", formatted_history)
+        print("QUERY:", query)
+        if not query:
+            print("FAILURE POINT DETECTED:", "state['query'] is empty")
+        if not formatted_history.strip():
+            print("FAILURE POINT DETECTED:", "formatted conversation history is empty")
         fallback_response = (
             "وعليكم السلام! أنا هنا للمساعدة. أخبرني بما تحتاجه وسأتابع معك خطوة بخطوة."
         )
         try:
+            _assert_query_integrity(query)
             prediction = await asyncio.to_thread(
                 self.generator, history=formatted_history, question=query
             )
@@ -679,6 +735,8 @@ class QueryRewriterNode:
 
         start_time = time.time()
         query = str(state.get("query", "")).strip()
+        print("NODE:", "QueryRewriterNode")
+        print("QUERY:", query)
         messages = state.get("messages", [])
         if not query or len(messages) <= 1:
             emit_telemetry(node_name="QueryRewriterNode", start_time=start_time, state=state)
@@ -695,6 +753,7 @@ class QueryRewriterNode:
 
         rewritten_query = query
         try:
+            _assert_query_integrity(query)
             result = await asyncio.to_thread(
                 self.rewriter,
                 conversation_history=history,
@@ -731,6 +790,8 @@ class ToolExecutorNode:
         from .telemetry import emit_telemetry
 
         start_time = time.time()
+        print("NODE:", "ToolExecutorNode")
+        print("QUERY:", str(state.get("query", "")).strip())
         messages = state.get("messages", [])
         if not messages:
             emit_telemetry(node_name="ToolExecutorNode", start_time=start_time, state=state)
@@ -779,6 +840,8 @@ class ValidatorNode:
         from .telemetry import emit_telemetry
 
         start_time = time.time()
+        print("NODE:", "ValidatorNode")
+        print("QUERY:", str(state.get("query", "")).strip())
         emit_telemetry(node_name="ValidatorNode", start_time=start_time, state=state)
         return {"tools_executed": bool(state.get("tools_executed", False))}
 

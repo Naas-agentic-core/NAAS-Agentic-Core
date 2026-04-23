@@ -1,6 +1,9 @@
 import pytest
 from langchain_core.messages import AIMessage, HumanMessage
 
+from microservices.orchestrator_service.src.services.overmind.graph.general_knowledge import (
+    GeneralKnowledgeNode,
+)
 from microservices.orchestrator_service.src.services.overmind.graph.main import (
     ChatFallbackNode,
     QueryRewriterNode,
@@ -121,3 +124,40 @@ async def test_query_rewriter_keeps_self_contained_queries() -> None:
     )
 
     assert result["query"] == "ما هي عاصمة الجزائر؟"
+
+
+@pytest.mark.asyncio
+async def test_general_knowledge_node_uses_resolved_state_query(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class _FakeAIClient:
+        def __init__(self) -> None:
+            self.last_messages: list[dict[str, str]] = []
+
+        async def chat_completion(self, messages: list[dict[str, str]], temperature: float = 0.3) -> str:
+            self.last_messages = messages
+            return "باريس"
+
+    fake_client = _FakeAIClient()
+    monkeypatch.setattr(
+        "microservices.orchestrator_service.src.services.overmind.graph.general_knowledge.get_ai_client",
+        lambda: fake_client,
+    )
+
+    node = GeneralKnowledgeNode()
+    result = await node(
+        {
+            "query": "ما هي عاصمة فرنسا؟",
+            "messages": [
+                HumanMessage(content="أين تقع فرنسا؟"),
+                AIMessage(content="تقع فرنسا في أوروبا."),
+                HumanMessage(content="ما هي عاصمتها؟"),
+            ],
+        }
+    )
+
+    payload = fake_client.last_messages[-1]["content"]
+    assert "Question:\nما هي عاصمة فرنسا؟" in payload
+    assert "ما هي عاصمتها؟" not in payload
+    assert "User: أين تقع فرنسا؟" in payload
+    assert result["final_response"] == "باريس"
