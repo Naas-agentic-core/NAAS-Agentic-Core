@@ -1,6 +1,6 @@
 import logging
 
-from langchain_core.messages import AIMessage, SystemMessage
+from langchain_core.messages import AIMessage
 
 from microservices.orchestrator_service.src.core.ai_gateway import get_ai_client
 
@@ -29,9 +29,9 @@ class GeneralKnowledgeNode:
         history = format_conversation_history(messages[:-1]) if messages else ""
 
         # FORENSIC PRINTS
-        print("RAW QUERY:", messages[-1].content if messages else "")
-        print("STATE QUERY:", query)
-        print("HISTORY:", history)
+        logger.debug(f"RAW QUERY: {messages[-1].content if messages else ''}")
+        logger.debug(f"STATE QUERY: {query}")
+        logger.debug(f"HISTORY: {history}")
 
         prompt_messages = [
             {"role": "system", "content": "أجب بدقة اعتماداً على سياق المحادثة"},
@@ -40,9 +40,9 @@ class GeneralKnowledgeNode:
 
         try:
             # MANDATORY FORENSIC PRINTS BEFORE LLM CALL
-            print("=== FINAL LLM INPUT ===")
-            print("HISTORY:", history)
-            print("QUERY:", query)
+            logger.debug("=== FINAL LLM INPUT ===")
+            logger.debug(f"HISTORY: {history}")
+            logger.debug(f"QUERY: {query}")
 
             response_content = await ai_client.chat_completion(
                 messages=prompt_messages, temperature=0.3
