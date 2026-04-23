@@ -49,6 +49,37 @@ class GeneralKnowledgeNode:
         # Build the final prompt list
         prompt_messages = [system_message, *context_messages]
 
+        # --- Lightweight Query Rewriter ---
+        resolved_query = query
+        if context_messages:
+            history_lines = []
+            for msg in context_messages:
+                r = (
+                    "user"
+                    if getattr(msg, "type", getattr(msg, "role", "user")) in ["user", "human"]
+                    else "assistant"
+                )
+                c = getattr(msg, "content", str(msg))
+                history_lines.append(f"{r}: {c}")
+            history_text = "\n".join(history_lines)
+
+            rewrite_prompt = [
+                {
+                    "role": "system",
+                    "content": "أنت أداة مساعدة لإعادة صياغة الأسئلة. مهمتك هي استبدال الضمائر (مثل هو، هي، عاصمتها) في السؤال الأخير بالأسماء الصريحة التي تعود عليها من سياق المحادثة. أخرج السؤال المعاد صياغته فقط دون أي إضافات. إذا لم يحتج لتعديل، أعده كما هو.",
+                },
+                {"role": "user", "content": f"سياق المحادثة:\n{history_text}\n\nالسؤال: {query}"},
+            ]
+            try:
+                rewrite_res = await ai_client.chat_completion(
+                    messages=rewrite_prompt, temperature=0.0
+                )
+                if rewrite_res and isinstance(rewrite_res, str):
+                    resolved_query = rewrite_res.strip()
+            except Exception as e:
+                logger.warning(f"GeneralKnowledgeNode rewrite failed, using original query: {e}")
+        # ----------------------------------
+
         try:
             # We call the model
             # Note: ai_client.chat_completion typically takes a list of dicts or similar,
@@ -69,7 +100,7 @@ class GeneralKnowledgeNode:
                 content = getattr(msg, "content", str(msg))
                 formatted_msgs.append({"role": role, "content": content})
 
-            formatted_msgs.append({"role": "user", "content": query})
+            formatted_msgs.append({"role": "user", "content": resolved_query})
 
             response_content = await ai_client.chat_completion(
                 messages=formatted_msgs, temperature=0.3
