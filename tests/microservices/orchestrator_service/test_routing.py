@@ -161,3 +161,20 @@ async def test_general_knowledge_node_uses_resolved_state_query(
     assert "ما هي عاصمتها؟" not in payload
     assert "User: أين تقع فرنسا؟" in payload
     assert result["final_response"] == "باريس"
+
+
+@pytest.mark.asyncio
+async def test_supervisor_resolves_arabic_pronoun_followup_from_history() -> None:
+    node = SupervisorNode()
+    result = await node(
+        {
+            "query": "ما هي عاصمتها؟",
+            "messages": [
+                HumanMessage(content="أين تقع فرنسا؟"),
+                AIMessage(content="تقع فرنسا في غرب أوروبا."),
+                HumanMessage(content="ما هي عاصمتها؟"),
+            ],
+        }
+    )
+
+    assert result["query"] == "ما هي عاصمة فرنسا؟"

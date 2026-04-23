@@ -10,44 +10,6 @@ from .supervisor import format_conversation_history
 logger = logging.getLogger("graph")
 
 
-def _query_has_resolved_entity(query: str) -> bool:
-    words = [word.strip("؟?,.!؛:") for word in query.split() if word.strip("؟?,.!؛:")]
-    if len(words) < 2:
-        return False
-
-    non_entity_tokens = {
-        "ما",
-        "ماذا",
-        "من",
-        "هي",
-        "هو",
-        "في",
-        "على",
-        "عن",
-        "هل",
-        "كم",
-        "أين",
-        "متى",
-        "كيف",
-        "لماذا",
-    }
-    for word in words:
-        if word in non_entity_tokens:
-            continue
-        if word.endswith("ها") or word.endswith("هم") or word.endswith("هن"):
-            continue
-        if len(word) >= 3:
-            return True
-    return False
-
-
-def _assert_query_integrity(query: str) -> None:
-    assert "?" in query or "؟" in query or len(query.strip()) > 0
-    if "ها" in query and not _query_has_resolved_entity(query):
-        print("🚨 RAW PRONOUN LEAK DETECTED")
-        raise AssertionError("Unresolved pronoun detected in query")
-
-
 class GeneralKnowledgeNode:
     """عقدة مسؤولة عن الإجابة على أسئلة المعرفة العامة (مثل العواصم، التعداد السكاني، إلخ)."""
 
@@ -81,7 +43,6 @@ class GeneralKnowledgeNode:
         print("QUERY:", query)
 
         try:
-            _assert_query_integrity(query)
             formatted_msgs = [
                 {"role": "system", "content": system_message.content},
                 {"role": "user", "content": user_payload},
