@@ -1,6 +1,6 @@
 import logging
 
-from langchain_core.messages import AIMessage, SystemMessage
+from langchain_core.messages import AIMessage
 
 from microservices.orchestrator_service.src.core.ai_gateway import get_ai_client
 
@@ -20,34 +20,35 @@ class GeneralKnowledgeNode:
 
         start_time = time.time()
         messages = state.get("messages", [])
-        query = str(state.get("query", "")).strip()
-        print("NODE:", "GeneralKnowledgeNode")
-        print("QUERY:", query)
+
+        query = state.get("query")
+        if not query and messages:
+            query = messages[-1].content
+        query = str(query or "").strip()
+
         history = format_conversation_history(messages[:-1] if messages else [])
-        print("RAW QUERY:", query)
-        print("STATE QUERY:", query)
-        print("HISTORY:", history)
-        if not query:
-            print("FAILURE POINT DETECTED:", "state['query'] is empty")
+
         if not history.strip():
-            print("FAILURE POINT DETECTED:", "formatted conversation history is empty")
+            print("🚨 FAILURE: EMPTY HISTORY")
 
-        ai_client = get_ai_client()
+        if "ها" in query and "فرنسا" not in query:
+            print("🚨 PRONOUN LEAK DETECTED")
 
-        system_message = SystemMessage(content="أجب بدقة اعتماداً على سياق المحادثة")
-        user_payload = f"Context:\n{history}\n\nQuestion:\n{query}"
+        if "فرنسا" not in history:
+            print("🚨 ENTITY LOST IN HISTORY")
+
         print("=== FINAL LLM INPUT ===")
         print("HISTORY:", history)
         print("QUERY:", query)
 
-        try:
-            formatted_msgs = [
-                {"role": "system", "content": system_message.content},
-                {"role": "user", "content": user_payload},
-            ]
+        ai_client = get_ai_client()
 
-            response_content = await ai_client.chat_completion(
-                messages=formatted_msgs, temperature=0.3
+        system_content = "أجب بدقة اعتماداً على سياق المحادثة. لا تتجاهل السياق أبداً."
+        user_content = f"السياق:\n{history}\n\nالسؤال:\n{query}"
+
+        try:
+            response_content = await ai_client.send_message(
+                system_prompt=system_content, user_message=user_content, temperature=0.3
             )
 
             emit_telemetry(node_name="GeneralKnowledgeNode", start_time=start_time, state=state)
