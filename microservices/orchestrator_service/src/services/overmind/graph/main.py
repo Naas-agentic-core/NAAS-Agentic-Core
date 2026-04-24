@@ -275,12 +275,29 @@ def build_conversation_context(
 
     recent_messages: list[str] = []
     last_signature: tuple[str, str] | None = None
+
     for msg in messages[-max_turns:]:
-        content = getattr(msg, "content", None)
+        if isinstance(msg, dict):
+            content = msg.get("content")
+            role = msg.get("role") or msg.get("type") or "user"
+        else:
+            content = getattr(msg, "content", None)
+            role = getattr(msg, "type", getattr(msg, "role", "user"))
+
         if not isinstance(content, str) or not content.strip():
             continue
-        role = getattr(msg, "type", getattr(msg, "role", "user"))
-        prefix = "User: " if role in ("human", "user") else "Assistant: "
+
+        role = str(role).lower().strip()
+
+        if role in {"assistant", "ai"}:
+            prefix = "Assistant: "
+        elif role in {"human", "user"}:
+            prefix = "User: "
+        elif role == "system":
+            prefix = "System: "
+        else:
+            prefix = "User: "
+
         text = content.strip()
         if include_json_extraction and text.startswith("{") and role in ("ai", "assistant"):
             try:
