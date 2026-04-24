@@ -497,7 +497,6 @@ class OrchestratorAgent:
             "\n5. If a field is not present, omit it."
             "\n\nEXAMPLES:"
             "\n- 'تمرين أعداد مركبة' -> {'q': 'complex numbers'}"
-            "\n- 'احتمالات بكالوريا 2024' -> {'q': 'probability', 'year': 2024, 'level': 'baccalaureate'}"
             "\n- 'متتاليات علوم تجريبية' -> {'q': 'sequences', 'branch': 'experimental_sciences'}"
             "\n- 'دوال أسية' -> {'q': 'exponential functions'}"
             "\n- 'نهايات ودوال' -> {'q': 'limits functions'}"

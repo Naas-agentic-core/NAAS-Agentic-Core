@@ -104,9 +104,16 @@ def register_default_patterns() -> None:
     for pattern in admin_patterns:
         IntentPatternRegistry.register(pattern, ChatIntent.ADMIN_QUERY, priority=90)
 
+    # Deep analysis (higher priority than content retrieval)
+    IntentPatternRegistry.register(
+        r"(حلل|analyze|explain|اشرح)\s+(.+)",
+        ChatIntent.DEEP_ANALYSIS,
+        priority=90,
+    )
+
     # Content retrieval (high priority)
     IntentPatternRegistry.register(
-        r"((أ|ا)ريد|بدي|i want|need|show|أعطني|هات|give me)?\s*(.*)(20[1-2][0-9]|bac|بكالوريا|subject|topic|lesson|درس|موضوع|تمارين|تمرين|exam|exercise|exercises|question|احتمالات|دوال|متتاليات|probability|functions|sequences)(.+)?",
+        r"((أ|ا)ريد|بدي|i want|need|show|أعطني|هات|give me)?\s*(.*)(20[1-2][0-9]|bac|بكالوريا|subject|topic|lesson|درس|موضوع|تمارين|تمرين|exam|exercise|exercises|احتمالات|دوال|متتاليات|probability|functions|sequences)(.+)?",
         ChatIntent.CONTENT_RETRIEVAL,
         priority=80,
     )
@@ -137,13 +144,6 @@ def register_default_patterns() -> None:
     IntentPatternRegistry.register(
         r"(فهرس|index)\s+(المشروع|project)",
         ChatIntent.PROJECT_INDEX,
-        priority=60,
-    )
-
-    # Deep analysis
-    IntentPatternRegistry.register(
-        r"(حلل|analyze|explain)\s+(.+)",
-        ChatIntent.DEEP_ANALYSIS,
         priority=60,
     )
 
