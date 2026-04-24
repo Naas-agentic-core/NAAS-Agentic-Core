@@ -134,7 +134,9 @@ async def test_general_knowledge_node_uses_resolved_state_query(
         def __init__(self) -> None:
             self.last_messages: list[dict[str, str]] = []
 
-        async def chat_completion(self, messages: list[dict[str, str]], temperature: float = 0.3) -> str:
+        async def chat_completion(
+            self, messages: list[dict[str, str]], temperature: float = 0.3
+        ) -> str:
             self.last_messages = messages
             return "باريس"
 
