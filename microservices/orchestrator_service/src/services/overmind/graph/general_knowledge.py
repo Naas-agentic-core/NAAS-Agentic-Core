@@ -34,9 +34,7 @@ class GeneralKnowledgeNode:
 
         ai_client = get_ai_client()
 
-        system_message = SystemMessage(
-            content="أجب بدقة اعتماداً على سياق المحادثة"
-        )
+        system_message = SystemMessage(content="أجب بدقة اعتماداً على سياق المحادثة")
         user_payload = f"Context:\n{history}\n\nQuestion:\n{query}"
         print("=== FINAL LLM INPUT ===")
         print("HISTORY:", history)
