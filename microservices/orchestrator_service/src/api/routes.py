@@ -1432,13 +1432,10 @@ async def _stream_chat_langgraph(
                 max(0, len(langchain_msgs) - 1),
             )
 
-            if checkpointer_available and checkpoint_has_state:
-                inputs: dict[str, object] = {"query": prepared_objective}
-            else:
-                inputs: dict[str, object] = {
-                    "query": prepared_objective,
-                    "messages": langchain_msgs,
-                }
+            inputs: dict[str, object] = {
+                "query": prepared_objective,
+                "messages": langchain_msgs,
+            }
             inputs = _merge_admin_inputs(inputs, admin_payload if chat_scope == "admin" else None)
             state_dict = inputs
             payload_messages = state_dict.get("messages", [])
@@ -1746,10 +1743,10 @@ async def _run_chat_langgraph(
         max(0, len(langchain_msgs) - 1),
     )
 
-    if checkpointer_available and checkpoint_has_state:
-        inputs: dict[str, object] = {"query": prepared_objective}
-    else:
-        inputs: dict[str, object] = {"query": prepared_objective, "messages": langchain_msgs}
+    inputs: dict[str, object] = {
+        "query": prepared_objective,
+        "messages": langchain_msgs,
+    }
     inputs = _merge_admin_inputs(inputs, admin_payload)
 
     final_resp = None
@@ -2437,12 +2434,13 @@ async def chat_with_agent_endpoint(
                     checkpoint_has_state=checkpoint_has_state,
                 )
 
-                if checkpointer_available and checkpoint_has_state:
-                    admin_inputs = _merge_admin_inputs({"query": prepared_objective}, admin_payload)
-                else:
-                    admin_inputs = _merge_admin_inputs(
-                        {"query": prepared_objective, "messages": langchain_msgs}, admin_payload
-                    )
+                admin_inputs = _merge_admin_inputs(
+                    {
+                        "query": prepared_objective,
+                        "messages": langchain_msgs,
+                    },
+                    admin_payload,
+                )
 
                 conversation_id = (
                     request.conversation_id

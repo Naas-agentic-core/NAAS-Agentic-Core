@@ -386,7 +386,7 @@ class SynthesizerNode:
                 text_val = getattr(prediction, "response", raw_doc_text).strip()
             except Exception as e:
                 logger.error(f"Synthesizer LLM generation failed: {e}")
-                text_val = raw_doc_text
+                text_val = "عذراً، تعذر صياغة الشرح المطلوب بسبب خطأ داخلي. يرجى إعادة صياغة السؤال."
 
         response_json = {
             "المصدر": source,

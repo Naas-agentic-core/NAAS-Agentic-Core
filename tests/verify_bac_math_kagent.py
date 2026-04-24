@@ -20,11 +20,29 @@ sys.modules["llama_index.llms.openai"] = MagicMock()
 sys.modules["llama_index.embeddings.openai"] = MagicMock()
 
 # Ensure app is in path
-sys.path.append(os.getcwd())
+sys.path.insert(0, os.getcwd())
 
 from app.core.ai_gateway import AIClient
 from app.services.kagent import AgentRequest, KagentMesh
+from app.services.kagent.adapters import BaseAgentAdapter
+from app.services.kagent.domain import AgentResponse
 from microservices.reasoning_agent.src.service import ReasoningService
+
+
+class MockReasoningAdapter(BaseAgentAdapter):
+    def __init__(self, service: ReasoningService):
+        self.service = service
+
+    async def execute(self, request: AgentRequest) -> AgentResponse:
+        try:
+            query = str(request.payload.get("query", ""))
+            action = request.action
+            if action == "solve_deeply":
+                result = await self.service.solve_deeply(query)
+                return AgentResponse(status="success", data=result)
+            return AgentResponse(status="error", error="Unsupported action")
+        except Exception as e:
+            return AgentResponse(status="error", error=str(e))
 
 
 class MockGeniusAI(AIClient):
@@ -108,7 +126,8 @@ async def verify_kagent_bac():
 
     # 3. Register Reasoning Service with injected dependencies
     service = ReasoningService(ai_client, retriever=mock_retriever)
-    kagent.register_service("reasoning_engine", service, capabilities=["solve_deeply"])
+    adapter = MockReasoningAdapter(service)
+    kagent.register_service("reasoning_engine", adapter, capabilities=["solve_deeply"])
 
     # 4. Formulate the Bac Problem
     problem_text = (

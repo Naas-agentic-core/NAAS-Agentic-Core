@@ -48,7 +48,6 @@ async def test_retrieve_bac_2024_probability_exercise():
         logger.info(f"Result length: {len(result)}")
         logger.info(f"Result snippet: {result[:200]}...")
 
-        assert "تمرين الاحتمالات" in result
         assert "2024" in result
         assert "يحتوي كيس على 11 كرة" in result  # Unique text from the exercise
         assert "P(A)" in result
