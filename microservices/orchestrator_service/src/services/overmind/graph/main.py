@@ -615,34 +615,48 @@ class ChatFallbackNode:
     async def __call__(self, state: AgentState) -> dict:
         import time
 
+        from microservices.orchestrator_service.src.core.ai_gateway import get_ai_client
+
         from .telemetry import emit_telemetry
 
         start_time = time.time()
         messages = state.get("messages", [])
-        query = str(state.get("query", "")).strip()
-        print("NODE:", "ChatFallbackNode")
-        print("QUERY:", query)
-        formatted_history = format_conversation_history(messages[:-1])
-        print("RAW QUERY:", query)
-        print("STATE QUERY:", query)
-        print("HISTORY:", formatted_history)
+
+        query = state.get("query")
+        if not query and messages:
+            query = messages[-1].content
+        query = str(query or "").strip()
+
+        history = format_conversation_history(messages[:-1] if messages else [])
+
+        if not history.strip():
+            print("🚨 FAILURE: EMPTY HISTORY")
+
+        if "ها" in query and "فرنسا" not in query:
+            print("🚨 PRONOUN LEAK DETECTED")
+
+        if "فرنسا" not in history:
+            print("🚨 ENTITY LOST IN HISTORY")
+
         print("=== FINAL LLM INPUT ===")
-        print("HISTORY:", formatted_history)
+        print("HISTORY:", history)
         print("QUERY:", query)
-        if not query:
-            print("FAILURE POINT DETECTED:", "state['query'] is empty")
-        if not formatted_history.strip():
-            print("FAILURE POINT DETECTED:", "formatted conversation history is empty")
+
+        ai_client = get_ai_client()
+
+        system_content = "أجب بدقة اعتماداً على سياق المحادثة. لا تتجاهل السياق أبداً."
+        user_content = f"السياق:\n{history}\n\nالسؤال:\n{query}"
+
         fallback_response = (
             "وعليكم السلام! أنا هنا للمساعدة. أخبرني بما تحتاجه وسأتابع معك خطوة بخطوة."
         )
+
         try:
-            prediction = await asyncio.to_thread(
-                self.generator, history=formatted_history, question=query
+            response_content = await ai_client.send_message(
+                system_prompt=system_content, user_message=user_content, temperature=0.7
             )
-            model_response = getattr(prediction, "response", "")
-            if isinstance(model_response, str) and model_response.strip():
-                fallback_response = model_response.strip()
+            if response_content and isinstance(response_content, str) and response_content.strip():
+                fallback_response = response_content.strip()
         except Exception as error:
             emit_telemetry(
                 node_name="ChatFallbackNode",

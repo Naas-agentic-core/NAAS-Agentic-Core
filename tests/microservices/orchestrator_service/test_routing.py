@@ -134,10 +134,13 @@ async def test_general_knowledge_node_uses_resolved_state_query(
         def __init__(self) -> None:
             self.last_messages: list[dict[str, str]] = []
 
-        async def chat_completion(
-            self, messages: list[dict[str, str]], temperature: float = 0.3
+        async def send_message(
+            self, system_prompt: str, user_message: str, temperature: float = 0.3
         ) -> str:
-            self.last_messages = messages
+            self.last_messages = [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_message},
+            ]
             return "باريس"
 
     fake_client = _FakeAIClient()
@@ -159,7 +162,7 @@ async def test_general_knowledge_node_uses_resolved_state_query(
     )
 
     payload = fake_client.last_messages[-1]["content"]
-    assert "Question:\nما هي عاصمة فرنسا؟" in payload
+    assert "السؤال:\nما هي عاصمة فرنسا؟" in payload
     assert "ما هي عاصمتها؟" not in payload
     assert "User: أين تقع فرنسا؟" in payload
     assert result["final_response"] == "باريس"
