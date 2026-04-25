@@ -363,7 +363,7 @@ def _extract_recent_entity_anchor(messages: list[object]) -> str | None:
         "عاصمتها",
         "عاصمته",
     }
-    for message in reversed(messages[:-1]):
+    for message in reversed(messages):
         role = get_message_role(message)
         if role != "user":
             continue
@@ -557,7 +557,7 @@ class SupervisorNode:
         print("NODE:", "SupervisorNode")
         print("QUERY:", query)
         messages = state.get("messages", [])
-        formatted_history = format_conversation_history(messages[:-1])
+        formatted_history = format_conversation_history(messages)
         resolved_q = _resolve_query_from_history(query=query, messages=messages)
         if resolved_q != query:
             print("RESOLVED QUERY:", resolved_q)
@@ -675,7 +675,7 @@ class ChatFallbackNode:
             query = messages[-1].content
         query = str(query or "").strip()
 
-        history = format_conversation_history(messages[:-1] if messages else [])
+        history = format_conversation_history(messages)
 
         if not history.strip():
             print("🚨 FAILURE: EMPTY HISTORY")
@@ -789,17 +789,21 @@ class QueryRewriterNode:
             return False
         return "User:" not in candidate and "Assistant:" not in candidate
 
-    def _extract_latest_reference_snippet(self, messages: list[object]) -> str:
+    def _extract_latest_reference_snippet(self, messages: list[object], current_query: str) -> str:
         """يستخرج آخر رسالة مرجعية غير فارغة لتثبيت الإحالة الضميرية عند الفشل."""
         if not messages:
             return ""
 
+        current_query_normalized = current_query.strip()
+
         for message in reversed(
-            messages[:-1]
-        ):  # exclude the last message which is the current query
+            messages
+        ):  # include all messages to avoid context amnesia
             role = get_message_role(message)
             content = get_message_content(message)
             if role not in {"user", "assistant"}:
+                continue
+            if isinstance(content, str) and content.strip() == current_query_normalized:
                 continue
 
             # Try extracting from structured kwargs first
@@ -835,7 +839,7 @@ class QueryRewriterNode:
 
     def _build_contextual_fallback_rewrite(self, query: str, messages: list[object]) -> str:
         """يبني إعادة صياغة حتمية عند تعذر إعادة الصياغة الذكية لمنع عمى السياق."""
-        reference = self._extract_latest_reference_snippet(messages=messages)
+        reference = self._extract_latest_reference_snippet(messages=messages, current_query=query)
         if not reference:
             return query
 

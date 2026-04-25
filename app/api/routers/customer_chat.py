@@ -150,7 +150,7 @@ def _merge_history_with_client_context(
     if not client_context:
         return persisted_history
     if not persisted_history:
-        return client_context
+        return []
 
     merged_history = list(persisted_history)
     for message in client_context:
