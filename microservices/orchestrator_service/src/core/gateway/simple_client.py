@@ -72,8 +72,8 @@ class OpenRouterClient(LLMClient):
         """توليد بصمة ثابتة لسياق المحادثة."""
         if not messages:
             return "empty"
-        # We hash everything *except* the last message (which is the new prompt)
-        context_msgs = messages[:-1] if len(messages) > 1 else []
+        # We hash everything
+        context_msgs = messages
         context_str = json.dumps(context_msgs, sort_keys=True)
         return hashlib.sha256(context_str.encode()).hexdigest()
 

@@ -46,7 +46,9 @@ export function useRealtimeConnection(wsUrl, token, eventNamespace = "default") 
     setState("connecting");
 
     try {
-        const ws = new WebSocket(wsUrl, ["jwt", token]);
+        const wsUrlObj = new URL(wsUrl);
+        wsUrlObj.searchParams.append("token", token);
+        const ws = new WebSocket(wsUrlObj.toString(), ["jwt", token]);
         wsRef.current = ws;
 
         ws.onopen = () => {

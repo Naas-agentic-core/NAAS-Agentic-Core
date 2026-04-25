@@ -26,7 +26,15 @@ class GeneralKnowledgeNode:
             query = messages[-1].content
         query = str(query or "").strip()
 
-        history = format_conversation_history(messages[:-1] if messages else [])
+        # Exclude the very last message from the HISTORY block if it's the current user query,
+        # to prevent prompt contamination. State is NOT modified.
+        prompt_messages = messages
+        if messages:
+            last_msg = messages[-1]
+            role = last_msg.get("role") or last_msg.get("type") if isinstance(last_msg, dict) else getattr(last_msg, "type", getattr(last_msg, "role", ""))
+            if role in ("human", "user"):
+                prompt_messages = messages[:-1]
+        history = format_conversation_history(prompt_messages)
 
         if not history.strip():
             print("🚨 FAILURE: EMPTY HISTORY")
