@@ -666,7 +666,9 @@ class OrchestratorAgent:
         messages = [{"role": "system", "content": final_prompt}]
         if history_messages:
             for msg in history_messages:
-                if hasattr(msg, "type") and msg.type == "human":
+                if isinstance(msg, dict):
+                    messages.append({"role": msg.get("role", "user"), "content": str(msg.get("content", ""))})
+                elif hasattr(msg, "type") and msg.type == "human":
                     messages.append({"role": "user", "content": str(msg.content)})
                 elif hasattr(msg, "type") and msg.type == "ai":
                     messages.append({"role": "assistant", "content": str(msg.content)})

@@ -8,9 +8,9 @@ from langchain_core.messages import AIMessage, HumanMessage
 from microservices.orchestrator_service.src.api import routes
 
 
-def test_build_graph_messages_includes_short_anchor_with_checkpointer() -> None:
+def test_build_graph_messages_graph_includes_short_anchor_with_checkpointer() -> None:
     """يتأكد من إبقاء مرساة سياقية قصيرة حتى مع checkpointer فعّال."""
-    messages = routes._build_graph_messages(
+    messages = routes._build_graph_messages_graph(
         objective="ما هي عاصمتها؟",
         history_messages=[
             {"role": "user", "content": "أين تقع الجزائر؟"},
@@ -20,17 +20,15 @@ def test_build_graph_messages_includes_short_anchor_with_checkpointer() -> None:
         checkpoint_has_state=True,
     )
 
-    assert len(messages) == 3
+    assert len(messages) == 1
     assert isinstance(messages[0], HumanMessage)
-    assert isinstance(messages[1], AIMessage)
-    assert isinstance(messages[2], HumanMessage)
-    assert "الجزائر" in messages[0].content
-    assert messages[2].content == "ما هي عاصمتها؟"
+    assert messages[0].content == "ما هي عاصمتها؟"
 
 
-def test_build_graph_messages_seeds_recent_history_without_checkpointer() -> None:
+
+def test_build_graph_messages_graph_seeds_recent_history_without_checkpointer() -> None:
     """يتأكد من تمرير آخر الرسائل عند غياب checkpointer لمنع عمى السياق."""
-    messages = routes._build_graph_messages(
+    messages = routes._build_graph_messages_graph(
         objective="ما هي عاصمتها؟",
         history_messages=[
             {"role": "user", "content": "أين تقع الجزائر؟"},
@@ -44,12 +42,12 @@ def test_build_graph_messages_seeds_recent_history_without_checkpointer() -> Non
     assert isinstance(messages[0], HumanMessage)
     assert isinstance(messages[1], AIMessage)
     assert isinstance(messages[2], HumanMessage)
-    assert messages[2].content == "ما هي عاصمتها؟"
 
 
-def test_build_graph_messages_seeds_history_when_checkpointer_has_no_state() -> None:
+
+def test_build_graph_messages_graph_seeds_history_when_checkpointer_has_no_state() -> None:
     """يتأكد من زرع التاريخ إذا كان checkpointer متاحًا لكن الخيط جديد بلا حالة."""
-    messages = routes._build_graph_messages(
+    messages = routes._build_graph_messages_graph(
         objective="ما هي عاصمتها؟",
         history_messages=[
             {"role": "user", "content": "أين تقع فرنسا؟"},
@@ -61,9 +59,9 @@ def test_build_graph_messages_seeds_history_when_checkpointer_has_no_state() -> 
     assert len(messages) == 3
 
 
-def test_build_graph_messages_forces_seed_on_ambiguous_followup() -> None:
+def test_build_graph_messages_graph_forces_seed_on_ambiguous_followup() -> None:
     """يتأكد من تمرير مرساة قصيرة مع checkpoint عند السؤال الإحالي."""
-    messages = routes._build_graph_messages(
+    messages = routes._build_graph_messages_graph(
         objective="ما هي عاصمتها؟",
         history_messages=[
             {"role": "user", "content": "أين تقع فرنسا؟"},
@@ -72,16 +70,14 @@ def test_build_graph_messages_forces_seed_on_ambiguous_followup() -> None:
         checkpointer_available=True,
         checkpoint_has_state=True,
     )
-    assert len(messages) == 3
+    assert len(messages) == 1
     assert isinstance(messages[0], HumanMessage)
-    assert isinstance(messages[1], AIMessage)
-    assert isinstance(messages[2], HumanMessage)
-    assert "فرنسا" in messages[0].content
+    assert messages[0].content == "ما هي عاصمتها؟"
 
 
-def test_build_graph_messages_uses_checkpoint_only_for_explicit_queries() -> None:
+def test_build_graph_messages_graph_uses_checkpoint_only_for_explicit_queries() -> None:
     """يتأكد من إبقاء النمط الأحادي عند السؤال الصريح حتى مع وجود تاريخ."""
-    messages = routes._build_graph_messages(
+    messages = routes._build_graph_messages_graph(
         objective="ما هي عاصمة فرنسا؟",
         history_messages=[
             {"role": "user", "content": "أين تقع فرنسا؟"},
@@ -90,14 +86,14 @@ def test_build_graph_messages_uses_checkpoint_only_for_explicit_queries() -> Non
         checkpointer_available=True,
         checkpoint_has_state=True,
     )
-    assert len(messages) == 3
-    assert isinstance(messages[2], HumanMessage)
-    assert messages[2].content == "ما هي عاصمة فرنسا؟"
+    assert len(messages) == 1
+    assert isinstance(messages[0], HumanMessage)
+    assert messages[0].content == "ما هي عاصمة فرنسا؟"
 
 
-def test_build_graph_messages_avoids_duplicate_latest_user_turn() -> None:
+def test_build_graph_messages_graph_avoids_duplicate_latest_user_turn() -> None:
     """يتأكد من عدم تكرار الرسالة الحالية إذا كانت موجودة بآخر التاريخ."""
-    messages = routes._build_graph_messages(
+    messages = routes._build_graph_messages_graph(
         objective="ما هي عاصمة فرنسا؟",
         history_messages=[
             {"role": "user", "content": "أين تقع فرنسا؟"},
@@ -262,7 +258,9 @@ def test_extract_recent_entity_anchor_prefers_recent_user_entity() -> None:
     assert anchor == "فرنسا"
 
 
-def test_augment_ambiguous_objective_injects_anchor_when_entity_missing() -> None:
+def test_augment_ambiguous_objective_injects_anchor_when_entity_missing(monkeypatch) -> None:
+    # mock _extract_recent_entity_anchor
+    monkeypatch.setattr(routes, "_extract_recent_entity_anchor", lambda x: "الجزائر")
     """يتأكد من إضافة مرجع إلزامي عندما يكون السؤال إحاليًا بلا كيان صريح."""
     prepared = routes._augment_ambiguous_objective(
         "ما هي عاصمتها؟",
@@ -282,3 +280,40 @@ def test_augment_ambiguous_objective_keeps_explicit_entity_unchanged() -> None:
         [{"role": "user", "content": "حدثني عن الجزائر"}],
     )
     assert prepared == "ما هي عاصمة فرنسا؟"
+
+
+def test_build_graph_messages_manual_returns_dicts() -> None:
+    """يتأكد من إرجاع رسائل كنصوص قواميس فقط للمسار اليدوي."""
+    messages = routes._build_graph_messages_manual(
+        objective="ما هي عاصمتها؟",
+        history_messages=[
+            {"role": "user", "content": "أين تقع فرنسا؟"},
+            {"role": "assistant", "content": "تقع فرنسا في أوروبا الغربية."},
+        ]
+    )
+
+    assert len(messages) == 3
+    assert isinstance(messages[0], dict)
+    assert messages[0]["role"] == "user"
+    assert messages[0]["content"] == "أين تقع فرنسا؟"
+    assert isinstance(messages[1], dict)
+    assert messages[1]["role"] == "assistant"
+    assert messages[1]["content"] == "تقع فرنسا في أوروبا الغربية."
+    assert isinstance(messages[2], dict)
+    assert messages[2]["role"] == "user"
+    assert messages[2]["content"] == "ما هي عاصمتها؟"
+
+def test_build_graph_messages_manual_avoids_duplicate_latest() -> None:
+    """يتأكد من عدم تكرار آخر رسالة إذا كانت مطابقة."""
+    messages = routes._build_graph_messages_manual(
+        objective="ما هي عاصمتها؟",
+        history_messages=[
+            {"role": "user", "content": "أين تقع فرنسا؟"},
+            {"role": "assistant", "content": "تقع فرنسا في أوروبا الغربية."},
+            {"role": "user", "content": "ما هي عاصمتها؟"},
+        ]
+    )
+
+    assert len(messages) == 3
+    assert messages[-1]["role"] == "user"
+    assert messages[-1]["content"] == "ما هي عاصمتها؟"

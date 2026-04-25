@@ -166,7 +166,7 @@ def _build_langchain_messages(
     return normalized_messages
 
 
-def _build_graph_messages(
+def _build_graph_messages_graph(
     *,
     objective: str,
     history_messages: list[dict[str, str]] | None,
@@ -195,13 +195,13 @@ def _build_graph_messages(
 
     history_len = len(history_messages) if history_messages else 0
     local_logger.warning(
-        f"[_build_graph_messages] checkpointer_available={checkpointer_available}, "
+        f"[_build_graph_messages_graph] checkpointer_available={checkpointer_available}, "
         f"checkpoint_has_state={checkpoint_has_state}, history_messages_len={history_len}"
     )
 
     if checkpointer_available and checkpoint_has_state:
         local_logger.info(
-            "[_build_graph_messages] checkpointer active and has state -> passing ONLY latest user message."
+            "[_build_graph_messages_graph] checkpointer active and has state -> passing ONLY latest user message."
         )
         return [latest_user_message]
 
@@ -211,6 +211,29 @@ def _build_graph_messages(
 
     # Fallback to rely purely on checkpointer ONLY if history is absent
     return [latest_user_message]
+
+
+
+def _build_graph_messages_manual(
+    *,
+    objective: str,
+    history_messages: list[dict[str, str]] | None,
+) -> list[dict[str, str]]:
+    """يبني رسائل الإدخال لوكيل OrchestratorAgent اليدوي (بدون LangChain/Checkpointer)."""
+    messages = []
+
+    if history_messages:
+        for msg in history_messages:
+            role = msg.get("role")
+            content = msg.get("content")
+            if role and content:
+                messages.append({"role": role, "content": content})
+
+    # Add the latest objective if not a duplicate
+    if not messages or messages[-1].get("content", "").strip() != objective.strip():
+        messages.append({"role": "user", "content": objective})
+
+    return messages
 
 
 def _question_contains_explicit_entity(question: str) -> bool:
@@ -368,29 +391,13 @@ def _augment_ambiguous_objective(
     if not anchor:
         return normalized
 
-    try:
-        from microservices.orchestrator_service.src.services.llm.client import get_ai_client
+    # Deterministic rewriting rule
+    if "ها" in normalized or "هذا" in normalized or "هذه" in normalized:
+        return f"{normalized} (مرجع سياقي إلزامي: {anchor})"
+    elif normalized.startswith("كيف") or normalized.startswith("لماذا") or normalized.startswith("كم"):
+        return f"{normalized} (مرجع سياقي إلزامي: {anchor})"
+    return f"{normalized} (مرجع سياقي إلزامي: {anchor})"
 
-        ai_client = get_ai_client()
-        response = ai_client.generate_sync(
-            messages=[
-                {
-                    "role": "user",
-                    "content": (
-                        f"أعد صياغة السؤال بحل الإحالة.\n"
-                        f"السؤال: {normalized}\n"
-                        f"الكيان: {anchor}\n"
-                        f"أخرج السؤال فقط."
-                    ),
-                }
-            ],
-            max_tokens=100,
-        )
-        result = response.choices[0].message.content.strip()
-        if result and len(result) <= 200:
-            return result
-    except Exception:
-        pass
 
     return normalized
 
@@ -1423,7 +1430,7 @@ async def _stream_chat_langgraph(
             config = {"configurable": {"thread_id": thread_id}}
             checkpointer_available, checkpoint_has_state = await _detect_checkpoint_state(thread_id)
             logger.warning(f"HISTORY SIZE: {len(history_messages) if history_messages else 0}")
-            langchain_msgs = _build_graph_messages(
+            langchain_msgs = _build_graph_messages_graph(
                 objective=prepared_objective,
                 history_messages=safe_history,
                 checkpointer_available=checkpointer_available,
@@ -1734,7 +1741,7 @@ async def _run_chat_langgraph(
         str(conversation_id),
     )
     checkpointer_available, checkpoint_has_state = await _detect_checkpoint_state(thread_id)
-    langchain_msgs = _build_graph_messages(
+    langchain_msgs = _build_graph_messages_graph(
         objective=prepared_objective,
         history_messages=history_messages,
         checkpointer_available=checkpointer_available,
@@ -2433,11 +2440,9 @@ async def chat_with_agent_endpoint(
                 checkpointer_available, checkpoint_has_state = await _detect_checkpoint_state(
                     thread_id
                 )
-                langchain_msgs = _build_graph_messages(
+                langchain_msgs = _build_graph_messages_manual(
                     objective=prepared_objective,
                     history_messages=request.history_messages,
-                    checkpointer_available=checkpointer_available,
-                    checkpoint_has_state=checkpoint_has_state,
                 )
 
                 admin_inputs = _merge_admin_inputs(
@@ -2573,11 +2578,9 @@ async def chat_with_agent_endpoint(
                 fallback_conversation_id=str(conversation_id_fallback),
             )
             checkpointer_available, checkpoint_has_state = await _detect_checkpoint_state(thread_id)
-            langchain_msgs = _build_graph_messages(
+            langchain_msgs = _build_graph_messages_manual(
                 objective=prepared_objective,
                 history_messages=request.history_messages,
-                checkpointer_available=checkpointer_available,
-                checkpoint_has_state=checkpoint_has_state,
             )
 
             run_result = agent.run(
