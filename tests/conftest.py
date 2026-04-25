@@ -12,7 +12,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-import jwt
+from jose import jwt
 
 os.environ.setdefault("ENVIRONMENT", "testing")
 os.environ.setdefault("LLM_MOCK_MODE", "1")
