@@ -10,7 +10,6 @@ mypy==1.8.0
 mypy_extensions==1.1.0
 types-passlib==1.7.7.20240106
 types-pyasn1==0.6.0.20250914
-types-python-jose==3.3.4.20240106
 types-requests==2.31.0.20240106
 
 # Security Scanning
