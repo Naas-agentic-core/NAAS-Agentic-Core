@@ -152,10 +152,19 @@ def _merge_history_with_client_context(
     if not persisted_history:
         return client_context
 
+    # CONTEXT_FIX: Avoid naive O(N^2) list membership check which misses similar content
+    # and duplicates messages. Prioritize client_context for recent turns as it contains
+    # the unpersisted optimistic UI state, but append to DB history gracefully.
+
     merged_history = list(persisted_history)
+    db_contents = {str(msg.get("content", "")).strip() for msg in merged_history}
+
     for message in client_context:
-        if message not in merged_history:
+        content = str(message.get("content", "")).strip()
+        if content and content not in db_contents:
             merged_history.append(message)
+            db_contents.add(content)
+
     return merged_history[-80:]
 
 

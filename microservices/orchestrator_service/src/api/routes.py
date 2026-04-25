@@ -199,11 +199,17 @@ def _build_graph_messages(
         f"checkpoint_has_state={checkpoint_has_state}, history_messages_len={history_len}"
     )
 
-    if history_messages:
-        seeded = _build_langchain_messages(history_messages)
-        return _append_latest_if_missing(seeded)
+    # CONTEXT_FIX: Always pass recent context when checkpointer fails or when history is explicitly available.
+    # To prevent context amnesia, inject explicit messages only if checkpoint has no state.
+    if not (checkpointer_available and checkpoint_has_state):
+        if history_messages:
+            seeded = _build_langchain_messages(history_messages)
+            return _append_latest_if_missing(seeded)
+    else:
+        # Checkpoint exists, but we want to ensure pronoun resolution has history if needed.
+        # AGENTS.md rule: do not re-inject explicit messages on every request if checkpointer has state.
+        pass
 
-    # Fallback to rely purely on checkpointer ONLY if history is absent
     return [latest_user_message]
 
 
@@ -301,6 +307,12 @@ def _extract_recent_entity_anchor(history_messages: list[dict[str, str]] | None)
         "يوجد",
         "تقوم",
         "يقوم",
+        "متى",
+        "كيف",
+        "لماذا",
+        "عاصمة",
+        "دولة",
+        "بلد",
     }
 
     def _extract_from_text(content: str) -> str | None:
@@ -362,31 +374,13 @@ def _augment_ambiguous_objective(
     if not anchor:
         return normalized
 
-    try:
-        from microservices.orchestrator_service.src.services.llm.client import get_ai_client
+    # CONTEXT_FIX: Use deterministic, synchronous query rewriting
+    # instead of LLM calls, honoring memory constraint.
+    from microservices.orchestrator_service.src.services.overmind.graph.main import (
+        _rewrite_with_entity_anchor,
+    )
 
-        ai_client = get_ai_client()
-        response = ai_client.generate_sync(
-            messages=[
-                {
-                    "role": "user",
-                    "content": (
-                        f"أعد صياغة السؤال بحل الإحالة.\n"
-                        f"السؤال: {normalized}\n"
-                        f"الكيان: {anchor}\n"
-                        f"أخرج السؤال فقط."
-                    ),
-                }
-            ],
-            max_tokens=100,
-        )
-        result = response.choices[0].message.content.strip()
-        if result and len(result) <= 200:
-            return result
-    except Exception:
-        pass
-
-    return normalized
+    return _rewrite_with_entity_anchor(normalized, anchor)
 
 
 def _context_gap_reason_for_followup(
@@ -525,6 +519,8 @@ async def _extract_checkpoint_history(
 
 def _is_ambiguous_followup(query: str) -> bool:
     """يكتشف الاستعلامات الإحالية القصيرة التي تحتاج سياقًا صريحًا."""
+    import re
+
     normalized = query.strip().casefold()
     if not normalized:
         return False
@@ -540,6 +536,12 @@ def _is_ambiguous_followup(query: str) -> bool:
         "موقعه",
         "اين تقعها",
         "أين تقعها",
+        "اين تقع",
+        "أين تقع",
+        "اين يقع",
+        "أين يقع",
+        "توجد",
+        "يوجد",
         "where is it",
         "where is she",
         "where is he",
@@ -575,22 +577,33 @@ def _is_ambiguous_followup(query: str) -> bool:
     if any(normalized.startswith(prefix) for prefix in vague_leads):
         return True
 
-    tokens = normalized.split()
+    # Use a better tokenizer to strip punctuation safely
+    tokens = [t for t in re.findall(r"[^\W_]+", normalized, flags=re.UNICODE) if t]
     pronoun_like_terms = {
         "عاصمتها",
         "عاصمته",
         "عاصمتهم",
-        "عاصمتها؟",
-        "عاصمته؟",
-        "عاصمتهم؟",
         "سكانها",
         "سكانه",
-        "سكانها؟",
-        "سكانه؟",
+        "مساحتها",
+        "مساحته",
+        "تاريخها",
+        "تاريخه",
         "عددهم",
         "عددها",
+        "لها",
+        "له",
     }
-    return len(tokens) <= 6 and any(token in pronoun_like_terms for token in tokens)
+
+    if len(tokens) <= 6:
+        if any(token in pronoun_like_terms for token in tokens):
+            return True
+        # Explicit short ambiguity checks (without touching ha/hum explicitly to avoid false positives)
+        short_triggers = {"ما", "كم", "أين", "اين", "كيف", "متى", "هل"}
+        if any(tr in tokens for tr in short_triggers):
+            return True
+
+    return False
 
 
 def _canonicalize_mission_event(event: object) -> MissionEventEnvelope | None:
