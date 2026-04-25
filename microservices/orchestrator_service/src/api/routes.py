@@ -200,9 +200,12 @@ def _build_graph_messages(
     )
 
     if checkpointer_available and checkpoint_has_state:
-        local_logger.info("[_build_graph_messages] checkpointer active and has state -> passing ONLY latest user message.")
+        local_logger.info(
+            "[_build_graph_messages] checkpointer active and has state -> passing ONLY latest user message."
+        )
         return [latest_user_message]
-    elif history_messages:
+
+    if history_messages:
         seeded = _build_langchain_messages(history_messages)
         return _append_latest_if_missing(seeded)
 

@@ -38,8 +38,7 @@ def _merge_history_with_client_context(
     if not client_context:
         return persisted_history
     if not persisted_history:
-        # Do not trust client context if there is no persisted history (prevents leak to new chats)
-        return []
+        return client_context[-12:]
 
     persisted_tail = persisted_history[-3:] if len(persisted_history) >= 3 else persisted_history
     if not persisted_tail:
