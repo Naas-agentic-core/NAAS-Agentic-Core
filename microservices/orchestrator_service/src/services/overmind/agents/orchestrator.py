@@ -138,6 +138,12 @@ class OrchestratorAgent:
         """
         Unified entrypoint for streaming processing.
         """
+        if context is None:
+            context = {}
+
+        if history_messages:
+            context["history_messages"] = history_messages
+
         return OrchestratorRunResult(self._run_stream(question, context, history_messages))
 
     async def _run_stream(
@@ -651,7 +657,7 @@ class OrchestratorAgent:
 
         personalization_context = await self._build_education_brief(context)
 
-        history_msgs = context.get("history_messages", [])
+        history_msgs = context.get("history_messages") or []
         history_text = ""
         if history_msgs:
             recent = history_msgs[-10:]
