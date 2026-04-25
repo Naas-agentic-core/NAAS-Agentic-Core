@@ -678,8 +678,8 @@ class OrchestratorAgent:
                     messages.append({"role": "user", "content": str(msg.content)})
                 elif hasattr(msg, "type") and msg.type == "ai":
                     messages.append({"role": "assistant", "content": str(msg.content)})
-        else:
-            messages.append({"role": "user", "content": question})
+
+        messages.append({"role": "user", "content": question})
 
         async for chunk in self._stream_ai_chunks(messages):
             if hasattr(chunk, "choices"):
