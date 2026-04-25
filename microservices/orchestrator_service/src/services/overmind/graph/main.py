@@ -259,6 +259,30 @@ ELLIPTICAL_TERMS = {
 }
 
 
+def get_message_content(message: object) -> str:
+    """Safely extracts content from dict or object messages."""
+    if isinstance(message, dict):
+        return str(message.get("content", "") or "")
+    return str(getattr(message, "content", "") or "")
+
+
+def get_message_role(message: object) -> str:
+    """Safely extracts and normalizes role from dict or object messages."""
+    if isinstance(message, dict):
+        role = message.get("role") or message.get("type") or "user"
+    else:
+        role = getattr(message, "type", getattr(message, "role", "user"))
+
+    role = str(role).lower().strip()
+    if role in {"human", "user"}:
+        return "user"
+    if role in {"ai", "assistant"}:
+        return "assistant"
+    if role == "system":
+        return "system"
+    return "user"
+
+
 def format_conversation_history(messages: list[object]) -> str:
     """Formats the entire messages list into a readable string dialogue."""
     return build_conversation_context(messages, max_turns=24)
@@ -278,22 +302,14 @@ def build_conversation_context(
     last_signature: tuple[str, str] | None = None
 
     for msg in messages[-max_turns:]:
-        if isinstance(msg, dict):
-            content = msg.get("content")
-            role = msg.get("role") or msg.get("type") or "user"
-        else:
-            content = getattr(msg, "content", None)
-            role = getattr(msg, "type", getattr(msg, "role", "user"))
+        content = get_message_content(msg)
+        role = get_message_role(msg)
 
-        if not isinstance(content, str) or not content.strip():
+        if not content.strip():
             continue
 
-        role = str(role).lower().strip()
-
-        if role in {"assistant", "ai"}:
+        if role == "assistant":
             prefix = "Assistant: "
-        elif role in {"human", "user"}:
-            prefix = "User: "
         elif role == "system":
             prefix = "System: "
         else:
@@ -348,10 +364,10 @@ def _extract_recent_entity_anchor(messages: list[object]) -> str | None:
         "عاصمته",
     }
     for message in reversed(messages[:-1]):
-        role = getattr(message, "type", getattr(message, "role", "user"))
-        if role not in {"human", "user"}:
+        role = get_message_role(message)
+        if role != "user":
             continue
-        content = str(getattr(message, "content", "")).strip(" ؟?.,!؛:")
+        content = get_message_content(message).strip(" ؟?.,!؛:")
         if not content:
             continue
         tokens = _tokenize_query(content)
@@ -781,13 +797,16 @@ class QueryRewriterNode:
         for message in reversed(
             messages[:-1]
         ):  # exclude the last message which is the current query
-            role = getattr(message, "type", getattr(message, "role", ""))
-            content = getattr(message, "content", "")
-            if role not in {"human", "user", "ai", "assistant"}:
+            role = get_message_role(message)
+            content = get_message_content(message)
+            if role not in {"user", "assistant"}:
                 continue
 
             # Try extracting from structured kwargs first
-            additional = getattr(message, "additional_kwargs", {})
+            if isinstance(message, dict):
+                additional = message.get("additional_kwargs", {})
+            else:
+                additional = getattr(message, "additional_kwargs", {})
             if isinstance(additional, dict) and "structured" in additional:
                 structured = additional["structured"]
                 if isinstance(structured, dict):
