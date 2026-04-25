@@ -25,7 +25,6 @@ def test_build_graph_messages_graph_includes_short_anchor_with_checkpointer() ->
     assert messages[0].content == "ما هي عاصمتها؟"
 
 
-
 def test_build_graph_messages_graph_seeds_recent_history_without_checkpointer() -> None:
     """يتأكد من تمرير آخر الرسائل عند غياب checkpointer لمنع عمى السياق."""
     messages = routes._build_graph_messages_graph(
@@ -42,7 +41,6 @@ def test_build_graph_messages_graph_seeds_recent_history_without_checkpointer() 
     assert isinstance(messages[0], HumanMessage)
     assert isinstance(messages[1], AIMessage)
     assert isinstance(messages[2], HumanMessage)
-
 
 
 def test_build_graph_messages_graph_seeds_history_when_checkpointer_has_no_state() -> None:
@@ -289,7 +287,7 @@ def test_build_graph_messages_manual_returns_dicts() -> None:
         history_messages=[
             {"role": "user", "content": "أين تقع فرنسا؟"},
             {"role": "assistant", "content": "تقع فرنسا في أوروبا الغربية."},
-        ]
+        ],
     )
 
     assert len(messages) == 3
@@ -303,6 +301,7 @@ def test_build_graph_messages_manual_returns_dicts() -> None:
     assert messages[2]["role"] == "user"
     assert messages[2]["content"] == "ما هي عاصمتها؟"
 
+
 def test_build_graph_messages_manual_avoids_duplicate_latest() -> None:
     """يتأكد من عدم تكرار آخر رسالة إذا كانت مطابقة."""
     messages = routes._build_graph_messages_manual(
@@ -311,7 +310,7 @@ def test_build_graph_messages_manual_avoids_duplicate_latest() -> None:
             {"role": "user", "content": "أين تقع فرنسا؟"},
             {"role": "assistant", "content": "تقع فرنسا في أوروبا الغربية."},
             {"role": "user", "content": "ما هي عاصمتها؟"},
-        ]
+        ],
     )
 
     assert len(messages) == 3
