@@ -347,7 +347,7 @@ def _extract_recent_entity_anchor(messages: list[object]) -> str | None:
         "عاصمتها",
         "عاصمته",
     }
-    for message in reversed(messages[:-1]):
+    for message in reversed(messages):
         role = getattr(message, "type", getattr(message, "role", "user"))
         if role not in {"human", "user"}:
             continue
@@ -541,7 +541,7 @@ class SupervisorNode:
         print("NODE:", "SupervisorNode")
         print("QUERY:", query)
         messages = state.get("messages", [])
-        formatted_history = format_conversation_history(messages[:-1])
+        formatted_history = format_conversation_history(messages)
         resolved_q = _resolve_query_from_history(query=query, messages=messages)
         if resolved_q != query:
             print("RESOLVED QUERY:", resolved_q)
@@ -659,7 +659,7 @@ class ChatFallbackNode:
             query = messages[-1].content
         query = str(query or "").strip()
 
-        history = format_conversation_history(messages[:-1] if messages else [])
+        history = format_conversation_history(messages if messages else [])
 
         if not history.strip():
             print("🚨 FAILURE: EMPTY HISTORY")
