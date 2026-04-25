@@ -79,7 +79,7 @@ jobs:
         run: |
           set -euo pipefail
           python -m pip install --upgrade pip
-          pip install "pytest==7.4.4" SQLAlchemy pydantic PyJWT
+          pip install "pytest==7.4.4" SQLAlchemy pydantic python-jose passlib bcrypt
       - name: Validate contracts and provider parity
         shell: bash
         run: |
