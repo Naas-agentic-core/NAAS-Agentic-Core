@@ -107,6 +107,7 @@ class AgentState(TypedDict):
     used_web: bool
     final_response: object
     tools_executed: bool
+    retry_count: int
 
 
 ADMIN_METRIC_TRIGGERS = {
@@ -529,6 +530,13 @@ class SupervisorNode:
         from .telemetry import emit_telemetry
 
         start_time = time.time()
+
+        # State Safety: Prevent query overwrite without backup
+        if "original_query" not in state:
+            # But wait, we can only update the state by returning a dict.
+            # Mutating `state` directly doesn't persist the change unless it is returned.
+            pass
+
         query = str(state.get("query", "")).strip()
         print("NODE:", "SupervisorNode")
         print("QUERY:", query)
@@ -542,12 +550,18 @@ class SupervisorNode:
         if emergency_intent_guard(query):
             intent = "admin"
             emit_telemetry(node_name="SupervisorNode", start_time=start_time, state=state)
-            return {"intent": intent, "query": query}
+            updates = {"intent": intent, "query": query}
+            if "original_query" not in state:
+                updates["original_query"] = state.get("query", "")
+            return updates
 
         query_normalized = query.strip().lower()
         if any(trigger in query_normalized for trigger in CHAT_INTENT_TRIGGERS):
             emit_telemetry(node_name="SupervisorNode", start_time=start_time, state=state)
-            return {"intent": "chat", "query": query}
+            updates = {"intent": "chat", "query": query}
+            if "original_query" not in state:
+                updates["original_query"] = state.get("query", "")
+            return updates
 
         for pattern in ADMIN_PATTERNS:
             if re.search(pattern, query, re.IGNORECASE):
@@ -570,16 +584,28 @@ class SupervisorNode:
 
             if pred_intent == "admin" and conf > 0.75:
                 emit_telemetry(node_name="SupervisorNode", start_time=start_time, state=state)
-                return {"intent": "admin", "query": resolved_q}
+                updates = {"intent": "admin", "query": resolved_q}
+                if "original_query" not in state:
+                    updates["original_query"] = state.get("query", "")
+                return updates
             if pred_intent == "general_knowledge" and conf > 0.60:
                 emit_telemetry(node_name="SupervisorNode", start_time=start_time, state=state)
-                return {"intent": "general_knowledge", "query": resolved_q}
+                updates = {"intent": "general_knowledge", "query": resolved_q}
+                if "original_query" not in state:
+                    updates["original_query"] = state.get("query", "")
+                return updates
             if pred_intent == "chat" and conf > 0.65:
                 emit_telemetry(node_name="SupervisorNode", start_time=start_time, state=state)
-                return {"intent": "chat", "query": resolved_q}
+                updates = {"intent": "chat", "query": resolved_q}
+                if "original_query" not in state:
+                    updates["original_query"] = state.get("query", "")
+                return updates
             if pred_intent == "educational" and conf > 0.55:
                 emit_telemetry(node_name="SupervisorNode", start_time=start_time, state=state)
-                return {"intent": "educational", "query": resolved_q}
+                updates = {"intent": "educational", "query": resolved_q}
+                if "original_query" not in state:
+                    updates["original_query"] = state.get("query", "")
+                return updates
 
         except Exception:
             pass
@@ -591,11 +617,17 @@ class SupervisorNode:
             and not _looks_elliptical_followup(query, formatted_history)
         ):
             emit_telemetry(node_name="SupervisorNode", start_time=start_time, state=state)
-            return {"intent": "chat", "query": query}
+            updates = {"intent": "chat", "query": query}
+            if "original_query" not in state:
+                updates["original_query"] = state.get("query", "")
+            return updates
 
         intent = "general_knowledge"
         emit_telemetry(node_name="SupervisorNode", start_time=start_time, state=state)
-        return {"intent": intent, "query": query}
+        updates = {"intent": intent, "query": query}
+        if "original_query" not in state:
+            updates["original_query"] = state.get("query", "")
+        return updates
 
 
 class ChatFallbackSignature(dspy.Signature):
@@ -914,8 +946,32 @@ class ValidatorNode:
         start_time = time.time()
         print("NODE:", "ValidatorNode")
         print("QUERY:", str(state.get("query", "")).strip())
+
+        updates: dict[str, object] = {"tools_executed": bool(state.get("tools_executed", False))}
+
+        final_response = state.get("final_response")
+        is_failure = False
+        if not final_response:
+            is_failure = True
+        elif isinstance(final_response, str):
+            response_lower = final_response.lower()
+            failure_phrases = ["لم أفهم", "يرجى التوضيح", "لا أستطيع"]
+            if (
+                any(phrase in response_lower for phrase in failure_phrases)
+                or not response_lower.strip()
+            ):
+                is_failure = True
+
+        retry_count = state.get("retry_count", 0)
+        if is_failure:
+            if retry_count >= 1:
+                updates["final_response"] = "عذراً، لم أتمكن من معالجة السياق."
+                updates["retry_count"] = retry_count
+            else:
+                updates["retry_count"] = retry_count + 1
+
         emit_telemetry(node_name="ValidatorNode", start_time=start_time, state=state)
-        return {"tools_executed": bool(state.get("tools_executed", False))}
+        return updates
 
 
 def route_intent(state: AgentState) -> str:
@@ -949,6 +1005,19 @@ def check_results(state: AgentState) -> str:
 
 
 def check_quality(state: AgentState) -> str:
+    final_response = state.get("final_response")
+    if not final_response:
+        return "fail"
+
+    if isinstance(final_response, str):
+        response_lower = final_response.lower()
+        failure_phrases = ["لم أفهم", "يرجى التوضيح", "لا أستطيع"]
+        if (
+            any(phrase in response_lower for phrase in failure_phrases)
+            or not response_lower.strip()
+        ):
+            return "fail"
+
     return "pass"
 
 
