@@ -260,7 +260,7 @@ def test_extract_recent_entity_anchor_prefers_recent_user_entity() -> None:
 
 def test_augment_ambiguous_objective_injects_anchor_when_entity_missing(monkeypatch) -> None:
     # mock _extract_recent_entity_anchor
-    monkeypatch.setattr(routes, "_extract_recent_entity_anchor", lambda x: "الجزائر")
+    monkeypatch.setattr(routes, "_extract_recent_entity_anchor", lambda _: "الجزائر")
     """يتأكد من إضافة مرجع إلزامي عندما يكون السؤال إحاليًا بلا كيان صريح."""
     prepared = routes._augment_ambiguous_objective(
         "ما هي عاصمتها؟",

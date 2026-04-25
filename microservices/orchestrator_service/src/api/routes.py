@@ -392,9 +392,7 @@ def _augment_ambiguous_objective(
         return normalized
 
     # Deterministic rewriting rule
-    if "ها" in normalized or "هذا" in normalized or "هذه" in normalized:
-        return f"{normalized} (مرجع سياقي إلزامي: {anchor})"
-    elif normalized.startswith("كيف") or normalized.startswith("لماذا") or normalized.startswith("كم"):
+    if "ها" in normalized or "هذا" in normalized or "هذه" in normalized or normalized.startswith("كيف") or normalized.startswith("لماذا") or normalized.startswith("كم"):
         return f"{normalized} (مرجع سياقي إلزامي: {anchor})"
     return f"{normalized} (مرجع سياقي إلزامي: {anchor})"
 
@@ -2437,7 +2435,7 @@ async def chat_with_agent_endpoint(
                     {"user_id": request.user_id, "conversation_id": request.conversation_id},
                     fallback_conversation_id=str(conversation_id_fallback),
                 )
-                checkpointer_available, checkpoint_has_state = await _detect_checkpoint_state(
+                _checkpointer_available, _checkpoint_has_state = await _detect_checkpoint_state(
                     thread_id
                 )
                 langchain_msgs = _build_graph_messages_manual(
@@ -2577,7 +2575,7 @@ async def chat_with_agent_endpoint(
                 {"user_id": request.user_id, "conversation_id": request.conversation_id},
                 fallback_conversation_id=str(conversation_id_fallback),
             )
-            checkpointer_available, checkpoint_has_state = await _detect_checkpoint_state(thread_id)
+            _checkpointer_available, _checkpoint_has_state = await _detect_checkpoint_state(thread_id)
             langchain_msgs = _build_graph_messages_manual(
                 objective=prepared_objective,
                 history_messages=request.history_messages,
