@@ -283,6 +283,16 @@ def get_message_role(message: object) -> str:
     return "user"
 
 
+def extract_last_user(messages: list[object]) -> str:
+    """Extracts the content of the last user message safely."""
+    if not messages:
+        return ""
+    for msg in reversed(messages):
+        if get_message_role(msg) == "user":
+            return get_message_content(msg).strip()
+    return ""
+
+
 def format_conversation_history(messages: list[object]) -> str:
     """Formats the entire messages list into a readable string dialogue."""
     return build_conversation_context(messages, max_turns=24)
@@ -670,9 +680,7 @@ class ChatFallbackNode:
         start_time = time.time()
         messages = state.get("messages", [])
 
-        query = state.get("query")
-        if not query and messages:
-            query = messages[-1].content
+        query = state.get("query") or extract_last_user(messages)
         query = str(query or "").strip()
 
         history = format_conversation_history(messages)
@@ -926,8 +934,9 @@ class ToolExecutorNode:
 
         last_msg = messages[-1]
         results = []
-        if hasattr(last_msg, "tool_calls") and last_msg.tool_calls:
-            for tc in last_msg.tool_calls:
+        tool_calls = getattr(last_msg, "tool_calls", None) or (last_msg.get("tool_calls") if isinstance(last_msg, dict) else None)
+        if tool_calls:
+            for tc in tool_calls:
                 from microservices.orchestrator_service.src.contracts.admin_tools import ADMIN_TOOLS
 
                 for t in ADMIN_TOOLS:

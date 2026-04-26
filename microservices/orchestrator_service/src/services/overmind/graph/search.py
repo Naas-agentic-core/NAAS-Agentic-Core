@@ -95,14 +95,13 @@ class QueryAnalyzerNode:
         messages = state.get("messages", [])
         error = None
 
-        from .main import format_conversation_history
+        from .main import format_conversation_history, extract_last_user, get_message_role, get_message_content
 
         # Exclude the current user query from history ONLY for prompt formatting
         prompt_messages = messages
         if messages:
             last_msg = messages[-1]
-            role = last_msg.get("role") or last_msg.get("type") if isinstance(last_msg, dict) else getattr(last_msg, "type", getattr(last_msg, "role", ""))
-            if role in ("human", "user"):
+            if get_message_role(last_msg) == "user":
                 prompt_messages = messages[:-1]
         formatted_history = format_conversation_history(prompt_messages)
 

@@ -4,7 +4,7 @@ from langchain_core.messages import AIMessage
 
 from microservices.orchestrator_service.src.core.ai_gateway import get_ai_client
 
-from .main import AgentState
+from .main import AgentState, extract_last_user, get_message_role, get_message_content
 from .supervisor import format_conversation_history
 
 logger = logging.getLogger("graph")
@@ -21,9 +21,7 @@ class GeneralKnowledgeNode:
         start_time = time.time()
         messages = state.get("messages", [])
 
-        query = state.get("query")
-        if not query and messages:
-            query = messages[-1].content
+        query = state.get("query") or extract_last_user(messages)
         query = str(query or "").strip()
 
         # Exclude the very last message from the HISTORY block if it's the current user query,
@@ -31,8 +29,7 @@ class GeneralKnowledgeNode:
         prompt_messages = messages
         if messages:
             last_msg = messages[-1]
-            role = last_msg.get("role") or last_msg.get("type") if isinstance(last_msg, dict) else getattr(last_msg, "type", getattr(last_msg, "role", ""))
-            if role in ("human", "user"):
+            if get_message_role(last_msg) == "user":
                 prompt_messages = messages[:-1]
         history = format_conversation_history(prompt_messages)
 
