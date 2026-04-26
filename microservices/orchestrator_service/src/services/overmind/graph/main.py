@@ -3,7 +3,6 @@ import json
 import logging
 import os
 import re
-from operator import add
 from types import SimpleNamespace
 from typing import Annotated, TypedDict
 
@@ -299,7 +298,7 @@ def preserve_context(messages: list[object]) -> list[object]:
             break
     recent = messages[-6:]
     if anchor and anchor not in recent:
-        return [anchor] + recent
+        return [anchor, *recent]
     return recent
 
 def format_conversation_history(messages: list[object]) -> str:

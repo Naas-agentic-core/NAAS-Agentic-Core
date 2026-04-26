@@ -89,7 +89,7 @@ async def test_customer_ws_legacy_protocol_when_flag_disabled(test_app) -> None:
                             with TestClient(test_app) as client:
                                 from starlette.websockets import WebSocketDisconnect
                                 with pytest.raises(WebSocketDisconnect) as exc:
-                                    with client.websocket_connect("/api/chat/ws") as websocket:
+                                    with client.websocket_connect("/api/chat/ws"):
                                         pass
                                 assert exc.value.code in (1000, 4401)
 
@@ -127,7 +127,7 @@ async def test_customer_ws_unified_protocol_when_flag_enabled(test_app) -> None:
                             with TestClient(test_app) as client:
                                 from starlette.websockets import WebSocketDisconnect
                                 with pytest.raises(WebSocketDisconnect) as exc:
-                                    with client.websocket_connect("/api/chat/ws") as websocket:
+                                    with client.websocket_connect("/api/chat/ws"):
                                         pass
                                 assert exc.value.code in (1000, 4401)
 
@@ -165,7 +165,7 @@ async def test_admin_ws_legacy_protocol_when_flag_disabled(test_app) -> None:
                             with TestClient(test_app) as client:
                                 from starlette.websockets import WebSocketDisconnect
                                 with pytest.raises(WebSocketDisconnect) as exc:
-                                    with client.websocket_connect("/admin/api/chat/ws") as websocket:
+                                    with client.websocket_connect("/admin/api/chat/ws"):
                                         pass
                                 assert exc.value.code in (1000, 4401)
 
@@ -203,7 +203,7 @@ async def test_admin_ws_unified_protocol_when_flag_enabled(test_app) -> None:
                             with TestClient(test_app) as client:
                                 from starlette.websockets import WebSocketDisconnect
                                 with pytest.raises(WebSocketDisconnect) as exc:
-                                    with client.websocket_connect("/admin/api/chat/ws") as websocket:
+                                    with client.websocket_connect("/admin/api/chat/ws"):
                                         pass
                                 assert exc.value.code in (1000, 4401)
 
@@ -247,7 +247,7 @@ async def test_customer_ws_forwards_recent_history_messages_to_orchestrator(test
                         with TestClient(test_app) as client:
                             from starlette.websockets import WebSocketDisconnect
                             with pytest.raises(WebSocketDisconnect) as exc:
-                                with client.websocket_connect("/api/chat/ws") as websocket:
+                                with client.websocket_connect("/api/chat/ws"):
                                     pass
                             assert exc.value.code in (1000, 4401)
 
@@ -291,7 +291,7 @@ async def test_admin_ws_forwards_recent_history_messages_to_orchestrator(test_ap
                         with TestClient(test_app) as client:
                             from starlette.websockets import WebSocketDisconnect
                             with pytest.raises(WebSocketDisconnect) as exc:
-                                with client.websocket_connect("/admin/api/chat/ws") as websocket:
+                                with client.websocket_connect("/admin/api/chat/ws"):
                                     pass
                             assert exc.value.code in (1000, 4401)
 
@@ -341,7 +341,7 @@ async def test_customer_ws_followup_uses_previous_answer_context_behaviorally(te
                         with TestClient(test_app) as client:
                             from starlette.websockets import WebSocketDisconnect
                             with pytest.raises(WebSocketDisconnect) as exc:
-                                with client.websocket_connect("/api/chat/ws") as websocket:
+                                with client.websocket_connect("/api/chat/ws"):
                                     pass
                             assert exc.value.code in (1000, 4401)
 
@@ -391,6 +391,6 @@ async def test_admin_ws_followup_uses_previous_answer_context_behaviorally(test_
                         with TestClient(test_app) as client:
                             from starlette.websockets import WebSocketDisconnect
                             with pytest.raises(WebSocketDisconnect) as exc:
-                                with client.websocket_connect("/admin/api/chat/ws") as websocket:
+                                with client.websocket_connect("/admin/api/chat/ws"):
                                     pass
                             assert exc.value.code in (1000, 4401)

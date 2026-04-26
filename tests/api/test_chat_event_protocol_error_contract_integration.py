@@ -31,7 +31,7 @@ async def test_customer_ws_admin_actor_emits_assistant_error_when_flag_enabled(t
                 with TestClient(test_app) as client:
                     from starlette.websockets import WebSocketDisconnect
                     with pytest.raises(WebSocketDisconnect) as exc:
-                        with client.websocket_connect("/api/chat/ws") as websocket:
+                        with client.websocket_connect("/api/chat/ws"):
                             pass
                     assert exc.value.code in (1000, 4401)
 
@@ -54,7 +54,7 @@ async def test_admin_ws_non_admin_actor_emits_assistant_error_when_flag_enabled(
                 with TestClient(test_app) as client:
                     from starlette.websockets import WebSocketDisconnect
                     with pytest.raises(WebSocketDisconnect) as exc:
-                        with client.websocket_connect("/admin/api/chat/ws") as websocket:
+                        with client.websocket_connect("/admin/api/chat/ws"):
                             pass
                     assert exc.value.code in (1000, 4401)
 
@@ -77,7 +77,7 @@ async def test_admin_ws_empty_question_emits_assistant_error_when_flag_enabled(t
                 with TestClient(test_app) as client:
                     from starlette.websockets import WebSocketDisconnect
                     with pytest.raises(WebSocketDisconnect) as exc:
-                        with client.websocket_connect("/admin/api/chat/ws") as websocket:
+                        with client.websocket_connect("/admin/api/chat/ws"):
                             pass
                     assert exc.value.code in (1000, 4401)
 
@@ -106,7 +106,7 @@ async def test_customer_ws_dispatch_http_exception_emits_assistant_error_when_fl
                     with TestClient(test_app) as client:
                         from starlette.websockets import WebSocketDisconnect
                         with pytest.raises(WebSocketDisconnect) as exc:
-                            with client.websocket_connect("/api/chat/ws") as websocket:
+                            with client.websocket_connect("/api/chat/ws"):
                                 pass
                         assert exc.value.code in (1000, 4401)
 
@@ -135,6 +135,6 @@ async def test_admin_ws_dispatch_http_exception_emits_assistant_error_when_flag_
                     with TestClient(test_app) as client:
                             from starlette.websockets import WebSocketDisconnect
                             with pytest.raises(WebSocketDisconnect) as exc:
-                                with client.websocket_connect("/admin/api/chat/ws") as websocket:
+                                with client.websocket_connect("/admin/api/chat/ws"):
                                     pass
                             assert exc.value.code in (1000, 4401)

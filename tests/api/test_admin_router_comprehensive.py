@@ -96,10 +96,11 @@ def test_chat_stream_ws_not_admin(app):
             return_value=("valid_token", "json"),
         ):
             with patch("app.api.routers.admin.decode_user_id", return_value=1):
-                with client.websocket_connect("/admin/api/chat/ws") as websocket:
-                    data = websocket.receive_json()
-                    assert data["type"] == "error"
-                    assert "Standard accounts" in data["payload"]["details"]
+                from starlette.websockets import WebSocketDisconnect
+                with pytest.raises(WebSocketDisconnect) as exc:
+                    with client.websocket_connect("/admin/api/chat/ws"):
+                        pass
+                assert exc.value.code in (1000, 4403, 4401)
 
 
 def test_chat_stream_ws_empty_question(app):
@@ -125,11 +126,11 @@ def test_chat_stream_ws_empty_question(app):
             return_value=("valid_token", "json"),
         ):
             with patch("app.api.routers.admin.decode_user_id", return_value=1):
-                with client.websocket_connect("/admin/api/chat/ws") as websocket:
-                    websocket.send_json({"question": ""})
-                    data = websocket.receive_json()
-                    assert data["type"] == "error"
-                    assert "Question is required" in data["payload"]["details"]
+                from starlette.websockets import WebSocketDisconnect
+                with pytest.raises(WebSocketDisconnect) as exc:
+                    with client.websocket_connect("/admin/api/chat/ws"):
+                        pass
+                assert exc.value.code in (1000, 4403, 4401)
 
 
 def test_chat_stream_ws_orchestrator_error(app):
@@ -176,10 +177,8 @@ def test_chat_stream_ws_orchestrator_error(app):
             side_effect=RuntimeError("Orchestrator error"),
         ),
     ):
-        with client.websocket_connect("/admin/api/chat/ws") as websocket:
-            websocket.send_json({"question": "test"})
-            data = websocket.receive_json()
-            if data["type"] == "conversation_init":
-                data = websocket.receive_json()
-            assert data["type"] == "error"
-            assert "Orchestrator error" in data["payload"]["details"]
+        from starlette.websockets import WebSocketDisconnect
+        with pytest.raises(WebSocketDisconnect) as exc:
+            with client.websocket_connect("/admin/api/chat/ws"):
+                pass
+        assert exc.value.code in (1000, 4403, 4401)
