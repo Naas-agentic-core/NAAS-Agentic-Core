@@ -98,6 +98,44 @@ class StreamFrame(BaseModel):
     payload: dict[str, object] = Field(default_factory=dict)
 
 
+def _resolve_session_id_from_incoming(incoming: dict[str, object]) -> str | None:
+    """يستخرج session_id بشكل صريح من الحمولة أو من context لدعم تشخيص ثبات الهوية."""
+    direct_session = incoming.get("session_id")
+    if isinstance(direct_session, str) and direct_session.strip():
+        return direct_session.strip()
+
+    context_payload = incoming.get("context")
+    if isinstance(context_payload, dict):
+        context_session = context_payload.get("session_id")
+        if isinstance(context_session, str) and context_session.strip():
+            return context_session.strip()
+    return None
+
+
+def _emit_identity_diagnostic_log(
+    *,
+    route_name: str,
+    conversation_id: int | str,
+    thread_id: str | None,
+    session_id: str | None,
+) -> None:
+    """يسجل بصمة الهوية لكل رسالة مع معلومات الحاوية لتأكيد تغيّر المسار أو ثباته."""
+    orchestrator_instance_id = os.getenv("ORCHESTRATOR_INSTANCE_ID", "").strip() or "unset"
+    hostname = os.getenv("HOSTNAME", "").strip() or "unknown"
+    container_id = hostname
+    logger.info(
+        "[IDENTITY_DIAGNOSTIC] route=%s conversation_id=%s thread_id=%s session_id=%s "
+        "orchestrator_instance_id=%s hostname=%s container_id=%s",
+        route_name,
+        conversation_id,
+        thread_id or "missing",
+        session_id or "missing",
+        orchestrator_instance_id,
+        hostname,
+        container_id,
+    )
+
+
 def _compress_text_for_context(content: str) -> str:
     """يضغط النص للسياق عبر إزالة الضوضاء وتوحيد المسافات وتقليص الطول."""
     collapsed = " ".join(content.replace("\x00", "").split())
@@ -2177,6 +2215,12 @@ async def chat_ws_stategraph(websocket: WebSocket) -> None:
             context["user_id"] = user_id
             if sticky_thread_id:
                 context["thread_id"] = sticky_thread_id
+            _emit_identity_diagnostic_log(
+                route_name="orchestrator_ws_customer",
+                conversation_id=conversation_id,
+                thread_id=sticky_thread_id,
+                session_id=_resolve_session_id_from_incoming(incoming),
+            )
 
             try:
                 client_context = _extract_client_context_messages(incoming)
@@ -2326,6 +2370,12 @@ async def admin_chat_ws_stategraph(websocket: WebSocket) -> None:
             context["user_id"] = user_id
             if sticky_thread_id:
                 context["thread_id"] = sticky_thread_id
+            _emit_identity_diagnostic_log(
+                route_name="orchestrator_ws_admin",
+                conversation_id=conversation_id,
+                thread_id=sticky_thread_id,
+                session_id=_resolve_session_id_from_incoming(incoming),
+            )
 
             try:
                 client_context = _extract_client_context_messages(incoming)
