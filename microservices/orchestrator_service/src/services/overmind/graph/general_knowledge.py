@@ -19,21 +19,38 @@ class GeneralKnowledgeNode:
         from .telemetry import emit_telemetry
 
         start_time = time.time()
+
+        logger.info(f"[GK] state keys={list(state.keys())}")
+        logger.info(f"[GK] query={state.get('query')}")
+        logger.info(f"[GK] messages[-1]={state.get('messages', [])[-1] if state.get('messages') else 'EMPTY'}")
+
         messages = state.get("messages", [])
 
+        # DO NOT override state["query"] with raw message content if it exists
         query = state.get("query")
         if not query and messages:
-            query = messages[-1].content
+            last_msg = messages[-1]
+            query = last_msg.get("content") if isinstance(last_msg, dict) else getattr(last_msg, "content", "")
         query = str(query or "").strip()
 
-        # Exclude the very last message from the HISTORY block if it's the current user query,
-        # to prevent prompt contamination. State is NOT modified.
-        prompt_messages = messages
-        if messages:
-            last_msg = messages[-1]
-            role = last_msg.get("role") or last_msg.get("type") if isinstance(last_msg, dict) else getattr(last_msg, "type", getattr(last_msg, "role", ""))
+        logger.info(f"[FINAL QUERY USED]: {query}")
+
+        # Exclude ONLY the message matching the active query to prevent prompt contamination.
+        # State is NOT modified. Do not use blanket slice messages[:-1].
+        prompt_messages = []
+        original_query_normalized = str(state.get("original_query") or "").strip()
+        query_normalized = query.strip()
+
+        for msg in messages:
+            role = msg.get("role") or msg.get("type") if isinstance(msg, dict) else getattr(msg, "type", getattr(msg, "role", ""))
+            content = msg.get("content") if isinstance(msg, dict) else getattr(msg, "content", "")
+
             if role in ("human", "user"):
-                prompt_messages = messages[:-1]
+                content_normalized = str(content).strip()
+                if content_normalized == query_normalized or (original_query_normalized and content_normalized == original_query_normalized):
+                    continue
+            prompt_messages.append(msg)
+
         history = format_conversation_history(prompt_messages)
 
         if not history.strip():

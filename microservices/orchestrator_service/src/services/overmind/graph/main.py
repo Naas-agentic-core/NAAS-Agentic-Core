@@ -672,8 +672,12 @@ class ChatFallbackNode:
 
         query = state.get("query")
         if not query and messages:
-            query = messages[-1].content
+            last_msg = messages[-1]
+            query = last_msg.get("content") if isinstance(last_msg, dict) else getattr(last_msg, "content", "")
         query = str(query or "").strip()
+
+        import logging
+        logging.getLogger("graph").info(f"[FINAL QUERY USED]: {query}")
 
         history = format_conversation_history(messages)
 
@@ -789,12 +793,13 @@ class QueryRewriterNode:
             return False
         return "User:" not in candidate and "Assistant:" not in candidate
 
-    def _extract_latest_reference_snippet(self, messages: list[object], current_query: str) -> str:
+    def _extract_latest_reference_snippet(self, messages: list[object], current_query: str, original_query: str = "") -> str:
         """يستخرج آخر رسالة مرجعية غير فارغة لتثبيت الإحالة الضميرية عند الفشل."""
         if not messages:
             return ""
 
         current_query_normalized = current_query.strip()
+        original_query_normalized = original_query.strip()
 
         for message in reversed(
             messages
@@ -803,8 +808,11 @@ class QueryRewriterNode:
             content = get_message_content(message)
             if role not in {"user", "assistant"}:
                 continue
-            if isinstance(content, str) and content.strip() == current_query_normalized:
-                continue
+
+            if isinstance(content, str):
+                content_normalized = content.strip()
+                if content_normalized == current_query_normalized or (original_query_normalized and content_normalized == original_query_normalized):
+                    continue
 
             # Try extracting from structured kwargs first
             if isinstance(message, dict):
@@ -837,9 +845,9 @@ class QueryRewriterNode:
             return text
         return ""
 
-    def _build_contextual_fallback_rewrite(self, query: str, messages: list[object]) -> str:
+    def _build_contextual_fallback_rewrite(self, query: str, original_query: str, messages: list[object]) -> str:
         """يبني إعادة صياغة حتمية عند تعذر إعادة الصياغة الذكية لمنع عمى السياق."""
-        reference = self._extract_latest_reference_snippet(messages=messages, current_query=query)
+        reference = self._extract_latest_reference_snippet(messages=messages, current_query=query, original_query=original_query)
         if not reference:
             return query
 
@@ -898,12 +906,12 @@ class QueryRewriterNode:
                 error=error,
             )
             return {
-                "query": self._build_contextual_fallback_rewrite(query=query, messages=messages)
+                "query": self._build_contextual_fallback_rewrite(query=query, original_query=str(state.get("original_query", "")), messages=messages)
             }
 
         if rewritten_query == query:
             rewritten_query = self._build_contextual_fallback_rewrite(
-                query=query, messages=messages
+                query=query, original_query=str(state.get("original_query", "")), messages=messages
             )
 
         emit_telemetry(node_name="QueryRewriterNode", start_time=start_time, state=state)
