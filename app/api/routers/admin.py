@@ -231,7 +231,7 @@ async def get_admin_user_count() -> AdminUserCountResponse:
         raise HTTPException(status_code=503, detail="User Service unavailable") from e
 
 
-@router.websocket("/api/chat/ws")
+# @router.websocket("/api/chat/ws")
 async def chat_stream_ws(
     websocket: WebSocket,
 ) -> None:

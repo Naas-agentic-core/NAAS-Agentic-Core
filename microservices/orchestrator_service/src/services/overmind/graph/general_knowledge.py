@@ -4,8 +4,7 @@ from langchain_core.messages import AIMessage
 
 from microservices.orchestrator_service.src.core.ai_gateway import get_ai_client
 
-from .main import AgentState
-from .supervisor import format_conversation_history
+from .main import AgentState, format_conversation_history, preserve_context, extract_last_user
 
 logger = logging.getLogger("graph")
 
@@ -21,10 +20,23 @@ class GeneralKnowledgeNode:
         start_time = time.time()
         messages = state.get("messages", [])
 
+        if not isinstance(messages, list):
+            raise RuntimeError("INVALID STATE")
+
+        if len(messages) == 0:
+            logger.info("STATE INIT — new conversation")
+
         query = state.get("query")
-        if not query and messages:
-            query = messages[-1].content
-        query = str(query or "").strip()
+        if not query:
+            raise RuntimeError("QUERY MISSING")
+
+        last_user = extract_last_user(messages)
+        if query.strip() == last_user.strip():
+            logger.info("DIRECT QUESTION — no resolution needed")
+
+        logger.info("THREAD=%s", state.get("configurable", {}).get("thread_id", "UNKNOWN"))
+        logger.info("QUERY=%s", query)
+        logger.info("MESSAGES_COUNT=%d", len(messages))
 
         # Exclude the very last message from the HISTORY block if it's the current user query,
         # to prevent prompt contamination. State is NOT modified.
@@ -34,16 +46,9 @@ class GeneralKnowledgeNode:
             role = last_msg.get("role") or last_msg.get("type") if isinstance(last_msg, dict) else getattr(last_msg, "type", getattr(last_msg, "role", ""))
             if role in ("human", "user"):
                 prompt_messages = messages[:-1]
+
+        prompt_messages = preserve_context(prompt_messages)
         history = format_conversation_history(prompt_messages)
-
-        if not history.strip():
-            print("🚨 FAILURE: EMPTY HISTORY")
-
-        if "ها" in query and "فرنسا" not in query:
-            print("🚨 PRONOUN LEAK DETECTED")
-
-        if "فرنسا" not in history:
-            print("🚨 ENTITY LOST IN HISTORY")
 
         print("=== FINAL LLM INPUT ===")
         print("HISTORY:", history)

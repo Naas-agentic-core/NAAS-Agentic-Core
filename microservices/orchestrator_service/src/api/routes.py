@@ -820,7 +820,12 @@ def _resolve_thread_id(context: ChatRunContext, fallback_conversation_id: int | 
         raise ValueError(
             f"[THREAD_RESOLUTION] user_id required for safe thread binding. conv_id={conv_id!r}"
         )
-    return f"u{user_id}:c{conv_id}"
+
+    resolved_id = f"u{user_id}:c{conv_id}"
+    if not resolved_id:
+        raise RuntimeError("THREAD MISSING")
+
+    return resolved_id
 
 
 def _build_conversation_thread_id(user_id: int, conversation_id: int | str) -> str:

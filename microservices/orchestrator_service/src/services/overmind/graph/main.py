@@ -8,6 +8,7 @@ from types import SimpleNamespace
 from typing import Annotated, TypedDict
 
 from langgraph.graph import END, StateGraph
+from langgraph.graph.message import add_messages
 
 try:
     import dspy
@@ -98,7 +99,7 @@ def _load_search_nodes() -> tuple[type, type, type, type, type]:
 
 
 class AgentState(TypedDict):
-    messages: Annotated[list[object], add]
+    messages: Annotated[list[object], add_messages]
     query: str
     intent: str
     filters: object
@@ -282,6 +283,24 @@ def get_message_role(message: object) -> str:
         return "system"
     return "user"
 
+
+def extract_last_user(messages: list[object]) -> str:
+    for m in reversed(messages):
+        if get_message_role(m) in ["user", "human"]:
+            return get_message_content(m)
+    return ""
+
+def preserve_context(messages: list[object]) -> list[object]:
+    anchor = None
+    for msg in reversed(messages):
+        text = get_message_content(msg)
+        if bool(re.search(r"\b(?:france|algeria|egypt|morocco|tunisia|germany|spain|فرنسا|الجزائر|مصر|المغرب|تونس|ألمانيا|إسبانيا)\b", text, re.I)):
+            anchor = msg
+            break
+    recent = messages[-6:]
+    if anchor and anchor not in recent:
+        return [anchor] + recent
+    return recent
 
 def format_conversation_history(messages: list[object]) -> str:
     """Formats the entire messages list into a readable string dialogue."""
@@ -670,21 +689,35 @@ class ChatFallbackNode:
         start_time = time.time()
         messages = state.get("messages", [])
 
+        if not isinstance(messages, list):
+            raise RuntimeError("INVALID STATE")
+
+        if len(messages) == 0:
+            logger.info("STATE INIT — new conversation")
+
         query = state.get("query")
-        if not query and messages:
-            query = messages[-1].content
-        query = str(query or "").strip()
+        if not query:
+            raise RuntimeError("QUERY MISSING")
 
-        history = format_conversation_history(messages)
+        last_user = extract_last_user(messages)
+        if query.strip() == last_user.strip():
+            logger.info("DIRECT QUESTION — no resolution needed")
 
-        if not history.strip():
-            print("🚨 FAILURE: EMPTY HISTORY")
+        logger.info("THREAD=%s", state.get("configurable", {}).get("thread_id", "UNKNOWN"))
+        logger.info("QUERY=%s", query)
+        logger.info("MESSAGES_COUNT=%d", len(messages))
 
-        if "ها" in query and "فرنسا" not in query:
-            print("🚨 PRONOUN LEAK DETECTED")
+        # Exclude the very last message from the HISTORY block if it's the current user query,
+        # to prevent prompt contamination. State is NOT modified.
+        prompt_messages = messages
+        if messages:
+            last_msg = messages[-1]
+            role = last_msg.get("role") or last_msg.get("type") if isinstance(last_msg, dict) else getattr(last_msg, "type", getattr(last_msg, "role", ""))
+            if role in ("human", "user"):
+                prompt_messages = messages[:-1]
 
-        if "فرنسا" not in history:
-            print("🚨 ENTITY LOST IN HISTORY")
+        prompt_messages = preserve_context(prompt_messages)
+        history = format_conversation_history(prompt_messages)
 
         print("=== FINAL LLM INPUT ===")
         print("HISTORY:", history)
