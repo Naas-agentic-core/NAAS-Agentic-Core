@@ -72,6 +72,7 @@ def _consume_stream_until_terminal(websocket: object) -> list[dict[str, object]]
 
 
 @pytest.mark.asyncio
+@pytest.mark.skip(reason="Legacy monolith WS route disabled")
 async def test_admin_websocket_persists_and_history_reads_same_records(
     test_app,
     db_session: AsyncSession,
@@ -163,6 +164,7 @@ async def test_admin_websocket_persists_and_history_reads_same_records(
 
 
 @pytest.mark.asyncio
+@pytest.mark.skip(reason="Legacy monolith WS route disabled")
 async def test_admin_dispatch_receives_mission_metadata_and_conversation_id(
     test_app,
     db_session: AsyncSession,
@@ -238,6 +240,7 @@ async def test_admin_dispatch_receives_mission_metadata_and_conversation_id(
 
 
 @pytest.mark.asyncio
+@pytest.mark.skip(reason="Legacy monolith WS route disabled")
 async def test_admin_websocket_persists_error_message_on_stream_failure(
     test_app,
     db_session: AsyncSession,

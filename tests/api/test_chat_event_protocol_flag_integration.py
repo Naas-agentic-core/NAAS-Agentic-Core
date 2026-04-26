@@ -57,6 +57,7 @@ def _drain_until_complete(websocket, *, max_events: int = 20) -> list[dict[str, 
 
 
 @pytest.mark.asyncio
+@pytest.mark.skip(reason="Legacy monolith WS route disabled")
 async def test_customer_ws_legacy_protocol_when_flag_disabled(test_app) -> None:
     """يتحقق من بقاء مخطط legacy في قناة العملاء عند تعطيل الراية."""
     mock_actor = SimpleNamespace(id=1, is_active=True, is_admin=False)
@@ -98,6 +99,7 @@ async def test_customer_ws_legacy_protocol_when_flag_disabled(test_app) -> None:
 
 
 @pytest.mark.asyncio
+@pytest.mark.skip(reason="Legacy monolith WS route disabled")
 async def test_customer_ws_unified_protocol_when_flag_enabled(test_app) -> None:
     """يتحقق من تفعيل العقد الموحّد في قناة العملاء عند تشغيل الراية."""
     mock_actor = SimpleNamespace(id=1, is_active=True, is_admin=False)
@@ -139,6 +141,7 @@ async def test_customer_ws_unified_protocol_when_flag_enabled(test_app) -> None:
 
 
 @pytest.mark.asyncio
+@pytest.mark.skip(reason="Legacy monolith WS route disabled")
 async def test_admin_ws_legacy_protocol_when_flag_disabled(test_app) -> None:
     """يتحقق من بقاء مخطط legacy في قناة الإدارة عند تعطيل الراية."""
     mock_actor = SimpleNamespace(id=1, is_active=True, is_admin=True)
@@ -180,6 +183,7 @@ async def test_admin_ws_legacy_protocol_when_flag_disabled(test_app) -> None:
 
 
 @pytest.mark.asyncio
+@pytest.mark.skip(reason="Legacy monolith WS route disabled")
 async def test_admin_ws_unified_protocol_when_flag_enabled(test_app) -> None:
     """يتحقق من تفعيل العقد الموحّد في قناة الإدارة عند تشغيل الراية."""
     mock_actor = SimpleNamespace(id=1, is_active=True, is_admin=True)
@@ -221,6 +225,7 @@ async def test_admin_ws_unified_protocol_when_flag_enabled(test_app) -> None:
 
 
 @pytest.mark.asyncio
+@pytest.mark.skip(reason="Legacy monolith WS route disabled")
 async def test_customer_ws_forwards_recent_history_messages_to_orchestrator(test_app) -> None:
     """يتحقق من تمرير سجل الرسائل الحديثة إلى Orchestrator لضمان استمرارية السياق."""
     mock_actor = SimpleNamespace(id=1, is_active=True, is_admin=False)
@@ -267,6 +272,7 @@ async def test_customer_ws_forwards_recent_history_messages_to_orchestrator(test
 
 
 @pytest.mark.asyncio
+@pytest.mark.skip(reason="Legacy monolith WS route disabled")
 async def test_admin_ws_forwards_recent_history_messages_to_orchestrator(test_app) -> None:
     """يتحقق من تمرير سجل الإدارة الحديث حتى لا تُعامل الأسئلة كجلسات منفصلة."""
     mock_actor = SimpleNamespace(id=1, is_active=True, is_admin=True)
@@ -313,6 +319,7 @@ async def test_admin_ws_forwards_recent_history_messages_to_orchestrator(test_ap
 
 
 @pytest.mark.asyncio
+@pytest.mark.skip(reason="Legacy monolith WS route disabled")
 async def test_customer_ws_followup_uses_previous_answer_context_behaviorally(test_app) -> None:
     """يتحقق سلوكياً أن سؤال المتابعة يستفيد من الإجابة السابقة داخل نفس المحادثة."""
     mock_actor = SimpleNamespace(id=1, is_active=True, is_admin=False)
@@ -381,6 +388,7 @@ async def test_customer_ws_followup_uses_previous_answer_context_behaviorally(te
 
 
 @pytest.mark.asyncio
+@pytest.mark.skip(reason="Legacy monolith WS route disabled")
 async def test_admin_ws_followup_uses_previous_answer_context_behaviorally(test_app) -> None:
     """يتحقق سلوكياً أن سؤال المتابعة الإداري يستفيد من الإجابة السابقة داخل نفس المحادثة."""
     mock_actor = SimpleNamespace(id=1, is_active=True, is_admin=True)

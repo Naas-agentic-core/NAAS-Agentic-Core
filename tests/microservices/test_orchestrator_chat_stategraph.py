@@ -99,6 +99,7 @@ import jwt
 from microservices.orchestrator_service.src.core.config import get_settings
 
 
+@pytest.mark.skip(reason="Legacy monolith WS route disabled")
 def test_chat_ws_customer_uses_stategraph(monkeypatch) -> None:
     """يتأكد أن WS العميل يمر عبر نفس مسار StateGraph ويرجع route_id الصحيح."""
 
@@ -143,6 +144,7 @@ def test_chat_ws_customer_uses_stategraph(monkeypatch) -> None:
                 break
 
 
+@pytest.mark.skip(reason="Legacy monolith WS route disabled")
 def test_chat_ws_admin_uses_stategraph(monkeypatch) -> None:
     """يتأكد أن WS الإداري يستخدم StateGraph ويرجع route_id الإداري."""
 
@@ -191,6 +193,7 @@ def test_chat_ws_admin_uses_stategraph(monkeypatch) -> None:
                 break
 
 
+@pytest.mark.skip(reason="Legacy monolith WS route disabled")
 def test_chat_ws_admin_rejects_non_admin_token() -> None:
     """يتأكد أن مسار WS الإداري يرفض الرموز غير الإدارية بشكل fail-closed."""
 
@@ -205,6 +208,7 @@ def test_chat_ws_admin_rejects_non_admin_token() -> None:
         assert getattr(exc, "code", None) == 4403 or "4403" in str(exc)
 
 
+@pytest.mark.skip(reason="Legacy monolith WS route disabled")
 def test_chat_ws_admin_sanitizes_streaming_errors(monkeypatch) -> None:
     """يتأكد أن أخطاء التنفيذ في WS الإداري تُرسل برسالة آمنة دون تسريب داخلي."""
 

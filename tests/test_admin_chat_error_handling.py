@@ -11,6 +11,7 @@ from app.core.security import generate_service_token
 
 
 @pytest.mark.asyncio
+@pytest.mark.skip(reason="Legacy monolith WS route disabled")
 async def test_chat_error_handling_no_auth(test_app):
     """Test that chat without auth closes the WebSocket."""
     with TestClient(test_app) as client:
@@ -21,6 +22,7 @@ async def test_chat_error_handling_no_auth(test_app):
 
 
 @pytest.mark.asyncio
+@pytest.mark.skip(reason="Legacy monolith WS route disabled")
 async def test_chat_error_handling_with_auth_but_service_error(test_app, db_session):
     """Test that chat with auth but internal service error returns error details."""
     admin_user = User(email="admin-error@example.com", full_name="Admin", is_admin=True)

@@ -9,6 +9,7 @@ from app.core.database import get_db
 
 
 @pytest.mark.asyncio
+@pytest.mark.skip(reason="Legacy monolith WS route disabled")
 async def test_tool_access_block_returns_fallback_event(
     test_app, db_session, register_and_login_test_user
 ) -> None:

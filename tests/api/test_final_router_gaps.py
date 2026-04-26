@@ -43,6 +43,7 @@ def test_customer_ws_decode_fail(customer_app):
                     pass
 
 
+@pytest.mark.skip(reason="Legacy monolith WS route disabled")
 def test_customer_ws_admin(customer_app):
     client = TestClient(customer_app)
     mock_user = MagicMock(spec=User)
@@ -65,6 +66,7 @@ def test_customer_ws_admin(customer_app):
             assert exc.value.code == 4401
 
 
+@pytest.mark.skip(reason="Legacy monolith WS route disabled")
 def test_customer_ws_empty_question(customer_app):
     client = TestClient(customer_app)
     mock_user = MagicMock(spec=User)

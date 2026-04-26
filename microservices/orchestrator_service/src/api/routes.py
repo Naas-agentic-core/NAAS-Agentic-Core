@@ -420,8 +420,7 @@ def _context_gap_reason_for_followup(
     anchor = _extract_recent_entity_anchor(history_messages)
     if anchor:
         return None
-    logger.info("[CONTEXT_GUARD] bypassed")
-    return None
+    return "MISSING_ENTITY_ANCHOR"
 
 
 async def _detect_checkpoint_state(thread_id: str) -> tuple[bool, bool]:
