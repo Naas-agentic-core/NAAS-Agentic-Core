@@ -95,7 +95,10 @@ class QueryAnalyzerNode:
         messages = state.get("messages", [])
         error = None
 
-        from .main import format_conversation_history, extract_last_user, get_message_role, get_message_content
+        from .main import (
+            format_conversation_history,
+            get_message_role,
+        )
 
         # Exclude the current user query from history ONLY for prompt formatting
         prompt_messages = messages
