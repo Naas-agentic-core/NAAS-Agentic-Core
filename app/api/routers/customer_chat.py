@@ -159,7 +159,7 @@ def _merge_history_with_client_context(
     return merged_history[-80:]
 
 
-@router.websocket("/ws")
+# @router.websocket("/ws")
 async def chat_stream_ws(
     websocket: WebSocket,
 ) -> None:
