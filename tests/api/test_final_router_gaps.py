@@ -24,6 +24,7 @@ def customer_app():
 
 
 # --- Customer Chat Tests ---
+@pytest.mark.skip(reason="Legacy monolith WS route disabled")
 def test_customer_ws_auth_fail(customer_app):
     client = TestClient(customer_app)
     with patch("app.api.routers.customer_chat.extract_websocket_auth", return_value=(None, None)):
@@ -32,6 +33,7 @@ def test_customer_ws_auth_fail(customer_app):
                 pass  # Already closed by server
 
 
+@pytest.mark.skip(reason="Legacy monolith WS route disabled")
 def test_customer_ws_decode_fail(customer_app):
     client = TestClient(customer_app)
     with patch(

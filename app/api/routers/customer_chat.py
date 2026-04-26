@@ -5,30 +5,22 @@
 مع فرض سياسات الأمان والملكية.
 """
 
-import asyncio
-import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.routers.ws_auth import extract_websocket_auth
 from app.api.schemas.customer_chat import (
     CustomerConversationDetails,
     CustomerConversationSummary,
 )
-from app.core.config import get_settings
-from app.core.database import async_session_factory, get_db
+from app.core.database import get_db
 from app.core.di import get_logger
-from app.core.domain.chat import MessageRole
 from app.core.domain.user import User
 from app.deps.auth import CurrentUser, require_permissions
-from app.infrastructure.clients.orchestrator_client import orchestrator_client
-from app.services.auth.token_decoder import decode_user_id
 from app.services.boundaries.customer_chat_boundary_service import (
     CustomerChatBoundaryService,
 )
 from app.services.rbac import QA_SUBMIT
-from shared.chat_protocol.event_protocol import normalize_streaming_event
 
 logger = get_logger(__name__)
 
