@@ -80,6 +80,25 @@ def _extract_session_id(websocket: WebSocket) -> str | None:
     return None
 
 
+def _emit_gateway_identity_log(route_name: str, websocket: WebSocket) -> None:
+    """يسجل تشخيص الهوية في البوابة لربط session_id مع مسار WS ومضيف التنفيذ."""
+    session_id = _extract_session_id(websocket)
+    thread_id = websocket.query_params.get("thread_id") or websocket.headers.get("x-thread-id")
+    conversation_id = (
+        websocket.query_params.get("conversation_id") or websocket.headers.get("x-conversation-id")
+    )
+    hostname = os.getenv("HOSTNAME", "").strip() or "unknown"
+    logger.info(
+        "[GATEWAY_IDENTITY_DIAGNOSTIC] route=%s conversation_id=%s thread_id=%s session_id=%s "
+        "hostname=%s",
+        route_name,
+        conversation_id or "missing",
+        thread_id or "missing",
+        session_id or "missing",
+        hostname,
+    )
+
+
 def _build_routing_identity(route_id: str, upstream_path: str, session_id: str | None) -> str:
     """Builds a routing identity prioritizing session_id to maintain sticky routing."""
     if session_id:
@@ -277,6 +296,7 @@ async def chat_ws_proxy(websocket: WebSocket):
         logger.info(
             f"Chat WebSocket route_id={route_id} legacy_flag=false traceparent={headers.get('traceparent', 'unknown')}"
         )
+        _emit_gateway_identity_log("gateway_ws_customer", websocket)
         session_id = _extract_session_id(websocket)
         logger.info(
             f"session_id presence: {'present' if session_id else 'absent'} in chat_ws_proxy"
@@ -312,6 +332,7 @@ async def admin_chat_ws_proxy(websocket: WebSocket):
         logger.info(
             f"Chat WebSocket route_id={route_id} legacy_flag=false traceparent={headers.get('traceparent', 'unknown')}"
         )
+        _emit_gateway_identity_log("gateway_ws_admin", websocket)
         session_id = _extract_session_id(websocket)
         logger.info(
             f"session_id presence: {'present' if session_id else 'absent'} in admin_chat_ws_proxy"
