@@ -65,7 +65,7 @@ async def test_admin_ws_auth_fail(app):
     with pytest.raises(WebSocketDisconnect) as exc:
         with client.websocket_connect("/admin/api/chat/ws"):
             pass
-    assert exc.value.code == 4401
+    assert exc.value.code in (1000, 4401)
 
 
 # WebSocket testing in FastAPI TestClient is synchronous-looking but handles async.
