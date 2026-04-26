@@ -30,6 +30,7 @@ async def test_customer_ws_admin_actor_emits_assistant_error_when_flag_enabled(t
             with patch("app.api.routers.customer_chat.decode_user_id", return_value=1):
                 with TestClient(test_app) as client:
                     from starlette.websockets import WebSocketDisconnect
+
                     with pytest.raises(WebSocketDisconnect) as exc:
                         with client.websocket_connect("/api/chat/ws"):
                             pass
@@ -53,6 +54,7 @@ async def test_admin_ws_non_admin_actor_emits_assistant_error_when_flag_enabled(
             with patch("app.api.routers.admin.decode_user_id", return_value=1):
                 with TestClient(test_app) as client:
                     from starlette.websockets import WebSocketDisconnect
+
                     with pytest.raises(WebSocketDisconnect) as exc:
                         with client.websocket_connect("/admin/api/chat/ws"):
                             pass
@@ -76,6 +78,7 @@ async def test_admin_ws_empty_question_emits_assistant_error_when_flag_enabled(t
             with patch("app.api.routers.admin.decode_user_id", return_value=1):
                 with TestClient(test_app) as client:
                     from starlette.websockets import WebSocketDisconnect
+
                     with pytest.raises(WebSocketDisconnect) as exc:
                         with client.websocket_connect("/admin/api/chat/ws"):
                             pass
@@ -105,6 +108,7 @@ async def test_customer_ws_dispatch_http_exception_emits_assistant_error_when_fl
                 ):
                     with TestClient(test_app) as client:
                         from starlette.websockets import WebSocketDisconnect
+
                         with pytest.raises(WebSocketDisconnect) as exc:
                             with client.websocket_connect("/api/chat/ws"):
                                 pass
@@ -133,8 +137,9 @@ async def test_admin_ws_dispatch_http_exception_emits_assistant_error_when_flag_
                     side_effect=HTTPException(status_code=409, detail="admin dispatch failed"),
                 ):
                     with TestClient(test_app) as client:
-                            from starlette.websockets import WebSocketDisconnect
-                            with pytest.raises(WebSocketDisconnect) as exc:
-                                with client.websocket_connect("/admin/api/chat/ws"):
-                                    pass
-                            assert exc.value.code in (1000, 4401)
+                        from starlette.websockets import WebSocketDisconnect
+
+                        with pytest.raises(WebSocketDisconnect) as exc:
+                            with client.websocket_connect("/admin/api/chat/ws"):
+                                pass
+                        assert exc.value.code in (1000, 4401)

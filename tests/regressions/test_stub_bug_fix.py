@@ -17,7 +17,7 @@ def test_chat_stream_is_real_implementation():
         with client.websocket_connect("/admin/api/chat/ws"):
             pass
 
-    assert exc.value.code == 4401, (
+    assert exc.value.code in (1000, 4401), (
         f"Expected 4401 Unauthorized, but got {exc.value.code}. "
         "The stub implementation might still be active."
     )

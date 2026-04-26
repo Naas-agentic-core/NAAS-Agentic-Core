@@ -49,6 +49,7 @@ async def test_admin_blocked_from_customer_chat(test_app, db_session: AsyncSessi
     try:
         with TestClient(test_app) as client:
             from starlette.websockets import WebSocketDisconnect
+
             with pytest.raises(WebSocketDisconnect) as exc:
                 with client.websocket_connect(f"/api/chat/ws?token={token}"):
                     pass

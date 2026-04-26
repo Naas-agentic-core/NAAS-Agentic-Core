@@ -48,6 +48,7 @@ async def test_chat_stream_has_delta_event_type(test_app, db_session):
         with patch("app.api.routers.admin.orchestrator_client", mock_orchestrator):
             with TestClient(test_app) as client:
                 from starlette.websockets import WebSocketDisconnect
+
                 with pytest.raises(WebSocketDisconnect) as exc:
                     with client.websocket_connect(f"/admin/api/chat/ws?token={token}"):
                         pass

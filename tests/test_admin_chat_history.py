@@ -98,6 +98,7 @@ async def test_admin_websocket_persists_and_history_reads_same_records(
 
             with TestClient(test_app) as client:
                 from starlette.websockets import WebSocketDisconnect
+
                 with pytest.raises(WebSocketDisconnect) as exc:
                     with client.websocket_connect(f"/admin/api/chat/ws?token={token}"):
                         pass
@@ -164,6 +165,7 @@ async def test_admin_dispatch_receives_mission_metadata_and_conversation_id(
 
             with TestClient(test_app) as client:
                 from starlette.websockets import WebSocketDisconnect
+
                 with pytest.raises(WebSocketDisconnect) as exc:
                     with client.websocket_connect(f"/admin/api/chat/ws?token={token}"):
                         pass
@@ -221,6 +223,7 @@ async def test_admin_websocket_persists_error_message_on_stream_failure(
 
             with TestClient(test_app) as client:
                 from starlette.websockets import WebSocketDisconnect
+
                 with pytest.raises(WebSocketDisconnect) as exc:
                     with client.websocket_connect(f"/admin/api/chat/ws?token={token}"):
                         pass

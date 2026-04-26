@@ -289,17 +289,25 @@ def extract_last_user(messages: list[object]) -> str:
             return get_message_content(m)
     return ""
 
+
 def preserve_context(messages: list[object]) -> list[object]:
     anchor = None
     for msg in reversed(messages):
         text = get_message_content(msg)
-        if bool(re.search(r"\b(?:france|algeria|egypt|morocco|tunisia|germany|spain|فرنسا|الجزائر|مصر|المغرب|تونس|ألمانيا|إسبانيا)\b", text, re.I)):
+        if bool(
+            re.search(
+                r"\b(?:france|algeria|egypt|morocco|tunisia|germany|spain|فرنسا|الجزائر|مصر|المغرب|تونس|ألمانيا|إسبانيا)\b",
+                text,
+                re.I,
+            )
+        ):
             anchor = msg
             break
     recent = messages[-6:]
     if anchor and anchor not in recent:
         return [anchor, *recent]
     return recent
+
 
 def format_conversation_history(messages: list[object]) -> str:
     """Formats the entire messages list into a readable string dialogue."""
@@ -711,7 +719,11 @@ class ChatFallbackNode:
         prompt_messages = messages
         if messages:
             last_msg = messages[-1]
-            role = last_msg.get("role") or last_msg.get("type") if isinstance(last_msg, dict) else getattr(last_msg, "type", getattr(last_msg, "role", ""))
+            role = (
+                last_msg.get("role") or last_msg.get("type")
+                if isinstance(last_msg, dict)
+                else getattr(last_msg, "type", getattr(last_msg, "role", ""))
+            )
             if role in ("human", "user"):
                 prompt_messages = messages[:-1]
 
@@ -828,9 +840,7 @@ class QueryRewriterNode:
 
         current_query_normalized = current_query.strip()
 
-        for message in reversed(
-            messages
-        ):  # include all messages to avoid context amnesia
+        for message in reversed(messages):  # include all messages to avoid context amnesia
             role = get_message_role(message)
             content = get_message_content(message)
             if role not in {"user", "assistant"}:

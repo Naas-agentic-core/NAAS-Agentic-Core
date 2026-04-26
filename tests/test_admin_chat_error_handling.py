@@ -53,6 +53,7 @@ async def test_chat_error_handling_with_auth_but_service_error(test_app, db_sess
 
             with TestClient(test_app) as client:
                 from starlette.websockets import WebSocketDisconnect
+
                 with pytest.raises(WebSocketDisconnect) as exc:
                     with client.websocket_connect(f"/admin/api/chat/ws?token={token}"):
                         pass

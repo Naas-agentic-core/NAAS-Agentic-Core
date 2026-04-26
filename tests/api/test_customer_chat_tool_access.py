@@ -50,6 +50,7 @@ async def test_tool_access_block_returns_fallback_event(
 
             with TestClient(test_app) as client:
                 from starlette.websockets import WebSocketDisconnect
+
                 with pytest.raises(WebSocketDisconnect) as exc:
                     with client.websocket_connect(f"/api/chat/ws?token={token}"):
                         pass

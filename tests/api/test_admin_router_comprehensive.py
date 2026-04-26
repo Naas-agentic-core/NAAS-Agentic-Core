@@ -97,6 +97,7 @@ def test_chat_stream_ws_not_admin(app):
         ):
             with patch("app.api.routers.admin.decode_user_id", return_value=1):
                 from starlette.websockets import WebSocketDisconnect
+
                 with pytest.raises(WebSocketDisconnect) as exc:
                     with client.websocket_connect("/admin/api/chat/ws"):
                         pass
@@ -127,6 +128,7 @@ def test_chat_stream_ws_empty_question(app):
         ):
             with patch("app.api.routers.admin.decode_user_id", return_value=1):
                 from starlette.websockets import WebSocketDisconnect
+
                 with pytest.raises(WebSocketDisconnect) as exc:
                     with client.websocket_connect("/admin/api/chat/ws"):
                         pass
@@ -178,6 +180,7 @@ def test_chat_stream_ws_orchestrator_error(app):
         ),
     ):
         from starlette.websockets import WebSocketDisconnect
+
         with pytest.raises(WebSocketDisconnect) as exc:
             with client.websocket_connect("/admin/api/chat/ws"):
                 pass
