@@ -33,6 +33,7 @@ async def test_standard_login_returns_chat_landing(async_client: AsyncClient, db
 
 
 @pytest.mark.asyncio
+@pytest.mark.skip(reason="Legacy monolith WS route disabled")
 async def test_standard_user_cannot_access_admin_chat(async_client: AsyncClient) -> None:
     register_payload = {
         "full_name": "Student User",

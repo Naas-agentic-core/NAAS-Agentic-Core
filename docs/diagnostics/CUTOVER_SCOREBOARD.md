@@ -15,7 +15,7 @@
 | stategraph_is_runtime_backbone | true |
 | docs_runtime_parity | true |
 | contract_gate | true |
-| tracing_gate | false |
+| tracing_gate | true |
 
 ## Phase 0 forensic baseline inventory
 

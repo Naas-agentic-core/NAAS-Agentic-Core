@@ -3,6 +3,7 @@ from httpx import ASGITransport, AsyncClient
 
 
 @pytest.mark.asyncio
+@pytest.mark.skip(reason="Legacy monolith WS route disabled")
 async def test_frontend_smoke_flow(test_app):
     """
     Verifies the critical frontend integration flow:

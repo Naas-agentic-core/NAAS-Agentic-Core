@@ -32,6 +32,8 @@ def mock_db():
 
 
 import pytest
+
+
 @pytest.mark.skip(reason="Legacy monolith WS route disabled")
 def test_get_actor_user_not_found(client, mock_db):
     client.app.dependency_overrides[get_db] = lambda: mock_db
