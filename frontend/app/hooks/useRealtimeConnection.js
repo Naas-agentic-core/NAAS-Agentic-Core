@@ -33,11 +33,18 @@ export function useRealtimeConnection(wsUrl, token, eventNamespace = "default") 
   const mountedRef = useRef(true);
   const reconnectTimeoutRef = useRef(null);
   const pendingQueue = useRef([]);
-  const connectionIdRef = useRef(
-    typeof crypto !== "undefined" && crypto.randomUUID
-      ? crypto.randomUUID()
-      : `${Date.now()}-${Math.random().toString(36).slice(2)}`
-  );
+  const connectionIdRef = useRef(null);
+
+  useEffect(() => {
+    let sid = sessionStorage.getItem("ws_session_id");
+    if (!sid) {
+      sid = typeof crypto !== "undefined" && crypto.randomUUID
+        ? crypto.randomUUID()
+        : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      sessionStorage.setItem("ws_session_id", sid);
+    }
+    connectionIdRef.current = sid;
+  }, []);
 
   const connect = useCallback(() => {
     if (!wsUrl || !token) return;
@@ -48,6 +55,9 @@ export function useRealtimeConnection(wsUrl, token, eventNamespace = "default") 
     try {
         const wsUrlObj = new URL(wsUrl);
         wsUrlObj.searchParams.append("token", token);
+        if (connectionIdRef.current) {
+          wsUrlObj.searchParams.append("session_id", connectionIdRef.current);
+        }
         const ws = new WebSocket(wsUrlObj.toString(), ["jwt", token]);
         wsRef.current = ws;
 

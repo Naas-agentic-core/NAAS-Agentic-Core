@@ -139,7 +139,9 @@ def _resolve_chat_ws_target(route_id: str, upstream_path: str, websocket: WebSoc
         ws_base = _conversation_ws_base_url()
     else:
         ws_base = _to_ws_base_url(target_base)
-    return f"{ws_base}/{upstream_path}"
+
+    query_string = str(websocket.query_params)
+    return f"{ws_base}/{upstream_path}?{query_string}" if query_string else f"{ws_base}/{upstream_path}"
 
 
 def _chat_route_uses_conversation() -> bool:
