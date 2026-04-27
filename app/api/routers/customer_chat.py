@@ -5,23 +5,14 @@
 مع فرض سياسات الأمان والملكية.
 """
 
-import asyncio
-import uuid
 
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.schemas.customer_chat import (
-    CustomerConversationDetails,
-    CustomerConversationSummary,
-)
-from app.core.config import get_settings
-from app.core.database import async_session_factory, get_db
+from app.core.database import get_db
 from app.core.di import get_logger
-from app.core.domain.chat import MessageRole
 from app.core.domain.user import User
 from app.deps.auth import CurrentUser, require_permissions
-from app.infrastructure.clients.orchestrator_client import orchestrator_client
-from app.services.auth.token_decoder import decode_user_id
 from app.services.boundaries.customer_chat_boundary_service import (
     CustomerChatBoundaryService,
 )
@@ -78,6 +69,7 @@ def get_customer_service(
     return CustomerChatBoundaryService(db)
 
 
+def _is_text_event(event: dict[str, object]) -> bool:
     """يتحقق من أن الحدث نصي ومسموح بتجميعه داخل مخزن النص النهائي."""
     return str(event.get("type", "")) in TEXT_EVENT_TYPES
 
@@ -96,6 +88,7 @@ def _bind_local_conversation_id(
     return event
 
 
+def _bind_stream_metadata(
     event: dict[str, object],
     conversation_id: int | None,
     request_id: str | None,
@@ -112,6 +105,7 @@ def _bind_local_conversation_id(
     return bound_event
 
 
+def _extract_client_context_messages(payload: dict[str, object]) -> list[dict[str, str]]:
     """استخراج سياق المحادثة المرسل من الواجهة بشكل آمن ومحدود الحجم."""
     raw_context = payload.get("client_context_messages")
     if not isinstance(raw_context, list):
@@ -136,6 +130,7 @@ def _bind_local_conversation_id(
     return sanitized
 
 
+def _merge_history_with_client_context(
     persisted_history: list[dict[str, str]],
     client_context: list[dict[str, str]],
 ) -> list[dict[str, str]]:
@@ -152,45 +147,3 @@ def _bind_local_conversation_id(
     return merged_history[-80:]
 
 
-@router.get(
-    "/latest",
-    summary="استرجاع آخر محادثة",
-    response_model=CustomerConversationDetails | None,
-)
-async def get_latest_chat(
-    actor: User = Depends(get_actor_user),
-    service: CustomerChatBoundaryService = Depends(get_customer_service),
-) -> CustomerConversationDetails | None:
-    conversation_data = await service.get_latest_conversation_details(actor)
-    if not conversation_data:
-        return None
-    return CustomerConversationDetails.model_validate(conversation_data)
-
-
-@router.get(
-    "/conversations",
-    summary="سرد المحادثات",
-    response_model=list[CustomerConversationSummary],
-)
-async def list_conversations(
-    actor: User = Depends(get_actor_user),
-    service: CustomerChatBoundaryService = Depends(get_customer_service),
-) -> list[CustomerConversationSummary]:
-    results = await service.list_user_conversations(actor)
-    return [CustomerConversationSummary.model_validate(r) for r in results]
-
-
-@router.get(
-    "/conversations/{conversation_id}",
-    summary="تفاصيل محادثة",
-    response_model=CustomerConversationDetails,
-    description="استرجاع تفاصيل محادثة محددة.",
-    operation_id="chatConversationGet",
-)
-async def get_conversation(
-    conversation_id: int,
-    actor: User = Depends(get_actor_user),
-    service: CustomerChatBoundaryService = Depends(get_customer_service),
-) -> CustomerConversationDetails:
-    data = await service.get_conversation_details(actor, conversation_id)
-    return CustomerConversationDetails.model_validate(data)

@@ -12,26 +12,17 @@
 - اعتماد كامل على حقن التبعيات (Dependency Injection).
 """
 
-import asyncio
 import inspect
-import uuid
 
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.schemas.admin import (
-    ConversationDetailsResponse,
-    ConversationSummaryResponse,
-)
-from app.core.config import get_settings
-from app.core.database import async_session_factory, get_db
+from app.core.database import get_db
 from app.core.di import get_logger
-from app.core.domain.chat import MessageRole
 from app.core.domain.user import User
 from app.deps.auth import CurrentUser, get_current_user, require_roles
-from app.infrastructure.clients.orchestrator_client import orchestrator_client
 from app.infrastructure.clients.user_client import user_client
-from app.services.auth.token_decoder import decode_user_id
 from app.services.boundaries.admin_chat_boundary_service import AdminChatBoundaryService
 from app.services.rbac import ADMIN_ROLE
 
@@ -57,6 +48,7 @@ class AdminUserCountResponse(BaseModel):
     count: int
 
 
+def _is_text_event(event: dict[str, object]) -> bool:
     """يتحقق من أن الحدث نصي ومسموح بتجميعه داخل مخزن النص النهائي."""
     return str(event.get("type", "")) in TEXT_EVENT_TYPES
 
@@ -75,6 +67,7 @@ def _bind_local_conversation_id(
     return event
 
 
+def _bind_stream_metadata(
     event: dict[str, object],
     conversation_id: int | None,
     request_id: str | None,
@@ -91,6 +84,7 @@ def _bind_local_conversation_id(
     return bound_event
 
 
+def _extract_client_context_messages(payload: dict[str, object]) -> list[dict[str, str]]:
     """استخراج سياق محادثة الواجهة مع تنظيف الأدوار والمحتوى."""
     raw_context = payload.get("client_context_messages")
     if not isinstance(raw_context, list):
@@ -115,6 +109,7 @@ def _bind_local_conversation_id(
     return sanitized
 
 
+def _merge_history_with_client_context(
     persisted_history: list[dict[str, str]],
     client_context: list[dict[str, str]],
 ) -> list[dict[str, str]]:
@@ -224,57 +219,3 @@ async def get_admin_user_count() -> AdminUserCountResponse:
         raise HTTPException(status_code=503, detail="User Service unavailable") from e
 
 
-@router.get(
-    "/api/chat/latest",
-    summary="استرجاع آخر محادثة (Get Latest Conversation)",
-    response_model=ConversationDetailsResponse | None,
-)
-async def get_latest_chat(
-    actor: User = Depends(get_actor_user),
-    service: AdminChatBoundaryService = Depends(get_admin_service),
-) -> ConversationDetailsResponse | None:
-    """
-    استرجاع تفاصيل آخر محادثة للمستخدم الحالي.
-    مفيد لاستعادة الحالة عند إعادة تحميل الصفحة.
-    """
-    if not actor.is_admin:
-        raise HTTPException(status_code=403, detail="Admin access required")
-    conversation_data = await service.get_latest_conversation_details(actor)
-    if not conversation_data:
-        return None
-    return ConversationDetailsResponse.model_validate(conversation_data)
-
-
-@router.get(
-    "/api/conversations",
-    summary="سرد المحادثات (List Conversations)",
-    response_model=list[ConversationSummaryResponse],
-)
-async def list_conversations(
-    actor: User = Depends(get_actor_user),
-    service: AdminChatBoundaryService = Depends(get_admin_service),
-) -> list[ConversationSummaryResponse]:
-    """
-    استرجاع قائمة بجميع محادثات المستخدم.
-
-    الخدمة تعيد البيانات متوافقة مع Schema مباشرة.
-    """
-    results = await service.list_user_conversations(actor)
-    return [ConversationSummaryResponse.model_validate(r) for r in results]
-
-
-@router.get(
-    "/api/conversations/{conversation_id}",
-    summary="تفاصيل المحادثة (Conversation Details)",
-    response_model=ConversationDetailsResponse,
-)
-async def get_conversation(
-    conversation_id: int,
-    actor: User = Depends(get_actor_user),
-    service: AdminChatBoundaryService = Depends(get_admin_service),
-) -> ConversationDetailsResponse:
-    """
-    استرجاع الرسائل والتفاصيل لمحادثة محددة.
-    """
-    data = await service.get_conversation_details(actor, conversation_id)
-    return ConversationDetailsResponse.model_validate(data)
