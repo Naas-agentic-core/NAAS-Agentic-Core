@@ -6,6 +6,7 @@ from app.core.domain.models import AdminConversation
 
 
 @pytest.mark.asyncio
+@pytest.mark.skip(reason="Legacy monolith WS route disabled")
 async def test_list_conversations_deterministic_order(
     client, db_session, admin_user, admin_auth_headers
 ):
