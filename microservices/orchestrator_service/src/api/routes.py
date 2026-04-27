@@ -1582,11 +1582,10 @@ async def _stream_chat_langgraph(
             await _safe_put({"type": "__DONE__", "result": final_res})
         except Exception as e:
             import traceback
-            await _safe_put({
-                "type": "__ERROR__",
-                "error": str(e),
-                "traceback": traceback.format_exc()
-            })
+
+            await _safe_put(
+                {"type": "__ERROR__", "error": str(e), "traceback": traceback.format_exc()}
+            )
 
     task = asyncio.create_task(_runner())
     active_background_tasks.add(task)
