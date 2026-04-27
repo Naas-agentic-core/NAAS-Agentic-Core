@@ -1581,7 +1581,12 @@ async def _stream_chat_langgraph(
 
             await _safe_put({"type": "__DONE__", "result": final_res})
         except Exception as e:
-            await _safe_put({"type": "__ERROR__", "error": str(e)})
+            import traceback
+            await _safe_put({
+                "type": "__ERROR__",
+                "error": str(e),
+                "traceback": traceback.format_exc()
+            })
 
     task = asyncio.create_task(_runner())
     active_background_tasks.add(task)
@@ -1646,6 +1651,8 @@ async def _stream_chat_langgraph(
                 )
                 break
             if evt["type"] == "__ERROR__":
+                if evt.get("traceback"):
+                    logger.error("REAL TRACEBACK:\n" + evt["traceback"])
                 request_id = str(uuid.uuid4())
                 logger.error(
                     "LangGraph streaming failure",
