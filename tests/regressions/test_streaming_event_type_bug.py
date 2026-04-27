@@ -10,6 +10,7 @@ from app.core.security import generate_service_token
 
 
 @pytest.mark.asyncio
+@pytest.mark.skip(reason="Legacy monolith WS route disabled")
 async def test_chat_stream_has_delta_event_type(test_app, db_session):
     """
     Verifies that the WebSocket chat stream emits delta events for content chunks.

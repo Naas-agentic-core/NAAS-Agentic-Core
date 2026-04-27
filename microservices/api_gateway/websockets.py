@@ -100,6 +100,13 @@ async def websocket_proxy(client_ws: WebSocket, target_url: str):
             for task in pending:
                 task.cancel()
 
+    except websockets.exceptions.InvalidStatusCode as e:
+        logger.error(f"WebSocket proxy auth failed for {target_url}: {e}")
+        if client_ws.client_state == WebSocketState.CONNECTED:
+            if e.status_code in (401, 403):
+                await client_ws.close(code=4400 + e.status_code)
+            else:
+                await client_ws.close(code=1011, reason="Upstream connection failed")
     except Exception as e:
         logger.error(f"WebSocket proxy failed to connect to {target_url}: {e}")
         # Close client connection if it's still open

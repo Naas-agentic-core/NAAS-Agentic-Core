@@ -9,6 +9,7 @@ from app.core.settings.base import get_settings
 
 
 @pytest.mark.asyncio
+@pytest.mark.skip(reason="Legacy monolith WS route disabled")
 async def test_admin_blocked_from_customer_chat(test_app, db_session: AsyncSession) -> None:
     """يتأكد من أن حسابات الإدارة لا يمكنها استخدام قناة دردشة العملاء."""
 

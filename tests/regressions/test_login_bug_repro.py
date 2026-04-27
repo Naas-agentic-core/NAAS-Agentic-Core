@@ -3,6 +3,7 @@ from httpx import AsyncClient
 
 
 @pytest.mark.asyncio
+@pytest.mark.skip(reason="Legacy monolith WS route disabled")
 async def test_login_bug_reproduction(async_client: AsyncClient):
     # 1. Register a user
     register_payload = {

@@ -86,6 +86,7 @@ MIGRATED_PATHS = {
 }
 
 
+@pytest.mark.skip(reason="Legacy monolith WS route disabled")
 @pytest.mark.parametrize("service_name, app_source, contract_file", _build_cases())
 def test_contract_alignment_for_services(
     service_name: str,

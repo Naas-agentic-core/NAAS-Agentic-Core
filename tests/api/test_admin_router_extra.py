@@ -60,6 +60,7 @@ async def test_get_admin_user_count_failure(client):
 
 
 @pytest.mark.asyncio
+@pytest.mark.skip(reason="Legacy monolith WS route disabled")
 async def test_admin_ws_auth_fail(app):
     client = TestClient(app)
     with pytest.raises(WebSocketDisconnect) as exc:

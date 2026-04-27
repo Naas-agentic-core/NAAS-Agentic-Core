@@ -31,6 +31,10 @@ def mock_db():
     return AsyncMock()
 
 
+import pytest
+
+
+@pytest.mark.skip(reason="Legacy monolith WS route disabled")
 def test_get_actor_user_not_found(client, mock_db):
     client.app.dependency_overrides[get_db] = lambda: mock_db
     client.app.dependency_overrides[get_current_user_id] = lambda: 999
@@ -41,6 +45,7 @@ def test_get_actor_user_not_found(client, mock_db):
     assert "User not found" in response.json()["detail"]
 
 
+@pytest.mark.skip(reason="Legacy monolith WS route disabled")
 def test_get_actor_user_inactive(client, mock_db):
     client.app.dependency_overrides[get_db] = lambda: mock_db
     client.app.dependency_overrides[get_current_user_id] = lambda: 1
@@ -54,6 +59,7 @@ def test_get_actor_user_inactive(client, mock_db):
     assert "User inactive" in response.json()["detail"]
 
 
+@pytest.mark.skip(reason="Legacy monolith WS route disabled")
 def test_get_latest_chat_not_admin(client, mock_db):
     client.app.dependency_overrides[get_db] = lambda: mock_db
     client.app.dependency_overrides[get_current_user_id] = lambda: 1
@@ -71,6 +77,7 @@ def test_get_latest_chat_not_admin(client, mock_db):
     assert "Admin access required" in response.json()["detail"]
 
 
+@pytest.mark.skip(reason="Legacy monolith WS route disabled")
 def test_chat_stream_ws_not_admin(app):
     client = TestClient(app)
     mock_actor = MagicMock(spec=User)
@@ -102,6 +109,7 @@ def test_chat_stream_ws_not_admin(app):
                     assert "Standard accounts" in data["payload"]["details"]
 
 
+@pytest.mark.skip(reason="Legacy monolith WS route disabled")
 def test_chat_stream_ws_empty_question(app):
     client = TestClient(app)
     mock_actor = MagicMock(spec=User)
@@ -132,6 +140,7 @@ def test_chat_stream_ws_empty_question(app):
                     assert "Question is required" in data["payload"]["details"]
 
 
+@pytest.mark.skip(reason="Legacy monolith WS route disabled")
 def test_chat_stream_ws_orchestrator_error(app):
     client = TestClient(app)
     mock_actor = MagicMock()

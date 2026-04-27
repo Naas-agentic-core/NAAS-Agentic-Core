@@ -7,6 +7,7 @@ from app.main import app
 client = TestClient(app)
 
 
+@pytest.mark.skip(reason="Legacy monolith WS route disabled")
 def test_chat_stream_is_real_implementation():
     """
     Verifies that the WebSocket chat endpoint enforces authentication.

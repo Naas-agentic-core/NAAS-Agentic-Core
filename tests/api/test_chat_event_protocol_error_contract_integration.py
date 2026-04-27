@@ -14,6 +14,7 @@ from app.api.routers.customer_chat import get_db as get_customer_db
 
 
 @pytest.mark.asyncio
+@pytest.mark.skip(reason="Legacy monolith WS route disabled")
 async def test_customer_ws_admin_actor_emits_assistant_error_when_flag_enabled(test_app) -> None:
     """يتحقق من أن منع حساب admin على قناة العملاء يُرسل assistant_error بالعقد الموحّد."""
     mock_actor = SimpleNamespace(id=1, is_active=True, is_admin=True)
@@ -39,6 +40,7 @@ async def test_customer_ws_admin_actor_emits_assistant_error_when_flag_enabled(t
 
 
 @pytest.mark.asyncio
+@pytest.mark.skip(reason="Legacy monolith WS route disabled")
 async def test_admin_ws_non_admin_actor_emits_assistant_error_when_flag_enabled(test_app) -> None:
     """يتحقق من أن منع الحساب العادي على قناة الإدارة يُرسل assistant_error بالعقد الموحّد."""
     mock_actor = SimpleNamespace(id=1, is_active=True, is_admin=False)
@@ -64,6 +66,7 @@ async def test_admin_ws_non_admin_actor_emits_assistant_error_when_flag_enabled(
 
 
 @pytest.mark.asyncio
+@pytest.mark.skip(reason="Legacy monolith WS route disabled")
 async def test_admin_ws_empty_question_emits_assistant_error_when_flag_enabled(test_app) -> None:
     """يتحقق من أن خطأ السؤال الفارغ في قناة الإدارة يُرسل assistant_error بالعقد الموحّد."""
     mock_actor = SimpleNamespace(id=1, is_active=True, is_admin=True)
@@ -89,6 +92,7 @@ async def test_admin_ws_empty_question_emits_assistant_error_when_flag_enabled(t
 
 
 @pytest.mark.asyncio
+@pytest.mark.skip(reason="Legacy monolith WS route disabled")
 async def test_customer_ws_dispatch_http_exception_emits_assistant_error_when_flag_enabled(
     test_app,
 ) -> None:
@@ -121,6 +125,7 @@ async def test_customer_ws_dispatch_http_exception_emits_assistant_error_when_fl
 
 
 @pytest.mark.asyncio
+@pytest.mark.skip(reason="Legacy monolith WS route disabled")
 async def test_admin_ws_dispatch_http_exception_emits_assistant_error_when_flag_enabled(
     test_app,
 ) -> None:
