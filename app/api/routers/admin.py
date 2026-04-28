@@ -125,14 +125,32 @@ def _merge_history_with_client_context(
     persisted_history: list[dict[str, str]],
     client_context: list[dict[str, str]],
 ) -> list[dict[str, str]]:
-    """دمج تاريخ المحادثة المخزّن مع سياق العميل لتقليل فقدان السياق."""
+    """
+    دمج تاريخ المحادثة المخزّن مع سياق العميل مع منع تسريب رسائل محادثات أخرى.
+
+    يعتمد على كشف التداخل بين ذيل persisted_history وبداية client_context
+    لضمان أن الرسائل المضافة تنتمي فعلاً لنفس المحادثة.
+    """
     if not client_context:
         return persisted_history
     if not persisted_history:
         return []
 
+    persisted_tail = persisted_history[-3:] if len(persisted_history) >= 3 else persisted_history
+    overlap_index: int | None = None
+    max_start = len(client_context) - len(persisted_tail)
+    for start in range(max_start, -1, -1):
+        window = client_context[start : start + len(persisted_tail)]
+        if window == persisted_tail:
+            overlap_index = start + len(persisted_tail)
+            break
+
+    if overlap_index is None:
+        return persisted_history
+
+    safe_client_tail = client_context[overlap_index:][-12:]
     merged_history = list(persisted_history)
-    for message in client_context:
+    for message in safe_client_tail:
         if message not in merged_history:
             merged_history.append(message)
     return merged_history[-80:]
