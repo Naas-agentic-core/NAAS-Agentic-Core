@@ -1,272 +1,297 @@
 # AGENTS.md Improvement Specification
 
-**Scope:** `AGENTS.md` + `docs/ai_skills/*.md`  
-**Status:** Draft — ready for implementation
+**Scope:** `AGENTS.md` + `docs/ai_skills/*.md`
+**Audit date:** 2026-04-28
+**Status:** Ready for implementation
 
 ---
 
-## 1. Audit Summary
+## 1. What Is Good
 
-### 1.1 What Is Good
-
-| Item | Assessment |
-|------|------------|
-| Dual-heritage philosophy (CS50 + SICP) | Clear, memorable framing that gives agents a coherent mental model |
+| Item | Notes |
+|------|-------|
+| Dual-heritage philosophy (CS50 + SICP) | Clear, memorable framing; gives agents a coherent mental model |
 | Python 3.12+ type-hint rules | Concrete and unambiguous (`int \| None`, `list[str]`) |
 | Arabic docstring mandate | Consistent with project identity; well-exemplified |
-| Skill library table | Correct domain-to-file mapping; easy to scan |
-| Microservices Constitution reference | Points to the right authoritative document |
-| `fastapi-templates.md` | Solid patterns: lifespan, DI, repository, service layer, async sessions |
-| `database-schema-designer.md` | Thorough: normalization, indexing, migration, anti-patterns, checklist |
-| `python-performance-optimization.md` | Covers profiling, generators, async I/O, memory — actionable checklist |
+| Repository layout contract | Canonical paths for every artefact type |
+| Development commands table | Correct commands; `ruff` + `mypy` pre-commit reminder |
+| Inter-service communication pattern | `httpx.AsyncClient` + `X-Correlation-ID` pattern is explicit |
+| Error handling contract | Structured `detail` dict, 502 re-raise, `trace_id` propagation |
+| Security rules | Covers secrets, logging, env vars, auth requirements |
+| Testing conventions | `pytest-asyncio`, in-memory DB, `dependency_overrides`, naming |
+| Skill library table | Correct domain-to-file mapping; trigger conditions are clear |
+| `fastapi-templates.md` | Pydantic v2 (`model_dump`, `ConfigDict`), SQLAlchemy 2.x, async sessions, anti-patterns section |
+| `database-schema-designer.md` | PostgreSQL-native syntax noted; SQLModel + Alembic templates present |
+| `python-performance-optimization.md` | Profiling, generators, async I/O, memory — actionable checklist |
+| `web-design-guidelines.md` | RTL layout, design tokens, WCAG 2.1 AA checklist, offline content |
+| `crafting-effective-readmes.md` | Inline templates, project-specific notes, no broken references |
 
-### 1.2 What Is Missing
+---
+
+## 2. What Is Missing
 
 | Gap | Impact |
 |-----|--------|
-| **No workflow trigger rules** — agents are told *what* skills exist but not *when* to load them automatically | Agents skip skill files unless they remember to check |
-| **No file-path conventions** — no rule about where new services, schemas, or tests must live | Agents create files in arbitrary locations |
-| **No commit / PR standards** — no message format, no branch naming, no PR description template | Inconsistent git history |
-| **No environment / tooling section** — no mention of `make`, `pytest`, `ruff`, `mypy`, Docker Compose targets | Agents run wrong commands or invent their own |
-| **No error-handling contract** — no rule on how exceptions must be raised, logged, or surfaced across service boundaries | Inconsistent error shapes in API responses |
-| **No inter-service communication pattern** — Constitution exists but AGENTS.md does not summarise the HTTP client pattern agents must use | Agents may call services directly or use wrong client |
-| **`web-design-guidelines.md` is a stub** — it only fetches a remote URL; no offline content | Fails in air-gapped or offline environments |
-| **`crafting-effective-readmes.md` is incomplete** — references `templates/oss.md` that does not exist in the repo | Broken skill reference |
-| **No testing conventions** — no mention of `pytest-asyncio`, fixture patterns, or which test database to use | Agents write incompatible tests |
-| **No security rules for agents** — no guidance on secrets, `.env` handling, or what must never be committed | Risk of accidental credential exposure |
-| **Constitution path is wrong in AGENTS.md** — links to `docs/architecture/MICROSERVICES_CONSTITUTION.md` but the canonical file is also at `docs/ARCH_MICROSERVICES_CONSTITUTION.md`; two copies exist | Confusion about which is authoritative |
+| **No commit / branch / PR conventions** — AGENTS.md has no guidance on commit message format, branch naming, or PR description structure | Inconsistent git history; agents invent their own formats |
+| **No LangGraph / agent-graph skill** — LangGraph is used in `orchestrator_service`, `planning_agent`, and `reasoning_agent`, but there is no skill file covering `StateGraph`, node patterns, checkpointers, or `AgentState` conventions | Agents write incompatible graph code; `LangGraph_Architectural_Blueprint.md` exists but is not wired into the skill system |
+| **`mypy` is not enforced in CI** — AGENTS.md says "CI will fail if mypy reports errors" but `ci.yml` has no mypy step | The stated contract is false; agents may trust it and be surprised |
+| **No guidance on `global` statement suppression** — `PLW0603` is silenced in `pyproject.toml` and the codebase has ~10 `global` singletons in `app/`; AGENTS.md says "no singletons" but the rule is suppressed | Agents are told one thing, the linter enforces another |
+| **`vercel-react-best-practices.md` references non-existent `rules/` directory** — the skill says "read individual rule files at `rules/async-parallel.md`" but that directory does not exist | Agents following the skill will hit a dead end |
+| **No guidance on the `.julesrc` guardrails** — the file defines hard limits (max 5 files per PR, 80% coverage minimum, cyclomatic complexity ≤ 15) that agents should know about | Agents may produce PRs that fail Jules validation silently |
+| **No ADR creation workflow** — `docs/architecture/adr/` is listed as the canonical location but there is no guidance on when to write an ADR or what format to use | Architectural decisions go undocumented |
+| **No guidance on the dual Constitution copies** — `docs/architecture/MICROSERVICES_CONSTITUTION.md` is canonical (Arabic, 100 laws); `docs/ARCH_MICROSERVICES_CONSTITUTION.md` is an English summary. AGENTS.md links both without explaining the relationship | Agents may edit the summary thinking it is canonical |
 
-### 1.3 What Is Wrong
+---
+
+## 3. What Is Wrong
 
 | Issue | Severity |
 |-------|----------|
-| **Broken cross-reference:** `AGENTS.md` links `docs/architecture/MICROSERVICES_CONSTITUTION.md` and `docs/architecture/PRINCIPLES.md` — both exist, but `AGENTS.md` is also embedded verbatim in the system prompt (coding-rules), creating a duplicate source of truth | High |
-| **`fastapi-templates.md` uses deprecated patterns:** `obj_in.dict()` (Pydantic v1) should be `obj_in.model_dump()`; `declarative_base()` is deprecated in SQLAlchemy 2.x in favour of `DeclarativeBase` | High |
-| **`fastapi-templates.md` uses `typing.List`, `typing.Optional`** in several code blocks — contradicts the no-`typing.*` rule in AGENTS.md | Medium |
-| **`fastapi-templates.md` references non-existent assets:** `references/fastapi-architecture.md`, `assets/project-template/`, `assets/docker-compose.yml` | Medium |
-| **`database-schema-designer.md` uses MySQL-specific syntax** (`AUTO_INCREMENT`, `TINYINT(1)`) without noting PostgreSQL equivalents — the project uses PostgreSQL | Medium |
-| **`vercel-react-best-practices.md` is frontend-only** but the skill table in AGENTS.md marks it "Critical for `frontend/` changes" without noting the project's frontend stack (Next.js in `frontend/`) — agents may apply it to the wrong layer | Low |
-| **No version pinning on skill files** — skills have `version: "1.0.0"` in frontmatter but AGENTS.md never instructs agents to check or update versions | Low |
-| **Emoji overuse in AGENTS.md** — decorative emoji (`🌟`, `🏛️`, `🛠️`, `🧪`, `📚`, `📜`) add noise without semantic value in a technical directive document | Low |
+| **`mypy` CI claim is false** — AGENTS.md states "CI will fail if either [ruff or mypy] reports errors" but `ci.yml` runs only `ruff check` and `ruff format --check`; mypy is absent from all workflow files | High — agents will trust a false contract |
+| **`vercel-react-best-practices.md` references missing `rules/` directory** — the "How to Use" section instructs agents to read `rules/async-parallel.md`, `rules/bundle-barrel-imports.md`, etc.; none of these files exist in the repo | Medium — broken skill navigation |
+| **`PLW0603` (global statement) is suppressed without explanation** — AGENTS.md's Berkeley Standard says "no singletons / global state" but `pyproject.toml` silences the linter rule that would catch them, and the codebase uses `global` in ~10 production files | Medium — contradictory guidance |
+| **Constitution relationship is ambiguous** — AGENTS.md links `docs/architecture/MICROSERVICES_CONSTITUTION.md` as canonical and `docs/ARCH_MICROSERVICES_CONSTITUTION.md` as "quick English summary", but the summary file itself says "do not edit this file independently — keep it in sync with the canonical." No agent or developer is told how to keep them in sync | Medium — dual-maintenance risk |
+| **`fastapi-templates.md` anti-patterns section is buried** — the note that `obj_in.dict()` and `declarative_base()` are wrong appears only at line 581; the code examples are already correct, but the warning is at the end rather than at the top where agents read first | Low — easy to miss |
+| **`vercel-react-best-practices.md` footer says "For the complete guide: `AGENTS.md`"** — stale reference from a template; the project's `AGENTS.md` does not contain the full Vercel rule set | Low — confusing cross-reference |
 
 ---
 
-## 2. Improvement Specification
+## 4. Improvement Specification
 
-### 2.1 `AGENTS.md` — Required Changes
+### 4.1 `AGENTS.md` — Required Changes
 
-#### 2.1.1 Fix broken/ambiguous references
+#### 4.1.1 Fix the mypy CI claim
 
 ```
-CURRENT:  docs/architecture/MICROSERVICES_CONSTITUTION.md
-CURRENT:  docs/architecture/PRINCIPLES.md
+CURRENT:  "Always run `ruff check .` and `mypy` before committing. CI will fail if either reports errors."
 
-ACTION:   Verify which copy is canonical. Delete the duplicate.
-          Update AGENTS.md to point to the single authoritative path.
-          Add a note: "Do not create a second copy of this file."
+ACTION:   Either (a) add a mypy job to ci.yml and keep the claim, or
+          (b) change the claim to: "Always run `ruff check .` before committing.
+              Run `mypy app/ microservices/` locally — it is not yet enforced in CI."
+
+Recommended: option (a) — add mypy to CI to match the stated contract.
 ```
 
-#### 2.1.2 Add automatic skill-loading triggers
+#### 4.1.2 Add commit / branch / PR conventions
 
-Add a section **"Skill Loading Rules"** immediately after the skill table:
+Add a section **"Git Conventions"** after the Development Commands table:
 
 ```markdown
-## Skill Loading Rules
+## Git Conventions
 
-Load the corresponding skill file **before generating any code** in that domain.
-Do not rely on memory — read the file each session.
+### Branch naming
+- Feature: `feat/<short-description>`
+- Bug fix: `fix/<short-description>`
+- Refactor: `refactor/<short-description>`
+- Docs: `docs/<short-description>`
 
-| Condition | Load |
-|-----------|------|
-| Any file under `app/api/` or `microservices/*/src/` | `fastapi-templates.md` |
-| Any SQLModel / Alembic / migration work | `database-schema-designer.md` |
-| Any file under `app/core/` with CPU/memory concern | `python-performance-optimization.md` |
-| Any file under `frontend/` | `vercel-react-best-practices.md` |
-| Writing or reviewing a README | `crafting-effective-readmes.md` |
-| UI component or CSS work | `web-design-guidelines.md` |
+### Commit messages
+Follow Conventional Commits: `<type>(<scope>): <subject>`
+
+Examples:
+- `feat(orchestrator): add retry logic to mission dispatcher`
+- `fix(user-service): handle null email on registration`
+- `docs(agents): add LangGraph skill trigger rule`
+
+Rules:
+- Subject line <= 72 characters, imperative mood
+- Body explains *why*, not *what*
+- Never commit directly to `main`
+
+### PR descriptions
+Lead with: what changed and why.
+Include: test evidence (passing CI link or local output).
+Omit: implementation minutiae already visible in the diff.
 ```
 
-#### 2.1.3 Add file-path conventions
+#### 4.1.3 Add LangGraph skill trigger
 
-Add a section **"Repository Layout Contract"**:
+Add a row to the Skill Loading Rules table:
 
 ```markdown
-## Repository Layout Contract
-
-| Artefact | Canonical location |
-|----------|--------------------|
-| New microservice | `microservices/<service_name>/` |
-| Shared gateway logic | `app/` (never `microservices/`) |
-| Alembic migrations | `microservices/<service_name>/migrations/` |
-| Integration tests | `tests/integration/` |
-| Unit tests | `tests/unit/` |
-| OpenAPI contracts | `docs/contracts/<service_name>.yaml` |
-| ADRs | `docs/architecture/adr/` |
-
-Never place business logic in `app/api/` route handlers — use the service layer.
-Never import from `microservices/*` inside `app/*`.
+| Any file under `microservices/orchestrator_service/`, `microservices/planning_agent/`, or `microservices/reasoning_agent/` | `langgraph-agent-patterns.md` |
 ```
 
-#### 2.1.4 Add tooling / environment commands
+And create `docs/ai_skills/langgraph-agent-patterns.md` (see §4.3).
 
-Add a section **"Development Commands"**:
+#### 4.1.4 Clarify the Constitution relationship
+
+Replace the current Constitution reference block with:
 
 ```markdown
-## Development Commands
+**Canonical document:** `docs/architecture/MICROSERVICES_CONSTITUTION.md` (100 laws, Arabic).
+**English summary:** `docs/ARCH_MICROSERVICES_CONSTITUTION.md` — read-only reference; do not edit independently.
 
-| Task | Command |
-|------|---------|
-| Run all tests | `pytest` |
-| Run with coverage | `pytest --cov=app --cov=microservices` |
-| Lint | `ruff check .` |
-| Format | `ruff format .` |
-| Type-check | `mypy app/ microservices/` |
-| Start full stack | `docker compose up` |
-| Start single service | `docker compose up <service_name>` |
-| Run migrations | `alembic upgrade head` (inside service directory) |
-
-Always run `ruff check` and `mypy` before committing.
+When the canonical changes, update the English summary in the same PR.
+Do not create a third copy.
 ```
 
-#### 2.1.5 Add error-handling contract
+#### 4.1.5 Clarify the `PLW0603` suppression
 
-Add a section **"Error Handling Contract"**:
+Add a note in the Coding Rules section under "Language & Style":
 
 ```markdown
-## Error Handling Contract
-
-- All HTTP errors must use `fastapi.HTTPException` with a structured `detail` dict:
-  `{"code": "RESOURCE_NOT_FOUND", "message": "...", "trace_id": "..."}`
-- Never let raw Python exceptions propagate to HTTP responses.
-- Log exceptions at `ERROR` level with `trace_id` before raising.
-- Cross-service errors must be re-raised as `HTTPException(502)` with the upstream
-  `trace_id` preserved.
-- Use `X-Correlation-ID` header for all outbound `httpx` calls.
+**Global singletons:** The codebase uses `global` for lazy-initialised service singletons
+(e.g., `_unified_observability`, `_mcp_server`). `PLW0603` is suppressed in `pyproject.toml`
+to allow this pattern. New code should prefer dependency injection via FastAPI `Depends`.
+Only use `global` for module-level singletons that cannot be injected (e.g., background
+workers initialised at startup). Document the reason with a comment.
 ```
 
-#### 2.1.6 Add inter-service communication pattern
+#### 4.1.6 Add `.julesrc` guardrail awareness
 
-Add a section **"Inter-Service Communication"**:
+Add a note in the Testing section:
 
 ```markdown
-## Inter-Service Communication
+**Jules guardrails (`.julesrc`):** The Jules AI agent enforces:
+- Max 5 files created per PR
+- Test coverage minimum: 80%
+- Cyclomatic complexity <= 15 per function
+- Coverage must not drop more than 1% per PR
 
-All cross-service calls must use `httpx.AsyncClient` via the shared gateway client
-in `app/gateway/`. Never instantiate a service class from another service.
-
-```python
-# Correct pattern
-async with httpx.AsyncClient(base_url=settings.ORCHESTRATOR_URL) as client:
-    response = await client.post(
-        "/missions",
-        json=payload,
-        headers={"X-Correlation-ID": trace_id},
-    )
-    response.raise_for_status()
+Keep these limits in mind when scoping changes.
 ```
 
-Direct database access across service boundaries is forbidden (Constitution §5).
-```
+#### 4.1.7 Add ADR creation guidance
 
-#### 2.1.7 Add security rules
-
-Add a section **"Security Rules for Agents"**:
+Add a subsection under Repository Layout Contract:
 
 ```markdown
-## Security Rules for Agents
+### When to write an ADR
 
-- Never commit `.env` files, secrets, or API keys.
-- Never log secret values, even at DEBUG level.
-- Never print or expose environment variable values in responses.
-- All new endpoints must require authentication unless explicitly marked public.
-- Use `settings` (Pydantic `BaseSettings`) for all configuration — no hard-coded values.
+Write an ADR in `docs/architecture/adr/` when:
+- Choosing between two or more viable technical approaches
+- Adopting a new library or framework
+- Changing a cross-service communication pattern
+- Deprecating an existing pattern
+
+ADR filename format: `NNN_short_title.md` (e.g., `003_use_redis_for_session_cache.md`).
+Use `docs/architecture/02_adr_001_dependency_rules.md` as a format reference.
 ```
-
-#### 2.1.8 Add testing conventions
-
-Expand the Testing section:
-
-```markdown
-## Testing Conventions
-
-- Use `pytest-asyncio` with `asyncio_mode = "auto"` (set in `pytest.ini`).
-- Use `sqlite+aiosqlite:///:memory:` for unit tests; never connect to production DB.
-- Override `get_db` dependency in `app.dependency_overrides` for route tests.
-- Test file naming: `test_<module_name>.py` mirroring the source tree.
-- Each test must assert behaviour, not implementation — test the HTTP response,
-  not internal function calls.
-- Minimum: one happy-path test + one error-path test per endpoint.
-```
-
-#### 2.1.9 Remove decorative emoji
-
-Replace section headers that use emoji with plain text headers. Emoji in headings
-break some markdown renderers and add no semantic value in a technical directive.
 
 ---
 
-### 2.2 `docs/ai_skills/fastapi-templates.md` — Required Changes
+### 4.2 `docs/ai_skills/vercel-react-best-practices.md` — Required Changes
 
 | # | Change |
 |---|--------|
-| 1 | Replace all `obj_in.dict()` with `obj_in.model_dump()` (Pydantic v2) |
-| 2 | Replace `declarative_base()` with `class Base(DeclarativeBase): pass` (SQLAlchemy 2.x) |
-| 3 | Replace `typing.List`, `typing.Optional` with `list[...]`, `... \| None` throughout |
-| 4 | Remove references to non-existent assets (`references/`, `assets/`) or replace with actual repo paths |
-| 5 | Add a note at the top: "This project uses PostgreSQL. Use `asyncpg` driver: `postgresql+asyncpg://`" |
-| 6 | Add `model_config = ConfigDict(from_attributes=True)` to Pydantic schema examples |
+| 1 | Remove the "How to Use" section that references `rules/async-parallel.md` etc. — the `rules/` directory does not exist |
+| 2 | Replace with: "All rules are listed in the Quick Reference above. Apply them directly when writing or reviewing code." |
+| 3 | Remove the footer line "For the complete guide with all rules expanded: `AGENTS.md`" — stale reference |
+| 4 | Add a project-specific note at the top: "The frontend lives in `frontend/`. It uses Next.js App Router with no Tailwind. Apply these rules to files under `frontend/`." |
 
 ---
 
-### 2.3 `docs/ai_skills/database-schema-designer.md` — Required Changes
+### 4.3 New skill: `docs/ai_skills/langgraph-agent-patterns.md`
 
-| # | Change |
-|---|--------|
-| 1 | Add a project-specific note at the top: "This project uses PostgreSQL 15+. Prefer `BIGSERIAL` over `AUTO_INCREMENT`, `BOOLEAN` over `TINYINT(1)`." |
-| 2 | Add SQLModel/SQLAlchemy 2.x ORM examples alongside raw SQL (the project uses SQLModel) |
-| 3 | Add Alembic migration template matching the project's `alembic.ini` structure |
+Create this file. Minimum required content:
+
+```markdown
+---
+name: langgraph-agent-patterns
+description: Patterns for building LangGraph agent graphs in this project. Use when working on orchestrator_service, planning_agent, or reasoning_agent.
+---
+
+# LangGraph Agent Patterns
+
+> **Project context:** LangGraph is used in `microservices/orchestrator_service/`,
+> `microservices/planning_agent/`, and `microservices/reasoning_agent/`.
+> The canonical graph blueprint is in `LangGraph_Architectural_Blueprint.md`.
+
+## AgentState Convention
+
+All graphs must use a `TypedDict` state with `Annotated[list[...], add]` for
+message accumulation (required by the LangGraph checkpointer):
+
+    from operator import add
+    from typing import Annotated, TypedDict
+
+    class AgentState(TypedDict):
+        messages: Annotated[list[object], add]
+        query: str
+        intent: str
+        # ... domain-specific fields
+
+## Node Pattern
+
+Each node is a pure async function:
+
+    async def classify_intent(state: AgentState) -> dict[str, object]:
+        """يصنّف نية المستخدم من الاستعلام."""
+        intent = await _classifier.classify(state["query"])
+        return {"intent": intent}
+
+Rules:
+- Nodes return a partial state dict — only the keys they update
+- Nodes must not mutate `state` directly
+- Nodes must be async
+
+## Graph Assembly
+
+    from langgraph.graph import END, StateGraph
+
+    graph = StateGraph(AgentState)
+    graph.add_node("classify", classify_intent)
+    graph.add_node("retrieve", retrieve_docs)
+    graph.set_entry_point("classify")
+    graph.add_edge("classify", "retrieve")
+    graph.add_edge("retrieve", END)
+    app = graph.compile()
+
+## Anti-patterns
+
+- Do not use `global` state inside nodes — pass everything through `AgentState`
+- Do not call other microservices directly from nodes — use `httpx.AsyncClient`
+  with `X-Correlation-ID` (see AGENTS.md Inter-Service Communication)
+- Do not share graph instances across requests — compile once at startup,
+  invoke per request
+```
 
 ---
 
-### 2.4 `docs/ai_skills/web-design-guidelines.md` — Required Changes
+### 4.4 CI — Add mypy job (if taking option (a) for §4.1.1)
 
-| # | Change |
-|---|--------|
-| 1 | Add offline fallback content — the current skill only fetches a remote URL; if the network is unavailable the skill is useless |
-| 2 | Add the project's design tokens / Tailwind config path so agents know where to find colours and spacing |
-| 3 | Add accessibility baseline: WCAG 2.1 AA minimum, `aria-label` on all interactive elements |
+Add to `.github/workflows/ci.yml`:
+
+```yaml
+  typecheck:
+    name: typecheck
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      DATABASE_URL: "sqlite+aiosqlite:///:memory:"
+      SECRET_KEY: test-secret-key-for-ci-pipeline-secure-length
+      ENVIRONMENT: testing
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: ./.github/actions/setup
+      - name: mypy
+        run: mypy app/ microservices/
+```
 
 ---
 
-### 2.5 `docs/ai_skills/crafting-effective-readmes.md` — Required Changes
-
-| # | Change |
-|---|--------|
-| 1 | Remove references to `templates/oss.md`, `templates/personal.md` — these files do not exist |
-| 2 | Inline a minimal README template directly in the skill file |
-| 3 | Add a project-specific note: "This repo uses Arabic docstrings; README files must be in English" |
-
----
-
-## 3. Priority Order
+## 5. Priority Order
 
 | Priority | Item | Effort |
 |----------|------|--------|
-| P0 | Fix broken Constitution path (single source of truth) | 5 min |
-| P0 | Fix Pydantic v2 / SQLAlchemy 2.x patterns in `fastapi-templates.md` | 30 min |
-| P1 | Add skill-loading trigger rules to `AGENTS.md` | 15 min |
-| P1 | Add file-path conventions to `AGENTS.md` | 15 min |
-| P1 | Add development commands to `AGENTS.md` | 10 min |
-| P2 | Add error-handling contract to `AGENTS.md` | 15 min |
-| P2 | Add inter-service communication pattern to `AGENTS.md` | 15 min |
-| P2 | Add security rules to `AGENTS.md` | 10 min |
-| P2 | Add testing conventions to `AGENTS.md` | 15 min |
-| P3 | Fix `typing.*` usage in `fastapi-templates.md` | 20 min |
-| P3 | Add PostgreSQL notes to `database-schema-designer.md` | 20 min |
-| P3 | Add offline content to `web-design-guidelines.md` | 30 min |
-| P3 | Fix broken template references in `crafting-effective-readmes.md` | 15 min |
-| P4 | Remove decorative emoji from `AGENTS.md` headings | 5 min |
+| P0 | Fix false mypy CI claim in AGENTS.md (update wording or add CI job) | 10 min |
+| P0 | Fix broken `rules/` references in `vercel-react-best-practices.md` | 5 min |
+| P1 | Add git conventions section to AGENTS.md | 15 min |
+| P1 | Create `docs/ai_skills/langgraph-agent-patterns.md` | 45 min |
+| P1 | Add LangGraph skill trigger row to AGENTS.md skill table | 5 min |
+| P2 | Clarify Constitution dual-copy relationship in AGENTS.md | 10 min |
+| P2 | Add `PLW0603` / global singleton clarification to AGENTS.md | 10 min |
+| P2 | Add `.julesrc` guardrail awareness to AGENTS.md | 10 min |
+| P3 | Add ADR creation guidance to AGENTS.md | 15 min |
+| P3 | Add mypy job to `ci.yml` (if P0 takes option a) | 20 min |
+| P4 | Add project-specific note to `vercel-react-best-practices.md` | 5 min |
 
 ---
 
-*Generated by audit of `AGENTS.md`, `docs/ai_skills/*.md`, `docs/architecture/MICROSERVICES_CONSTITUTION.md`, `docs/architecture/PRINCIPLES.md`, and the live repository structure.*
+*Audited files: `AGENTS.md`, `docs/ai_skills/*.md`, `docs/architecture/MICROSERVICES_CONSTITUTION.md`,
+`docs/ARCH_MICROSERVICES_CONSTITUTION.md`, `docs/architecture/PRINCIPLES.md`,
+`.github/workflows/ci.yml`, `pyproject.toml`, `.julesrc`, `LangGraph_Architectural_Blueprint.md`.*

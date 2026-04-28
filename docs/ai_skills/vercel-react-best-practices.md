@@ -9,6 +9,10 @@ metadata:
 
 # Vercel React Best Practices
 
+> **Project context:** The frontend lives in `frontend/`. It uses **Next.js App Router** with
+> no Tailwind — custom CSS variables are defined in `frontend/app/globals.css`. Apply these
+> rules only to files under `frontend/`.
+
 Comprehensive performance optimization guide for React and Next.js applications, maintained by Vercel. Contains 45 rules across 8 categories, prioritized by impact to guide automated refactoring and code generation.
 
 ## When to Apply
@@ -106,20 +110,6 @@ Reference these guidelines when:
 
 ## How to Use
 
-Read individual rule files for detailed explanations and code examples:
+All rules are listed in the Quick Reference above. Apply them directly when writing or reviewing code — no separate rule files are needed.
 
-```
-rules/async-parallel.md
-rules/bundle-barrel-imports.md
-rules/_sections.md
-```
-
-Each rule file contains:
-- Brief explanation of why it matters
-- Incorrect code example with explanation
-- Correct code example with explanation
-- Additional context and references
-
-## Full Compiled Document
-
-For the complete guide with all rules expanded: `AGENTS.md`
+When a rule applies to code you are writing or reviewing, check the rule name against the Quick Reference and apply the described pattern. For rules where the correct pattern is not obvious from the name, search for the rule keyword (e.g., `async-parallel`, `bundle-barrel-imports`) in the Next.js or Vercel documentation.

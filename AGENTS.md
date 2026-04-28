@@ -25,8 +25,8 @@ This project adopts a fusion of two computer science methodologies. All code and
 The system is mandated to be **100% API First Microservice**.
 All agents and developers must strictly adhere to the **100 Laws of Microservices** defined in the Constitution.
 
-**[READ THE CONSTITUTION HERE](docs/architecture/MICROSERVICES_CONSTITUTION.md)** *(canonical — 100 laws, Arabic)*
-*Quick English summary: [docs/ARCH_MICROSERVICES_CONSTITUTION.md](docs/ARCH_MICROSERVICES_CONSTITUTION.md)*
+**Canonical document:** [`docs/architecture/MICROSERVICES_CONSTITUTION.md`](docs/architecture/MICROSERVICES_CONSTITUTION.md) — 100 laws, Arabic. This is the authoritative source.
+**English summary:** [`docs/ARCH_MICROSERVICES_CONSTITUTION.md`](docs/ARCH_MICROSERVICES_CONSTITUTION.md) — read-only reference; do not edit independently. When the canonical changes, update the summary in the same PR. Do not create a third copy.
 
 ### Critical Laws Summary
 
@@ -60,6 +60,17 @@ The `app/kernel.py` and `app/core` must act as the **Evaluator** of the system.
     *   Do NOT use `typing.Union`, `typing.List`.
 *   **Imports:** Clean, sorted, and explicit.
 
+### D. Global Singletons (Controlled Exception)
+
+The codebase uses `global` for lazy-initialised service singletons (e.g., `_unified_observability`, `_mcp_server`). `PLW0603` is suppressed in `pyproject.toml` to allow this pattern.
+
+New code should prefer dependency injection via FastAPI `Depends`. Only use `global` when a singleton cannot be injected — for example, a background worker initialised at startup. Always document the reason with a comment:
+
+```python
+# Singleton: initialised once at startup, injected via get_service() dependency elsewhere.
+_service_instance: MyService | None = None
+```
+
 ---
 
 ## Repository Layout Contract
@@ -79,6 +90,17 @@ Rules:
 - Never import from `microservices/*` inside `app/*`.
 - Never import from one microservice into another microservice.
 
+### When to write an ADR
+
+Write an ADR in `docs/architecture/adr/` when:
+- Choosing between two or more viable technical approaches
+- Adopting a new library or framework
+- Changing a cross-service communication pattern
+- Deprecating an existing pattern
+
+ADR filename format: `NNN_short_title.md` (e.g., `003_use_redis_for_session_cache.md`).
+Use `docs/architecture/02_adr_001_dependency_rules.md` as a format reference.
+
 ---
 
 ## Development Commands
@@ -94,7 +116,39 @@ Rules:
 | Start single service | `docker compose up <service_name>` |
 | Run migrations | `alembic upgrade head` (run inside the service directory) |
 
-Always run `ruff check .` and `mypy` before committing. CI will fail if either reports errors.
+Always run `ruff check .` and `mypy` before committing. `ruff` is enforced in CI. `mypy` is not yet in CI — run it locally; a CI job is planned.
+
+---
+
+## Git Conventions
+
+### Branch naming
+
+| Type | Pattern |
+|------|---------|
+| Feature | `feat/<short-description>` |
+| Bug fix | `fix/<short-description>` |
+| Refactor | `refactor/<short-description>` |
+| Docs | `docs/<short-description>` |
+
+### Commit messages
+
+Follow Conventional Commits: `<type>(<scope>): <subject>`
+
+```
+feat(orchestrator): add retry logic to mission dispatcher
+fix(user-service): handle null email on registration
+docs(agents): add LangGraph skill trigger rule
+```
+
+Rules:
+- Subject line ≤ 72 characters, imperative mood
+- Body explains *why*, not *what*
+- Never commit directly to `main`
+
+### PR descriptions
+
+Lead with what changed and why. Include test evidence (passing CI link or local output). Omit implementation details already visible in the diff.
 
 ---
 
@@ -155,6 +209,14 @@ Use `X-Correlation-ID` on every outbound request for distributed tracing.
 *   Test file naming: `test_<module_name>.py` mirroring the source tree.
 *   Minimum per endpoint: one happy-path test + one error-path test.
 
+**Jules guardrails (`.julesrc`):** The Jules AI agent enforces hard limits per PR:
+- Max **5 files created** per PR
+- Test coverage minimum: **80%**
+- Cyclomatic complexity ≤ **15** per function
+- Coverage must not drop more than **1%** per PR
+
+Keep these limits in mind when scoping changes. If a task requires more than 5 new files, split it across multiple PRs.
+
 ---
 
 ## Skill Library
@@ -173,6 +235,7 @@ Load the corresponding skill file **before generating any code** in that domain.
 | Any file under `frontend/` | `vercel-react-best-practices.md` |
 | Writing or reviewing a README | `crafting-effective-readmes.md` |
 | UI component or CSS work | `web-design-guidelines.md` |
+| Any file under `microservices/orchestrator_service/`, `microservices/planning_agent/`, or `microservices/reasoning_agent/` | `langgraph-agent-patterns.md` |
 
 ### Skill Index
 
@@ -184,6 +247,7 @@ Load the corresponding skill file **before generating any code** in that domain.
 | `python-performance-optimization.md` | Python Core | Profiling, generators, async I/O |
 | `database-schema-designer.md` | Database | SQLModel/SQLAlchemy schemas, migrations |
 | `crafting-effective-readmes.md` | Documentation | README standards |
+| `langgraph-agent-patterns.md` | Agent Graphs (LangGraph) | `AgentState`, nodes, routing, ingress/egress |
 
 ---
 
