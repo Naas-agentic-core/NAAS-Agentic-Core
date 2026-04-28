@@ -84,8 +84,8 @@ def _emit_gateway_identity_log(route_name: str, websocket: WebSocket) -> None:
     """يسجل تشخيص الهوية في البوابة لربط session_id مع مسار WS ومضيف التنفيذ."""
     session_id = _extract_session_id(websocket)
     thread_id = websocket.query_params.get("thread_id") or websocket.headers.get("x-thread-id")
-    conversation_id = (
-        websocket.query_params.get("conversation_id") or websocket.headers.get("x-conversation-id")
+    conversation_id = websocket.query_params.get("conversation_id") or websocket.headers.get(
+        "x-conversation-id"
     )
     hostname = os.getenv("HOSTNAME", "").strip() or "unknown"
     logger.info(

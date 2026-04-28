@@ -796,9 +796,7 @@ class QueryRewriterNode:
 
         current_query_normalized = current_query.strip()
 
-        for message in reversed(
-            messages
-        ):  # include all messages to avoid context amnesia
+        for message in reversed(messages):  # include all messages to avoid context amnesia
             role = get_message_role(message)
             content = get_message_content(message)
             if role not in {"user", "assistant"}:
