@@ -1471,9 +1471,7 @@ async def _stream_chat_langgraph(
             config = {"configurable": {"thread_id": thread_id}}
 
             inputs: dict[str, object] = {
-                "messages": [
-                    {"role": "user", "content": prepared_objective}
-                ]
+                "messages": [{"role": "user", "content": prepared_objective}]
             }
             inputs = _merge_admin_inputs(inputs, admin_payload if chat_scope == "admin" else None)
             state_dict = inputs
@@ -1567,7 +1565,10 @@ async def _stream_chat_langgraph(
             await _safe_put({"type": "__DONE__", "result": final_res})
         except Exception as e:
             import traceback
-            await _safe_put({"type": "__ERROR__", "error": str(e), "traceback": traceback.format_exc()})
+
+            await _safe_put(
+                {"type": "__ERROR__", "error": str(e), "traceback": traceback.format_exc()}
+            )
 
     task = asyncio.create_task(_runner())
     active_background_tasks.add(task)
@@ -1767,11 +1768,7 @@ async def _run_chat_langgraph(
         else "conversation_fallback",
         str(conversation_id),
     )
-    inputs: dict[str, object] = {
-        "messages": [
-            {"role": "user", "content": prepared_objective}
-        ]
-    }
+    inputs: dict[str, object] = {"messages": [{"role": "user", "content": prepared_objective}]}
     inputs = _merge_admin_inputs(inputs, admin_payload)
 
     final_resp = None
@@ -2464,11 +2461,7 @@ async def chat_with_agent_endpoint(
                     thread_id
                 )
                 admin_inputs = _merge_admin_inputs(
-                    {
-                        "messages": [
-                            {"role": "user", "content": prepared_objective}
-                        ]
-                    },
+                    {"messages": [{"role": "user", "content": prepared_objective}]},
                     admin_payload,
                 )
 

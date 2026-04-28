@@ -101,7 +101,11 @@ class QueryAnalyzerNode:
         prompt_messages = messages
         if messages:
             last_msg = messages[-1]
-            role = last_msg.get("role") or last_msg.get("type") if isinstance(last_msg, dict) else getattr(last_msg, "type", getattr(last_msg, "role", ""))
+            role = (
+                last_msg.get("role") or last_msg.get("type")
+                if isinstance(last_msg, dict)
+                else getattr(last_msg, "type", getattr(last_msg, "role", ""))
+            )
             if role in ("human", "user"):
                 prompt_messages = messages[:-1]
         formatted_history = format_conversation_history(prompt_messages)
