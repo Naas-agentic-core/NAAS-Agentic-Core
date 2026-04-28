@@ -57,7 +57,6 @@ from microservices.orchestrator_service.src.services.overmind.domain.api_schemas
     MissionResponse,
 )
 from microservices.orchestrator_service.src.services.overmind.entrypoint import start_mission
-from microservices.orchestrator_service.src.services.overmind.graph import create_unified_graph
 from microservices.orchestrator_service.src.services.overmind.state import MissionStateManager
 from microservices.orchestrator_service.src.services.overmind.utils.tools import tool_registry
 from microservices.orchestrator_service.src.services.tools.registry import get_registry
@@ -1471,9 +1470,7 @@ async def _stream_chat_langgraph(
             config = {"configurable": {"thread_id": thread_id}}
 
             inputs: dict[str, object] = {
-                "messages": [
-                    {"role": "user", "content": prepared_objective}
-                ]
+                "messages": [{"role": "user", "content": prepared_objective}]
             }
             inputs = _merge_admin_inputs(inputs, admin_payload if chat_scope == "admin" else None)
             state_dict = inputs
@@ -1567,7 +1564,10 @@ async def _stream_chat_langgraph(
             await _safe_put({"type": "__DONE__", "result": final_res})
         except Exception as e:
             import traceback
-            await _safe_put({"type": "__ERROR__", "error": str(e), "traceback": traceback.format_exc()})
+
+            await _safe_put(
+                {"type": "__ERROR__", "error": str(e), "traceback": traceback.format_exc()}
+            )
 
     task = asyncio.create_task(_runner())
     active_background_tasks.add(task)
@@ -1750,7 +1750,7 @@ async def _run_chat_langgraph(
 ) -> AsyncGenerator[str, None]:
     """يشغّل LangGraph كعمود فقري لرحلة chat ويعيد حمولة موحدة قابلة للبث (HTTP legacy fallback)."""
     if not app_graph:
-        app_graph = create_unified_graph()
+        raise RuntimeError("LangGraph instance is required but was not found on app.state")
     requested_conversation_id = context.get("conversation_id") if context else None
     safe_conversation_id = _safe_conversation_id(requested_conversation_id)
     conversation_id: int | str = (
@@ -1767,11 +1767,7 @@ async def _run_chat_langgraph(
         else "conversation_fallback",
         str(conversation_id),
     )
-    inputs: dict[str, object] = {
-        "messages": [
-            {"role": "user", "content": prepared_objective}
-        ]
-    }
+    inputs: dict[str, object] = {"messages": [{"role": "user", "content": prepared_objective}]}
     inputs = _merge_admin_inputs(inputs, admin_payload)
 
     final_resp = None
@@ -2435,8 +2431,9 @@ async def chat_with_agent_endpoint(
             try:
                 admin_app = getattr(fastapi_req.app.state, "admin_app", None)
                 if admin_app is None:
-                    admin_app = create_unified_graph()
-                    logger.warning("[ADMIN_STREAM] admin_app not on app.state — using fresh graph")
+                    raise RuntimeError(
+                        "LangGraph admin_app is required but was not found on app.state"
+                    )
 
                 if isinstance(request.context, dict):
                     request.context["is_admin"] = True
@@ -2464,11 +2461,7 @@ async def chat_with_agent_endpoint(
                     thread_id
                 )
                 admin_inputs = _merge_admin_inputs(
-                    {
-                        "messages": [
-                            {"role": "user", "content": prepared_objective}
-                        ]
-                    },
+                    {"messages": [{"role": "user", "content": prepared_objective}]},
                     admin_payload,
                 )
 

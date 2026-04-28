@@ -28,13 +28,7 @@ class GeneralKnowledgeNode:
 
         # Memory is accurate and automatically loaded by Checkpointer.
         # We no longer amputate the prompt_messages via slicing.
-        # However, to avoid prompt contamination, we exclude the current user query if it's the last message
         prompt_messages = messages
-        if messages:
-            last_msg = messages[-1]
-            role = last_msg.get("role") or last_msg.get("type") if isinstance(last_msg, dict) else getattr(last_msg, "type", getattr(last_msg, "role", ""))
-            if role in ("human", "user"):
-                prompt_messages = messages[:-1]
         history = format_conversation_history(prompt_messages)
 
         if not history.strip():
