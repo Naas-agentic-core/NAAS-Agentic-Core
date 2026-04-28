@@ -2444,7 +2444,6 @@ async def chat_with_agent_endpoint(
                     admin_payload = request.context
                 else:
                     admin_payload = {"is_admin": True, "role": "admin"}
-                langchain_msgs: list[HumanMessage | AIMessage] = []
 
                 # Augment the objective for explicit context before sending to LangGraph
                 prepared_objective = _augment_ambiguous_objective(
@@ -2464,11 +2463,6 @@ async def chat_with_agent_endpoint(
                 _checkpointer_available, _checkpoint_has_state = await _detect_checkpoint_state(
                     thread_id
                 )
-                langchain_msgs = _build_graph_messages_manual(
-                    objective=prepared_objective,
-                    history_messages=request.history_messages,
-                )
-
                 admin_inputs = _merge_admin_inputs(
                     {
                         "messages": [
