@@ -87,11 +87,13 @@ async def lifespan(app: FastAPI):
         from microservices.orchestrator_service.src.services.overmind.graph.main import (
             create_unified_graph,
         )
+        from langgraph.checkpoint.memory import MemorySaver
 
+        memory = MemorySaver()
         app.state.admin_app = admin_graph.compile(
-            checkpointer=get_checkpointer(), interrupt_before=[]
+            checkpointer=get_checkpointer() or memory, interrupt_before=[]
         )
-        app.state.app_graph = create_unified_graph(admin_app=app.state.admin_app)
+        app.state.app_graph = create_unified_graph(admin_app=app.state.admin_app, checkpointer=get_checkpointer() or memory)
 
         # ═══ PHASE 3: WARMUP — PROVE IT WORKS ══════════════════════
         result = await app.state.admin_app.ainvoke(

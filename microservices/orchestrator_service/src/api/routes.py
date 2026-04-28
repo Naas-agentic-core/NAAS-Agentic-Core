@@ -1460,7 +1460,7 @@ async def _stream_chat_langgraph(
         try:
             _graph = app_graph or getattr(websocket.app.state, "app_graph", None)
             if not _graph:
-                _graph = create_unified_graph()
+                _graph = websocket.app.state.app_graph
             incoming_messages = safe_history
             await _append_telemetry_line(
                 f"[TELEMETRY] INGRESS | "
@@ -1469,26 +1469,11 @@ async def _stream_chat_langgraph(
                 f"messages_in_request={len(incoming_messages)}"
             )
             config = {"configurable": {"thread_id": thread_id}}
-            checkpointer_available, checkpoint_has_state = await _detect_checkpoint_state(thread_id)
-            logger.warning(f"HISTORY SIZE: {len(history_messages) if history_messages else 0}")
-            langchain_msgs = _build_graph_messages_graph(
-                objective=prepared_objective,
-                history_messages=safe_history,
-                checkpointer_available=checkpointer_available,
-                checkpoint_has_state=checkpoint_has_state,
-            )
-            logger.info(
-                "[CONTEXT_MODE] channel=websocket conv_id=%s thread_id=%s checkpointer_available=%s checkpoint_has_state=%s seeded_history=%s",
-                conversation_id,
-                thread_id,
-                checkpointer_available,
-                checkpoint_has_state,
-                max(0, len(langchain_msgs) - 1),
-            )
 
             inputs: dict[str, object] = {
-                "query": prepared_objective,
-                "messages": langchain_msgs,
+                "messages": [
+                    {"role": "user", "content": prepared_objective}
+                ]
             }
             inputs = _merge_admin_inputs(inputs, admin_payload if chat_scope == "admin" else None)
             state_dict = inputs
@@ -1581,7 +1566,8 @@ async def _stream_chat_langgraph(
 
             await _safe_put({"type": "__DONE__", "result": final_res})
         except Exception as e:
-            await _safe_put({"type": "__ERROR__", "error": str(e)})
+            import traceback
+            await _safe_put({"type": "__ERROR__", "error": str(e), "traceback": traceback.format_exc()})
 
     task = asyncio.create_task(_runner())
     active_background_tasks.add(task)
@@ -1781,25 +1767,10 @@ async def _run_chat_langgraph(
         else "conversation_fallback",
         str(conversation_id),
     )
-    checkpointer_available, checkpoint_has_state = await _detect_checkpoint_state(thread_id)
-    langchain_msgs = _build_graph_messages_graph(
-        objective=prepared_objective,
-        history_messages=history_messages,
-        checkpointer_available=checkpointer_available,
-        checkpoint_has_state=checkpoint_has_state,
-    )
-    logger.info(
-        "[CONTEXT_MODE] channel=http conv_id=%s thread_id=%s checkpointer_available=%s checkpoint_has_state=%s seeded_history=%s",
-        conversation_id,
-        thread_id,
-        checkpointer_available,
-        checkpoint_has_state,
-        max(0, len(langchain_msgs) - 1),
-    )
-
     inputs: dict[str, object] = {
-        "query": prepared_objective,
-        "messages": langchain_msgs,
+        "messages": [
+            {"role": "user", "content": prepared_objective}
+        ]
     }
     inputs = _merge_admin_inputs(inputs, admin_payload)
 
@@ -2500,8 +2471,9 @@ async def chat_with_agent_endpoint(
 
                 admin_inputs = _merge_admin_inputs(
                     {
-                        "query": prepared_objective,
-                        "messages": langchain_msgs,
+                        "messages": [
+                            {"role": "user", "content": prepared_objective}
+                        ]
                     },
                     admin_payload,
                 )
