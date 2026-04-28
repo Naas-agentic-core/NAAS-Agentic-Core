@@ -26,8 +26,9 @@ class GeneralKnowledgeNode:
             query = messages[-1].content
         query = str(query or "").strip()
 
-        # Exclude the very last message from the HISTORY block if it's the current user query,
-        # to prevent prompt contamination. State is NOT modified.
+        # Memory is accurate and automatically loaded by Checkpointer.
+        # We no longer amputate the prompt_messages via slicing.
+        # However, to avoid prompt contamination, we exclude the current user query if it's the last message
         prompt_messages = messages
         if messages:
             last_msg = messages[-1]

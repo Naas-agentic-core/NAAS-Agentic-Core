@@ -1044,7 +1044,7 @@ def check_quality(state: AgentState) -> str:
     return "pass"
 
 
-def create_unified_graph(admin_app=None):
+def create_unified_graph(admin_app=None, checkpointer=None):
     _configure_dspy()
     graph = StateGraph(AgentState)
 
@@ -1058,8 +1058,9 @@ def create_unified_graph(admin_app=None):
 
     from .admin import AdminAgentNode
     from .general_knowledge import GeneralKnowledgeNode
+    from .supervisor import SupervisorNode as ImportedSupervisorNode
 
-    graph.add_node("supervisor", SupervisorNode())
+    graph.add_node("supervisor", ImportedSupervisorNode())
     graph.add_node("query_rewriter", QueryRewriterNode())
     graph.add_node("query_analyzer", query_analyzer_node())
     graph.add_node("retriever", internal_retriever_node())
@@ -1109,13 +1110,17 @@ def create_unified_graph(admin_app=None):
 
     graph.set_entry_point("supervisor")
 
+    if checkpointer:
+        logger.info("[CHECKPOINTER] LangGraph compiled with provided checkpointer.")
+        return graph.compile(checkpointer=checkpointer)
+
     # Use global postgres checkpointer if available, otherwise compile without it
     from microservices.orchestrator_service.src.core.database import get_checkpointer
 
-    checkpointer = get_checkpointer()
-    if checkpointer:
+    db_checkpointer = get_checkpointer()
+    if db_checkpointer:
         logger.info("[CHECKPOINTER] LangGraph compiled with Postgres checkpointer.")
-        return graph.compile(checkpointer=checkpointer)
+        return graph.compile(checkpointer=db_checkpointer)
 
     logger.warning(
         "[CHECKPOINTER] LangGraph compiled without checkpointer; state continuity relies on injected history."
