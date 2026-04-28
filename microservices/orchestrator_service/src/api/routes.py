@@ -6,7 +6,6 @@ import re
 import time
 import uuid
 from collections.abc import AsyncGenerator
-from contextlib import suppress
 from typing import TypedDict
 
 import anyio
@@ -57,7 +56,6 @@ from microservices.orchestrator_service.src.services.overmind.domain.api_schemas
     MissionResponse,
 )
 from microservices.orchestrator_service.src.services.overmind.entrypoint import start_mission
-from microservices.orchestrator_service.src.services.overmind.graph import create_unified_graph
 from microservices.orchestrator_service.src.services.overmind.state import MissionStateManager
 from microservices.orchestrator_service.src.services.overmind.utils.tools import tool_registry
 from microservices.orchestrator_service.src.services.tools.registry import get_registry
@@ -1404,7 +1402,6 @@ async def _stream_chat_langgraph(
     admin_payload: dict[str, object] | None = None,
     history_messages: list[dict[str, str]] | None = None,
 ) -> None:
-    """يشغّل LangGraph الموحد لمسارات البحث والإدارة ويبث الأحداث."""
     queue: asyncio.Queue[dict[str, object]] = asyncio.Queue(maxsize=256)
     thread_id = _resolve_thread_id(context, conversation_id)
     safe_history = list(history_messages) if history_messages else []
@@ -1458,9 +1455,10 @@ async def _stream_chat_langgraph(
                 logger.warning("[QUEUE_OVERFLOW] dropping event type=%s", evt.get("type"))
 
         try:
-            _graph = app_graph or getattr(websocket.app.state, "app_graph", None)
+            _graph = getattr(websocket.app.state, "app_graph", None)
             if not _graph:
-                _graph = create_unified_graph()
+                raise RuntimeError("Graph not initialized on app state")
+
             incoming_messages = safe_history
             await _append_telemetry_line(
                 f"[TELEMETRY] INGRESS | "
@@ -1471,23 +1469,19 @@ async def _stream_chat_langgraph(
             config = {"configurable": {"thread_id": thread_id}}
             checkpointer_available, checkpoint_has_state = await _detect_checkpoint_state(thread_id)
             logger.warning(f"HISTORY SIZE: {len(history_messages) if history_messages else 0}")
-            langchain_msgs = _build_graph_messages_graph(
-                objective=prepared_objective,
-                history_messages=safe_history,
-                checkpointer_available=checkpointer_available,
-                checkpoint_has_state=checkpoint_has_state,
-            )
+
+            langchain_msgs = [{"role": "user", "content": prepared_objective}]
+
             logger.info(
                 "[CONTEXT_MODE] channel=websocket conv_id=%s thread_id=%s checkpointer_available=%s checkpoint_has_state=%s seeded_history=%s",
                 conversation_id,
                 thread_id,
                 checkpointer_available,
                 checkpoint_has_state,
-                max(0, len(langchain_msgs) - 1),
+                0,
             )
 
             inputs: dict[str, object] = {
-                "query": prepared_objective,
                 "messages": langchain_msgs,
             }
             inputs = _merge_admin_inputs(inputs, admin_payload if chat_scope == "admin" else None)
@@ -1511,14 +1505,13 @@ async def _stream_chat_langgraph(
                     await _append_telemetry_line(
                         f"[TELEMETRY] CHECKPOINTER | "
                         f"elapsed={_elapsed:.4f}s | "
-                        f"state={'NONE — silent failure' if _ckpt is None else _keys}"
+                        f"has_state={_ckpt is not None} | "
+                        f"keys={_keys}"
                     )
-                except Exception as _e:
-                    await _append_telemetry_line(
-                        f"[TELEMETRY] CHECKPOINTER CRASHED | {type(_e).__name__}: {_e}"
-                    )
+                except Exception as _ce:
+                    await _append_telemetry_line(f"[TELEMETRY] CHECKPOINTER ERROR | {_ce}")
 
-            final_res = None
+            final_resp = None
             async for event in _graph.astream_events(inputs, config=config, version="v2"):
                 if event["event"] == "on_chain_start":
                     node_name = event.get("name", "")
@@ -1538,50 +1531,63 @@ async def _stream_chat_langgraph(
                                 "payload": {"phase": node_name, "agent": "orchestrator"},
                             }
                         )
-                    if not node_name or node_name == "LangGraph":
-                        final_res = event["data"].get("output", {})
-                        if (
-                            final_res
-                            and isinstance(final_res, dict)
-                            and "final_response" in final_res
-                        ):
-                            pass  # We have our final response
-                        elif (
-                            final_res
-                            and isinstance(final_res, dict)
-                            and "messages" in final_res
-                            and final_res["messages"]
-                        ):
-                            # Fallback to extract final response from last message
-                            last_msg = final_res["messages"][-1]
-                            if hasattr(last_msg, "content"):
-                                final_res = {"final_response": last_msg.content}
+                    if node_name == "LangGraph":
+                        final_resp = event["data"].get("output")
+                        if final_resp is not None:
+                            await _append_telemetry_line(
+                                "[TELEMETRY] GRAPH COMPLETED | has_output=True"
+                            )
+                            if checkpointer is not None:
+                                try:
+                                    _ckpt_after = await checkpointer.aget(config)
+                                    _keys_after = (
+                                        list(_ckpt_after.channel_values.keys())
+                                        if _ckpt_after
+                                        else None
+                                    )
+                                    await _append_telemetry_line(
+                                        f"[TELEMETRY] POST-INVOKE CHECKPOINTER | "
+                                        f"has_state={_ckpt_after is not None} | keys={_keys_after}"
+                                    )
+                                except Exception as _ce:
+                                    await _append_telemetry_line(
+                                        f"[TELEMETRY] POST-INVOKE CHECKPOINTER ERROR | {_ce}"
+                                    )
+                elif event["event"] == "on_chat_model_stream":
+                    chunk = event["data"]["chunk"]
+                    if isinstance(chunk, AIMessage) and chunk.content:
+                        await _safe_put(
+                            {
+                                "type": "assistant_delta",
+                                "payload": {"content": chunk.content},
+                            }
+                        )
 
-            if checkpointer is not None:
-                _t2 = time.monotonic()
-                try:
-                    _ckpt_after = await checkpointer.aget(config)
-                    _elapsed2 = time.monotonic() - _t2
-                    _msgs_saved = (
-                        len(_ckpt_after.channel_values.get("messages", [])) if _ckpt_after else 0
-                    )
-                    await _append_telemetry_line(
-                        f"[TELEMETRY] POST-INVOKE | "
-                        f"elapsed={_elapsed2:.4f}s | "
-                        f"messages_persisted={_msgs_saved} | "
-                        f"state={'NONE — not saved' if _ckpt_after is None else 'SAVED'}"
-                    )
-                except Exception as _e:
-                    await _append_telemetry_line(
-                        f"[TELEMETRY] POST-INVOKE CRASHED | {type(_e).__name__}: {_e}"
-                    )
+            if final_resp is not None:
+                if isinstance(final_resp, dict):
+                    final_content = final_resp.get("final_response", "")
+                else:
+                    final_content = str(final_resp)
+                await _safe_put(
+                    {
+                        "type": "assistant_final",
+                        "payload": {"content": final_content},
+                    }
+                )
+            else:
+                await _safe_put(
+                    {
+                        "type": "assistant_error",
+                        "payload": {"content": "عذراً، لم أتمكن من إكمال معالجة طلبك."},
+                    }
+                )
 
-            if not final_res:
-                final_res = {"final_response": "لم يتم العثور على رد من النظام"}
-
-            await _safe_put({"type": "__DONE__", "result": final_res})
         except Exception as e:
-            await _safe_put({"type": "__ERROR__", "error": str(e)})
+            import traceback
+
+            await _safe_put(
+                {"type": "__ERROR__", "error": str(e), "traceback": traceback.format_exc()}
+            )
 
     task = asyncio.create_task(_runner())
     active_background_tasks.add(task)
@@ -1592,132 +1598,59 @@ async def _stream_chat_langgraph(
             t.result()
         except asyncio.CancelledError:
             pass
-        except Exception:
-            logger.error("LangGraph task failed", exc_info=True)
+        except Exception as exc:
+            logger.error("Background stream task failed for conv=%s: %s", conversation_id, exc)
 
     task.add_done_callback(_cleanup_task)
-    _task_ref = task  # store reference to avoid GC
-
-    from datetime import UTC, datetime
-
-    now = datetime.now(UTC).isoformat()
-    await websocket.send_json(
-        {
-            "type": "RUN_STARTED",
-            "payload": {
-                "run_id": "sync-run",
-                "seq": 1,
-                "timestamp": now,
-                "iteration": 0,
-                "mode": context.get("mission_type", "auto"),
-            },
-        }
-    )
 
     final_content = ""
     try:
         while True:
-            evt = await queue.get()
-            if evt["type"] == "__DONE__":
-                run_data = evt["result"]
-
-                # Extract the final response from our custom Unified Graph output
-                final_resp = run_data.get("final_response")
-
-                if isinstance(final_resp, dict):
-                    response_text = await _serialize_json_async(final_resp)
-                else:
-                    response_text = str(final_resp or "لا توجد تفاصيل متاحة.")
-
-                final_content = response_text
-                logger.info(f"FINAL RESPONSE → {response_text[:100]}")
+            try:
+                async with asyncio.timeout(30.0):
+                    evt = await queue.get()
+            except TimeoutError:
                 await websocket.send_json(
                     {
-                        "type": "assistant_final",
-                        "payload": {
-                            "content": response_text,
-                            "status": "ok",
-                            "run_id": "sync-run",
-                            "timeline": [],
-                            "graph_mode": "unified_stategraph",
-                            "route_id": f"chat_ws_{chat_scope}",
-                        },
+                        "type": "assistant_error",
+                        "payload": {"content": "انتهت مهلة الانتظار. يرجى المحاولة لاحقاً."},
                     }
                 )
                 break
-            if evt["type"] == "__ERROR__":
-                request_id = str(uuid.uuid4())
-                logger.error(
-                    "LangGraph streaming failure",
-                    exc_info=True,
-                    extra={"request_id": request_id, "chat_scope": chat_scope},
-                )
-                final_content = _safe_assistant_error(request_id)
+
+            if evt.get("type") == "__ERROR__":
+                logger.error(f"[STREAM ERROR] conv={conversation_id} error={evt.get('error')}")
+                logger.error(evt.get("traceback"))
                 await websocket.send_json(
-                    {"type": "assistant_error", "payload": {"content": final_content}}
+                    {
+                        "type": "assistant_error",
+                        "payload": {"content": "عذراً، حدث خطأ داخلي. يرجى المحاولة لاحقاً."},
+                    }
                 )
                 break
-            if evt["type"] == "phase_start":
-                phase_name = (
-                    evt["payload"].get("phase", "") if isinstance(evt["payload"], dict) else ""
-                )
-                agent_name = (
-                    evt["payload"].get("agent", "") if isinstance(evt["payload"], dict) else ""
-                )
+
+            if evt["type"] == "assistant_delta":
+                chunk_str = evt.get("payload", {}).get("content", "")
+                if chunk_str:
+                    final_content += chunk_str
+
+            if evt["type"] == "assistant_final":
+                await websocket.send_json(evt)
+                break
+
+            if evt["type"] in ("phase_start", "phase_completed"):
+                mode = str(evt.get("payload", {}).get("phase", ""))
                 await websocket.send_json(
                     {
-                        "type": "PHASE_STARTED",
+                        "type": "phase_status",
                         "payload": {
-                            "run_id": "sync-run",
-                            "seq": 2,
-                            "phase": phase_name,
-                            "agent": agent_name,
-                            "timestamp": datetime.now(UTC).isoformat(),
-                        },
-                    }
-                )
-                await websocket.send_json(
-                    {
-                        "type": "assistant_delta",
-                        "payload": {"content": f"🔄 جاري التنفيذ: {phase_name}\n"},
-                    }
-                )
-            elif evt["type"] == "phase_completed":
-                phase_name = (
-                    evt["payload"].get("phase", "") if isinstance(evt["payload"], dict) else ""
-                )
-                agent_name = (
-                    evt["payload"].get("agent", "") if isinstance(evt["payload"], dict) else ""
-                )
-                await websocket.send_json(
-                    {
-                        "type": "PHASE_COMPLETED",
-                        "payload": {
-                            "run_id": "sync-run",
-                            "seq": 3,
-                            "phase": phase_name,
-                            "agent": agent_name,
-                            "timestamp": datetime.now(UTC).isoformat(),
-                        },
-                    }
-                )
-            elif evt["type"] == "loop_start":
-                iteration = (
-                    evt["payload"].get("iteration", 0) if isinstance(evt["payload"], dict) else 0
-                )
-                mode = (
-                    evt["payload"].get("graph_mode", "standard")
-                    if isinstance(evt["payload"], dict)
-                    else "standard"
-                )
-                await websocket.send_json(
-                    {
-                        "type": "RUN_STARTED",
-                        "payload": {
-                            "run_id": f"sync-run:{iteration}",
-                            "seq": 4,
-                            "timestamp": datetime.now(UTC).isoformat(),
-                            "iteration": iteration,
+                            "status": "in_progress"
+                            if evt["type"] == "phase_start"
+                            else "completed",
+                            "message": str(
+                                evt.get("payload", {}).get("phase", ""),
+                                "in_progress" if evt["type"] == "phase_start" else "completed",
+                            ),
                             "mode": mode,
                         },
                     }
@@ -1749,10 +1682,6 @@ async def _stream_chat_langgraph(
     finally:
         if not task.done():
             task.cancel()
-            with suppress(asyncio.CancelledError):
-                await task
-
-    await websocket.send_json({"type": "complete", "payload": {}})
 
 
 async def _run_chat_langgraph(
@@ -1762,9 +1691,8 @@ async def _run_chat_langgraph(
     admin_payload: dict[str, object] | None = None,
     history_messages: list[dict[str, str]] | None = None,
 ) -> AsyncGenerator[str, None]:
-    """يشغّل LangGraph كعمود فقري لرحلة chat ويعيد حمولة موحدة قابلة للبث (HTTP legacy fallback)."""
     if not app_graph:
-        app_graph = create_unified_graph()
+        raise RuntimeError("Graph not initialized")
     requested_conversation_id = context.get("conversation_id") if context else None
     safe_conversation_id = _safe_conversation_id(requested_conversation_id)
     conversation_id: int | str = (
@@ -1782,23 +1710,16 @@ async def _run_chat_langgraph(
         str(conversation_id),
     )
     checkpointer_available, checkpoint_has_state = await _detect_checkpoint_state(thread_id)
-    langchain_msgs = _build_graph_messages_graph(
-        objective=prepared_objective,
-        history_messages=history_messages,
-        checkpointer_available=checkpointer_available,
-        checkpoint_has_state=checkpoint_has_state,
-    )
+    langchain_msgs = [{"role": "user", "content": prepared_objective}]
     logger.info(
-        "[CONTEXT_MODE] channel=http conv_id=%s thread_id=%s checkpointer_available=%s checkpoint_has_state=%s seeded_history=%s",
+        "[CONTEXT_MODE] channel=http conv_id=%s thread_id=%s checkpointer_available=%s checkpoint_has_state=%s seeded_history=0",
         conversation_id,
         thread_id,
         checkpointer_available,
         checkpoint_has_state,
-        max(0, len(langchain_msgs) - 1),
     )
 
     inputs: dict[str, object] = {
-        "query": prepared_objective,
         "messages": langchain_msgs,
     }
     inputs = _merge_admin_inputs(inputs, admin_payload)
@@ -1823,39 +1744,32 @@ async def _run_chat_langgraph(
                         "payload": {"phase": node_name, "agent": "orchestrator"},
                     }
                 )
-            if not node_name or node_name == "LangGraph":
-                final_res = event["data"].get("output", {})
-                if final_res and isinstance(final_res, dict) and "final_response" in final_res:
-                    final_resp = final_res["final_response"]
-                elif (
-                    final_res
-                    and isinstance(final_res, dict)
-                    and "messages" in final_res
-                    and final_res["messages"]
-                ):
-                    last_msg = final_res["messages"][-1]
-                    if hasattr(last_msg, "content"):
-                        final_resp = last_msg.content
+            if node_name == "LangGraph":
+                final_resp = event["data"].get("output")
+        elif event["event"] == "on_chat_model_stream":
+            chunk = event["data"]["chunk"]
+            if isinstance(chunk, AIMessage) and chunk.content:
+                yield await _serialize_stream_frame(
+                    {"type": "assistant_delta", "payload": {"content": chunk.content}}
+                )
 
-    if isinstance(final_resp, dict):
-        response_text = await _serialize_json_async(final_resp)
+    if final_resp is not None:
+        if isinstance(final_resp, dict):
+            final_content = final_resp.get("final_response", "")
+        else:
+            final_content = str(final_resp)
+        yield await _serialize_stream_frame(
+            {"type": "assistant_final", "payload": {"content": final_content}}
+        )
     else:
-        response_text = str(final_resp or "لا توجد تفاصيل متاحة.")
-
-    yield await _serialize_stream_frame(
-        {
-            "type": "assistant_final",
-            "payload": {
-                "content": response_text,
-                "status": "ok",
-                "run_id": "http-run",
-                "graph_mode": "unified_stategraph",
-            },
-        }
-    )
+        yield await _serialize_stream_frame(
+            {
+                "type": "assistant_error",
+                "payload": {"content": "عذراً، حدث خطأ أثناء معالجة طلبك عبر HTTP."},
+            }
+        )
 
 
-@router.get("/api/chat/messages", summary="Chat Health Endpoint")
 async def chat_messages_health_endpoint() -> dict[str, str]:
     """يوفر نقطة صحة توافقية لمسار chat ضمن سلطة orchestrator الموحدة."""
     return {
@@ -2464,8 +2378,7 @@ async def chat_with_agent_endpoint(
             try:
                 admin_app = getattr(fastapi_req.app.state, "admin_app", None)
                 if admin_app is None:
-                    admin_app = create_unified_graph()
-                    logger.warning("[ADMIN_STREAM] admin_app not on app.state — using fresh graph")
+                    raise RuntimeError("Graph not initialized")
 
                 if isinstance(request.context, dict):
                     request.context["is_admin"] = True
@@ -2493,14 +2406,10 @@ async def chat_with_agent_endpoint(
                 _checkpointer_available, _checkpoint_has_state = await _detect_checkpoint_state(
                     thread_id
                 )
-                langchain_msgs = _build_graph_messages_manual(
-                    objective=prepared_objective,
-                    history_messages=request.history_messages,
-                )
+                langchain_msgs = [{"role": "user", "content": prepared_objective}]
 
                 admin_inputs = _merge_admin_inputs(
                     {
-                        "query": prepared_objective,
                         "messages": langchain_msgs,
                     },
                     admin_payload,
@@ -2633,10 +2542,7 @@ async def chat_with_agent_endpoint(
             _checkpointer_available, _checkpoint_has_state = await _detect_checkpoint_state(
                 thread_id
             )
-            langchain_msgs = _build_graph_messages_manual(
-                objective=prepared_objective,
-                history_messages=request.history_messages,
-            )
+            langchain_msgs = [{"role": "user", "content": prepared_objective}]
 
             run_result = agent.run(
                 prepared_objective, context=context, history_messages=langchain_msgs
