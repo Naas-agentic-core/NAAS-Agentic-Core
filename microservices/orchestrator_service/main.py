@@ -22,6 +22,15 @@ from microservices.orchestrator_service.src.services.tools.registry import regis
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("orchestrator_service")
 
+# MemorySaver singleton — يُنشأ مرة واحدة على مستوى الـ module لضمان استمرارية الذاكرة
+# بين الطلبات عند غياب Postgres checkpointer. لا تُنشئ instance جديداً داخل lifespan.
+try:
+    from langgraph.checkpoint.memory import MemorySaver as _MemorySaver
+
+    _memory_saver: _MemorySaver | None = _MemorySaver()
+except ModuleNotFoundError:
+    _memory_saver = None
+
 
 async def _run_outbox_relay_once() -> dict[str, int]:
     """ينفذ دورة relay واحدة لسجلات Outbox مع عزل جلسة قاعدة البيانات."""
@@ -83,19 +92,19 @@ async def lifespan(app: FastAPI):
 
     # ═══ PHASE 2: GRAPHS AFTER TOOLS ═══════════════════════════
     try:
-        from langgraph.checkpoint.memory import MemorySaver
-
         from microservices.orchestrator_service.src.services.overmind.graph.admin import admin_graph
         from microservices.orchestrator_service.src.services.overmind.graph.main import (
             create_unified_graph,
         )
 
-        memory = MemorySaver()
+        # يستخدم Postgres checkpointer إذا كان متاحاً، وإلا يعود إلى MemorySaver singleton
+        # (لا تُنشئ MemorySaver جديداً هنا — يجب أن يكون نفس الـ instance طوال عمر العملية)
+        active_checkpointer = get_checkpointer() or _memory_saver
         app.state.admin_app = admin_graph.compile(
-            checkpointer=get_checkpointer() or memory, interrupt_before=[]
+            checkpointer=active_checkpointer, interrupt_before=[]
         )
         app.state.app_graph = create_unified_graph(
-            admin_app=app.state.admin_app, checkpointer=get_checkpointer() or memory
+            admin_app=app.state.admin_app, checkpointer=active_checkpointer
         )
 
         # ═══ PHASE 3: WARMUP — PROVE IT WORKS ══════════════════════

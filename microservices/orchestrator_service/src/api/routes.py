@@ -1469,19 +1469,9 @@ async def _stream_chat_langgraph(
             )
             config = {"configurable": {"thread_id": thread_id}}
 
-            inputs: dict[str, object] = {
-                "messages": [{"role": "user", "content": prepared_objective}]
-            }
-            inputs = _merge_admin_inputs(inputs, admin_payload if chat_scope == "admin" else None)
-            state_dict = inputs
-            payload_messages = state_dict.get("messages", [])
-            await _append_telemetry_line(
-                f"[TELEMETRY] PRE-INVOKE | "
-                f"messages type={type(payload_messages).__name__} | "
-                f"count={len(payload_messages)} | "
-                f"last_msg={str(payload_messages[-1])[:120] if payload_messages else 'EMPTY'}"
-            )
+            # فحص حالة الـ checkpointer لتحديد ما إذا كانت الحالة محفوظة مسبقاً
             checkpointer = get_checkpointer()
+            _checkpointer_available, _checkpoint_has_state = False, False
             if checkpointer is None:
                 await _append_telemetry_line("[TELEMETRY] CHECKPOINTER NOT IN SCOPE")
             else:
@@ -1489,16 +1479,40 @@ async def _stream_chat_langgraph(
                 try:
                     _ckpt = await checkpointer.aget(config)
                     _elapsed = time.monotonic() - _t
+                    _checkpoint_has_state = _ckpt is not None
+                    _checkpointer_available = True
                     _keys = list(_ckpt.channel_values.keys()) if _ckpt else None
                     await _append_telemetry_line(
                         f"[TELEMETRY] CHECKPOINTER | "
                         f"elapsed={_elapsed:.4f}s | "
-                        f"state={'NONE — silent failure' if _ckpt is None else _keys}"
+                        f"state={'NONE — no prior state' if _ckpt is None else _keys}"
                     )
                 except Exception as _e:
                     await _append_telemetry_line(
                         f"[TELEMETRY] CHECKPOINTER CRASHED | {type(_e).__name__}: {_e}"
                     )
+
+            # بناء رسائل الإدخال بشكل صحيح:
+            # - إذا كان checkpointer يحمل حالة → نمرر رسالة المستخدم الحالية فقط (delta)
+            # - إذا لم تكن هناك حالة محفوظة → نمرر كامل التاريخ + الرسالة الحالية
+            graph_messages = _build_graph_messages_graph(
+                objective=prepared_objective,
+                history_messages=safe_history if safe_history else None,
+                checkpointer_available=_checkpointer_available,
+                checkpoint_has_state=_checkpoint_has_state,
+            )
+            inputs: dict[str, object] = {"messages": graph_messages}
+            inputs = _merge_admin_inputs(inputs, admin_payload if chat_scope == "admin" else None)
+            state_dict = inputs
+            payload_messages = state_dict.get("messages", [])
+            await _append_telemetry_line(
+                f"[TELEMETRY] PRE-INVOKE | "
+                f"checkpointer_available={_checkpointer_available} | "
+                f"checkpoint_has_state={_checkpoint_has_state} | "
+                f"messages type={type(payload_messages).__name__} | "
+                f"count={len(payload_messages)} | "
+                f"last_msg={str(payload_messages[-1])[:120] if payload_messages else 'EMPTY'}"
+            )
 
             final_res = None
             async for event in _graph.astream_events(inputs, config=config, version="v2"):
@@ -1767,7 +1781,15 @@ async def _run_chat_langgraph(
         else "conversation_fallback",
         str(conversation_id),
     )
-    inputs: dict[str, object] = {"messages": [{"role": "user", "content": prepared_objective}]}
+    # فحص حالة الـ checkpointer لتحديد ما إذا كانت الحالة محفوظة مسبقاً
+    _checkpointer_available, _checkpoint_has_state = await _detect_checkpoint_state(thread_id)
+    graph_messages = _build_graph_messages_graph(
+        objective=prepared_objective,
+        history_messages=history_messages,
+        checkpointer_available=_checkpointer_available,
+        checkpoint_has_state=_checkpoint_has_state,
+    )
+    inputs: dict[str, object] = {"messages": graph_messages}
     inputs = _merge_admin_inputs(inputs, admin_payload)
 
     final_resp = None
