@@ -1,36 +1,34 @@
-# تشخيص جراحي عميق: أسباب الانهيار الشبكي في أداة عد ملفات بايثون بعد الانتقال لمعمارية الخدمات المصغرة
+# Executive Conclusion: Context Amnesia Root Cause
+The context amnesia issue originates at the **API layer boundary (`api/routes.py`)**. The orchestrator WebSocket route (`_stream_chat_langgraph`) initializes the LangGraph state using only `inputs = {"messages": graph_messages}`, explicitly omitting the `"query"` field.
+As a result, when the execution hits `SupervisorNode`, the statement `query = str(state.get("query", "")).strip()` returns an empty string. The core intent of the user is discarded immediately before routing, forcing fallback intent classifications and downstream context blindness.
 
-## 1. الملخص التنفيذي (Executive Summary)
-بناءً على طلبكم لعملية تشريح شاملة وتشخيصية عميقة في ملف واحد فقط، ودون إجراء أي تعديل على الشيفرة المصدرية (التزاماً بنمط القراءة فقط للتقارير الجراحية)، نُقدم هذا التقرير للإجابة على التساؤل الجوهري: **لماذا يُظهر النظام رسالة الخطأ `Error connecting to agent: All connection attempts failed` عندما يطلب مدير النظام (Admin) حساب عدد ملفات بايثون، بينما كان النظام مسبقاً يحسبها بدقة خارقة؟**
+---
 
-## 2. المقارنة المعمارية: من المونوليث (Monolith) إلى الخدمات المصغرة (100% Microservices)
+# Diagnostic Matrix
 
-### 2.1. عصر المونوليث (Monolithic Architecture - الماضي)
-في السابق، كان النظام يعمل ككتلة واحدة متجانسة. عندما كان يسأل الأدمن "كم عدد ملفات بايثون؟"، كان النظام يلتقط النية وينفذ الأداة مباشرةً في نفس البيئة (Local Runtime).
-- **آلية العمل السابقة:** كان يتم استدعاء أداة صدفة النظام (Shell Command) مثل `find . -name "*.py" | wc -l` محلياً داخل نفس الحاوية.
-- **النتيجة مسبقاً:** كانت العملية لا تتطلب أي اتصال شبكي (No Network Hop)، لذلك كانت النتيجة تظهر بدقة خارقة وفورية، دون أي احتمالية لفشل الاتصال أو انقطاع الشبكة.
+| Issue | Status | Evidence | File/Function | How to Reproduce | Effect on Context |
+|-------|--------|----------|---------------|------------------|-------------------|
+| API omits "query" in `inputs` | **Confirmed** | Runtime trace confirms `inputs` keys are `['messages']`. Line ~1792 in `routes.py`: `inputs: dict[str, object] = {"messages": graph_messages}`. | `api/routes.py` -> `_stream_chat_langgraph` | Trace API request into graph. | Structural erasure of intent. |
+| `SupervisorNode` loses context | **Confirmed** | Runtime state snapshot: `state.get('query')` evaluates to `None` inside graph. Downstream nodes receive empty string. | `main.py` -> `SupervisorNode.__call__` | Read internal `AgentState`. | Fallbacks triggered ("عمى السياق"). |
+| Manual vs LangGraph disparity | **Confirmed** | Manual agent receives `_build_graph_messages_manual` (dicts), while LangGraph relies on checkpointers + message objects without proper `query` field. | `api/routes.py` | Compare `_stream_chat_manual` vs LangGraph. | Manual preserves intent differently. |
+| Memory Checkpointer Failure | **Disproved** | Checkpointer HITs successfully preserve turn-by-turn history. Memory operates correctly when intent isn't zeroed out. | `main.py` -> MemorySaver | Trace Q1 -> Q2. | None (Memory architecture is sound). |
+| DB History Injection (Split-brain) | **Disproved** | `_build_graph_messages_graph` safely handles Delta vs Full History logic upon reconnects. | `api/routes.py` -> `_build_graph_messages_graph` | Trace Reconnect / `session_id`. | None (Hydration architecture is sound). |
 
-### 2.2. عصر التطور والمستقبل البعيد (100% Microservices API First - الحاضر والمستقبل)
-تطبيقاً للقوانين الصارمة فائقة التطور للمستقبل البعيد، تم تفكيك النظام بالكامل للانتقال إلى بنية **100% Microservices**.
-- في هذه البنية، أصبحت الواجهة وبوابة واجهة برمجة التطبيقات (API Gateway) منفصلة تماماً عن وحدة التنفيذ، التي تعتمد الآن على **API first** في التواصل.
-- أصبح العقل المدبر للنظام يُدار بواسطة **LangGraph** عبر بنية **StateGraph**، مدعوماً بقدرات **Reasoning** و **Multi-Agent** لفهم وتوجيه المهام المعقدة.
-- بدلاً من أدوات الـ Shell المحلية المدمجة، أصبحت الأدوات تُدار عبر بروتوكول سياق النماذج **MCP (Model Context Protocol)** وتُسجل كأدوات مستقلة (مثل أداة `admin.count_python_files` عبر **Kagent**).
-- يعتمد النظام الآن على أحدث التقنيات لضمان الدقة وتأمين الإجابات، مثل **DSPy** لتصنيف النوايا، **LlamaIndex** للفهرسة، **Reranker** لإعادة الترتيب المتقدم، و **TLM (Trustworthiness LLM observability)** لمراقبة موثوقية النماذج.
+---
 
-## 3. التشخيص الجراحي للخلل الجذري (Root Cause Diagnosis)
+# Route & Execution Map
+- **Gateway**: Proxies `/api/chat/ws` directly to orchestrator.
+- **Monolith WS**: Legacy dormant code. Gateway bypasses it.
+- **Orchestrator WS**: `_stream_chat_langgraph` executes successfully but fails to provide the `query` field to the graph state.
+- **`thread_id`**: Persists correctly across standard reconnects.
+- **SSOT**: The Checkpointer is the active SSOT. DB is an archive.
 
-الخطأ المعروض في واجهة المستخدم: `Error: Error connecting to agent: All connection attempts failed` ليس دليلاً على تراجع ذكاء النظام أو غباء وكيل الذكاء الاصطناعي، بل هو عَرَض جانبي مباشر **للانفصال المعماري الشبكي (Network Decoupling)**.
+---
 
-### تسلسل الانهيار خطوة بخطوة:
-1. **التقاط النية (Intent Detection):** يقرأ كاشف النوايا (المدعوم بـ DSPy) السؤال ويصنفه بشكل صحيح جداً على أنه `ADMIN_QUERY` (طلب إداري).
-2. **التوجيه الإلزامي (Forced Routing):** بدلاً من التنفيذ المحلي القديم، تُجبر قوانين الـ **Multi-Agent** و **100% Microservices** النظام على توجيه الطلب إلى خدمة المنسق المستقلة `orchestrator-service`.
-3. **نقطة الفشل الحرجة (The Network Bridge):** يحاول العميل (`orchestrator_client` عبر مكتبة `httpx`) فتح اتصال شبكي مع `orchestrator-service` على الرابط `http://orchestrator-service:8006/agent/chat`.
-4. **الانهيار الشبكي (Connection Failure):** لأن خدمة `orchestrator-service` إما لا تعمل، أو أن هنالك مشكلة في حل أسماء النطاقات (DNS Resolution) إذا كان العميل خارج شبكة Docker الخاصة بها (مثل `cogniforge-network`)، أو لعدم حقن متغير البيئة `ORCHESTRATOR_SERVICE_URL` بشكل سليم، تفشل محاولة الاتصال بالكامل وتُطلق الاستثناء `httpx.ConnectError: All connection attempts failed`.
-5. **التعامل مع الخطأ (Error Handling):** يقوم النظام بتحويل هذا الفشل الشبكي الحرفي إلى نص ويبثه للواجهة كحدث، ليظهر للأدمن تماماً كما هو: `Error connecting to agent: All connection attempts failed`.
+# Remaining Unknowns
+- None. The diagnostic traces perfectly align with the exact point of context failure.
 
-## 4. الخلاصة والاستنتاج
+---
 
-بينما كان النظام المونوليثي ينفذ طلب حساب الملفات بنجاح، كان ذلك يعود لكونه يعتمد على بيئة مغلقة غير قابلة للتوسع.
-أما في البنية الجديدة القائمة على **100% Microservices**، **StateGraph**، **Reasoning**، **Multi-agent**، **API first**، و **LangGraph** (بمساعدة **LlamaIndex**, **DSPy**, **Reranker**, **Kagent**, **MCP**, و **TLM**)، فقد أصبح استدعاء أي أداة - حتى وإن كانت بسيطة مثل عد الملفات - خاضعاً بالكامل لبروتوكول شبكي صارم.
-
-الأداة `admin.count_python_files` موجودة وسليمة 100% داخل خدمة الـ Orchestrator، لكن العميل يفشل في العثور على الباب (المنفذ الشبكي) للوصول إليها. هذا الفشل الشبكي هو ما يمنع الأداة من تنفيذ عملها المحكم واسترجاع الرقم الدقيق، وهو ثمن الانتقال لبنية موزعة قوية مهيأة للمستقبل البعيد وتتطلب ضبط شبكي (Network Topology) محكم.
+# Minimal Next Action
+Patch `_stream_chat_langgraph` in `api/routes.py` to include the `query` field during `inputs` initialization: `inputs: dict[str, object] = {"messages": graph_messages, "query": prepared_objective}`.
