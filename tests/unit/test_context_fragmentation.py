@@ -12,26 +12,28 @@
 
 import pytest
 
+from app.api.routers.customer_chat import (
+    _merge_history_with_client_context as monolith_merge,
+)
+
 # ---------------------------------------------------------------------------
 # Imports under test — pure functions, no I/O, no DB
 # ---------------------------------------------------------------------------
 from microservices.orchestrator_service.src.api.context_utils import (
     _extract_client_context_messages,
+)
+from microservices.orchestrator_service.src.api.context_utils import (
     _merge_history_with_client_context as orchestrator_merge,
 )
 from microservices.orchestrator_service.src.api.routes import (
+    ChatRunContext,
     _build_conversation_thread_id,
     _build_graph_messages_graph,
     _build_graph_messages_manual,
     _conversation_id_from_scoped_thread,
     _resolve_thread_id,
     _safe_thread_id,
-    ChatRunContext,
 )
-from app.api.routers.customer_chat import (
-    _merge_history_with_client_context as monolith_merge,
-)
-
 
 # ===========================================================================
 # SECTION 1 — _merge_history_with_client_context: monolith vs orchestrator
@@ -468,7 +470,6 @@ class TestPathDivergenceProof:
         PROOF: مسار LangGraph بدون checkpointer → يحتاج التاريخ الكامل.
         هذا هو نفس سلوك manual — كلاهما يعتمد على history_messages المحقونة.
         """
-        from langchain_core.messages import HumanMessage
         history = [
             {"role": "user", "content": "تحدث عن فرنسا"},
             {"role": "assistant", "content": "فرنسا دولة أوروبية..."},
