@@ -237,6 +237,11 @@ def _build_graph_messages_graph(
     )
 
     if checkpointer_available and checkpoint_has_state:
+        # CONTEXT FIX: Checkpointer claims state, but what if it's truncated?
+        # If DB history is manually injected and checkpointer has < DB history, we must seed from DB history.
+        # But LangGraph checkpointer will auto-hydrate anyway. We just need to make sure we don't accidentally
+        # strip history if it's NOT a real checkpointer. Since we fixed app.state.app_graph, it is the real one.
+        # Therefore, delta is correct for the REAL checkpointer.
         local_logger.info(
             "[_build_graph_messages_graph] checkpointer active and has state -> passing ONLY latest user message."
         )
@@ -1458,8 +1463,8 @@ async def _stream_chat_langgraph(
 
         try:
             _graph = app_graph or getattr(websocket.app.state, "app_graph", None)
-            if not _graph:
-                _graph = websocket.app.state.app_graph
+            if _graph is None:
+                raise RuntimeError("LangGraph instance is required but was not found on app.state")
             incoming_messages = safe_history
             await _append_telemetry_line(
                 f"[TELEMETRY] INGRESS | "

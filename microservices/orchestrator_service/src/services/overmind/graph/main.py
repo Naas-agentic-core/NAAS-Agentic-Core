@@ -557,26 +557,30 @@ class SupervisorNode:
         print("NODE:", "SupervisorNode")
         print("QUERY:", query)
         messages = state.get("messages", [])
+
+        # Protect original query as SSOT backup BEFORE resolution
+        updates = {}
+        if "original_query" not in state:
+            updates["original_query"] = query
+
         formatted_history = format_conversation_history(messages)
         resolved_q = _resolve_query_from_history(query=query, messages=messages)
-        if resolved_q != query:
+
+        # Only adopt resolved query if it successfully extracted something meaningful
+        if resolved_q and resolved_q != query:
             print("RESOLVED QUERY:", resolved_q)
-        query = resolved_q
+            query = resolved_q
+            updates["query"] = query
 
         if emergency_intent_guard(query):
-            intent = "admin"
+            updates["intent"] = "admin"
             emit_telemetry(node_name="SupervisorNode", start_time=start_time, state=state)
-            updates = {"intent": intent, "query": query}
-            if "original_query" not in state:
-                updates["original_query"] = state.get("query", "")
             return updates
 
         query_normalized = query.strip().lower()
         if any(trigger in query_normalized for trigger in CHAT_INTENT_TRIGGERS):
+            updates["intent"] = "chat"
             emit_telemetry(node_name="SupervisorNode", start_time=start_time, state=state)
-            updates = {"intent": "chat", "query": query}
-            if "original_query" not in state:
-                updates["original_query"] = state.get("query", "")
             return updates
 
         for pattern in ADMIN_PATTERNS:
