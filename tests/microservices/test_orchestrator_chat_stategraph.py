@@ -70,10 +70,8 @@ def test_chat_http_messages_uses_stategraph(monkeypatch) -> None:
     def _fake_create_unified_graph():
         return FakeGraph()
 
-    import microservices.orchestrator_service.src.services.overmind.graph.main as graph_main
-    monkeypatch.setattr(graph_main, "create_unified_graph", _fake_create_unified_graph)
+    monkeypatch.setattr(routes, "create_unified_graph", _fake_create_unified_graph)
 
-    app.state.app_graph = FakeGraph()
     client = TestClient(app)
     token = jwt.encode({"sub": "1", "user_id": 1}, get_settings().SECRET_KEY, algorithm="HS256")
 
@@ -115,8 +113,7 @@ def test_chat_ws_customer_uses_stategraph(monkeypatch) -> None:
     def _fake_create_unified_graph():
         return FakeGraph()
 
-    import microservices.orchestrator_service.src.services.overmind.graph.main as graph_main
-    monkeypatch.setattr(graph_main, "create_unified_graph", _fake_create_unified_graph)
+    monkeypatch.setattr(routes, "create_unified_graph", _fake_create_unified_graph)
 
     async def fake_ensure_conversation(**kwargs):
         return 123, []
@@ -128,7 +125,6 @@ def test_chat_ws_customer_uses_stategraph(monkeypatch) -> None:
 
     monkeypatch.setattr(routes, "_persist_assistant_message", fake_persist_assistant_message)
 
-    app.state.app_graph = FakeGraph()
     token = jwt.encode({"sub": "1", "user_id": 1}, get_settings().SECRET_KEY, algorithm="HS256")
     with TestClient(app).websocket_connect(f"/api/chat/ws?token={token}") as ws:
         ws.send_json({"question": "hello"})
@@ -161,8 +157,7 @@ def test_chat_ws_admin_uses_stategraph(monkeypatch) -> None:
     def _fake_create_unified_graph():
         return FakeGraph()
 
-    import microservices.orchestrator_service.src.services.overmind.graph.main as graph_main
-    monkeypatch.setattr(graph_main, "create_unified_graph", _fake_create_unified_graph)
+    monkeypatch.setattr(routes, "create_unified_graph", _fake_create_unified_graph)
 
     async def fake_ensure_conversation(**kwargs):
         return 456, []
@@ -174,7 +169,6 @@ def test_chat_ws_admin_uses_stategraph(monkeypatch) -> None:
 
     monkeypatch.setattr(routes, "_persist_assistant_message", fake_persist_assistant_message)
 
-    app.state.app_graph = FakeGraph()
     token = jwt.encode(
         {"sub": "1", "user_id": 1, "role": "admin", "is_admin": True},
         get_settings().SECRET_KEY,
@@ -218,9 +212,7 @@ def test_chat_ws_admin_sanitizes_streaming_errors(monkeypatch) -> None:
         async def ainvoke(self, *args, **kwargs):
             raise RuntimeError("sensitive-internal-stack")
 
-    import microservices.orchestrator_service.src.services.overmind.graph.main as graph_main
-    monkeypatch.setattr(graph_main, "create_unified_graph", ExplodingGraph)
-    app.state.app_graph = ExplodingGraph()
+    monkeypatch.setattr(routes, "create_unified_graph", ExplodingGraph)
 
     async def fake_ensure_conversation(**kwargs):
         return 999, []
