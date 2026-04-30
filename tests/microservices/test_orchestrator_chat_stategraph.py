@@ -71,6 +71,7 @@ def test_chat_http_messages_uses_stategraph(monkeypatch) -> None:
         return FakeGraph()
 
     import microservices.orchestrator_service.src.services.overmind.graph.main as graph_main
+
     monkeypatch.setattr(graph_main, "create_unified_graph", _fake_create_unified_graph)
     app.state.app_graph = FakeGraph()
 
@@ -116,6 +117,7 @@ def test_chat_ws_customer_uses_stategraph(monkeypatch) -> None:
         return FakeGraph()
 
     import microservices.orchestrator_service.src.services.overmind.graph.main as graph_main
+
     monkeypatch.setattr(graph_main, "create_unified_graph", _fake_create_unified_graph)
     app.state.app_graph = FakeGraph()
 
@@ -162,6 +164,7 @@ def test_chat_ws_admin_uses_stategraph(monkeypatch) -> None:
         return FakeGraph()
 
     import microservices.orchestrator_service.src.services.overmind.graph.main as graph_main
+
     monkeypatch.setattr(graph_main, "create_unified_graph", _fake_create_unified_graph)
     app.state.app_graph = FakeGraph()
 
@@ -219,6 +222,7 @@ def test_chat_ws_admin_sanitizes_streaming_errors(monkeypatch) -> None:
             raise RuntimeError("sensitive-internal-stack")
 
     import microservices.orchestrator_service.src.services.overmind.graph.main as graph_main
+
     monkeypatch.setattr(graph_main, "create_unified_graph", ExplodingGraph)
     app.state.app_graph = ExplodingGraph()
 
