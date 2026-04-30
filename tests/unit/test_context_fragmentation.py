@@ -12,30 +12,33 @@
 
 import pytest
 
+from app.api.routers.customer_chat import (
+    _merge_history_with_client_context as monolith_merge,
+)
+
 # ---------------------------------------------------------------------------
 # Imports under test — pure functions, no I/O, no DB
 # ---------------------------------------------------------------------------
 from microservices.orchestrator_service.src.api.context_utils import (
     _extract_client_context_messages,
+)
+from microservices.orchestrator_service.src.api.context_utils import (
     _merge_history_with_client_context as orchestrator_merge,
 )
 from microservices.orchestrator_service.src.api.routes import (
+    ChatRunContext,
     _build_conversation_thread_id,
     _build_graph_messages_graph,
     _build_graph_messages_manual,
     _conversation_id_from_scoped_thread,
     _resolve_thread_id,
     _safe_thread_id,
-    ChatRunContext,
 )
-from app.api.routers.customer_chat import (
-    _merge_history_with_client_context as monolith_merge,
-)
-
 
 # ===========================================================================
 # SECTION 1 — _merge_history_with_client_context: monolith vs orchestrator
 # ===========================================================================
+
 
 class TestMergeHistoryMonolith:
     """يثبت سلوك دمج التاريخ في الـ monolith (customer_chat / admin)."""
@@ -182,12 +185,14 @@ class TestMergeHistoryDivergence:
 # SECTION 2 — _build_graph_messages_graph vs _build_graph_messages_manual
 # ===========================================================================
 
+
 class TestBuildGraphMessagesGraph:
     """يثبت سلوك بناء رسائل LangGraph graph."""
 
     def test_no_checkpointer_no_history_returns_only_user_message(self):
         """بدون checkpointer وبدون history → رسالة المستخدم فقط."""
         from langchain_core.messages import HumanMessage
+
         result = _build_graph_messages_graph(
             objective="ما عاصمة فرنسا؟",
             history_messages=None,
@@ -204,6 +209,7 @@ class TestBuildGraphMessagesGraph:
         هذا صحيح لأن checkpointer يحمل التاريخ الكامل.
         """
         from langchain_core.messages import HumanMessage
+
         history = [
             {"role": "user", "content": "Q1"},
             {"role": "assistant", "content": "A1"},
@@ -224,6 +230,7 @@ class TestBuildGraphMessagesGraph:
         هذا هو مسار استمرارية السياق عند غياب checkpointer.
         """
         from langchain_core.messages import AIMessage, HumanMessage
+
         history = [
             {"role": "user", "content": "Q1"},
             {"role": "assistant", "content": "A1"},
@@ -312,6 +319,7 @@ class TestBuildGraphMessagesManual:
 # SECTION 3 — thread_id stability
 # ===========================================================================
 
+
 class TestThreadIdResolution:
     """يثبت ثبات thread_id عبر الطلبات."""
 
@@ -375,6 +383,7 @@ class TestThreadIdResolution:
 # SECTION 4 — context_utils extract
 # ===========================================================================
 
+
 class TestExtractClientContextMessages:
     """يثبت سلوك استخراج client_context_messages."""
 
@@ -399,9 +408,7 @@ class TestExtractClientContextMessages:
 
     def test_truncates_to_50(self):
         payload = {
-            "client_context_messages": [
-                {"role": "user", "content": f"msg{i}"} for i in range(60)
-            ]
+            "client_context_messages": [{"role": "user", "content": f"msg{i}"} for i in range(60)]
         }
         result = _extract_client_context_messages(payload)
         assert len(result) == 50
@@ -410,6 +417,7 @@ class TestExtractClientContextMessages:
 # ===========================================================================
 # SECTION 5 — الفرق الجوهري بين المسارين (proof of divergence)
 # ===========================================================================
+
 
 class TestPathDivergenceProof:
     """
@@ -451,6 +459,7 @@ class TestPathDivergenceProof:
         السياق محفوظ في checkpointer ولا يحتاج إعادة إرسال.
         """
         from langchain_core.messages import HumanMessage
+
         result = _build_graph_messages_graph(
             objective="ما عاصمتها؟",
             history_messages=[
@@ -468,7 +477,6 @@ class TestPathDivergenceProof:
         PROOF: مسار LangGraph بدون checkpointer → يحتاج التاريخ الكامل.
         هذا هو نفس سلوك manual — كلاهما يعتمد على history_messages المحقونة.
         """
-        from langchain_core.messages import HumanMessage
         history = [
             {"role": "user", "content": "تحدث عن فرنسا"},
             {"role": "assistant", "content": "فرنسا دولة أوروبية..."},
@@ -526,4 +534,3 @@ class TestPathDivergenceProof:
         tid2 = _build_conversation_thread_id(42, 200)
         assert tid1 != tid2
         # كل محادثة لها checkpointer state مستقل — هذا صحيح وليس bug
-
