@@ -70,7 +70,9 @@ def test_chat_http_messages_uses_stategraph(monkeypatch) -> None:
     def _fake_create_unified_graph():
         return FakeGraph()
 
-    monkeypatch.setattr(routes, "create_unified_graph", _fake_create_unified_graph)
+    import microservices.orchestrator_service.src.services.overmind.graph.main as graph_main
+    monkeypatch.setattr(graph_main, "create_unified_graph", _fake_create_unified_graph)
+    app.state.app_graph = FakeGraph()
 
     client = TestClient(app)
     token = jwt.encode({"sub": "1", "user_id": 1}, get_settings().SECRET_KEY, algorithm="HS256")
@@ -113,7 +115,9 @@ def test_chat_ws_customer_uses_stategraph(monkeypatch) -> None:
     def _fake_create_unified_graph():
         return FakeGraph()
 
-    monkeypatch.setattr(routes, "create_unified_graph", _fake_create_unified_graph)
+    import microservices.orchestrator_service.src.services.overmind.graph.main as graph_main
+    monkeypatch.setattr(graph_main, "create_unified_graph", _fake_create_unified_graph)
+    app.state.app_graph = FakeGraph()
 
     async def fake_ensure_conversation(**kwargs):
         return 123, []
@@ -157,7 +161,9 @@ def test_chat_ws_admin_uses_stategraph(monkeypatch) -> None:
     def _fake_create_unified_graph():
         return FakeGraph()
 
-    monkeypatch.setattr(routes, "create_unified_graph", _fake_create_unified_graph)
+    import microservices.orchestrator_service.src.services.overmind.graph.main as graph_main
+    monkeypatch.setattr(graph_main, "create_unified_graph", _fake_create_unified_graph)
+    app.state.app_graph = FakeGraph()
 
     async def fake_ensure_conversation(**kwargs):
         return 456, []
@@ -212,7 +218,9 @@ def test_chat_ws_admin_sanitizes_streaming_errors(monkeypatch) -> None:
         async def ainvoke(self, *args, **kwargs):
             raise RuntimeError("sensitive-internal-stack")
 
-    monkeypatch.setattr(routes, "create_unified_graph", ExplodingGraph)
+    import microservices.orchestrator_service.src.services.overmind.graph.main as graph_main
+    monkeypatch.setattr(graph_main, "create_unified_graph", ExplodingGraph)
+    app.state.app_graph = ExplodingGraph()
 
     async def fake_ensure_conversation(**kwargs):
         return 999, []
