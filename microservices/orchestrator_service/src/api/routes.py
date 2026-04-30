@@ -1458,8 +1458,8 @@ async def _stream_chat_langgraph(
 
         try:
             _graph = app_graph or getattr(websocket.app.state, "app_graph", None)
-            if not _graph:
-                _graph = websocket.app.state.app_graph
+            if _graph is None:
+                raise RuntimeError("LangGraph instance is required but was not found on app.state")
             incoming_messages = safe_history
             await _append_telemetry_line(
                 f"[TELEMETRY] INGRESS | "
@@ -1761,9 +1761,13 @@ async def _run_chat_langgraph(
     app_graph: object = None,
     admin_payload: dict[str, object] | None = None,
     history_messages: list[dict[str, str]] | None = None,
+    request: Request | None = None,
 ) -> AsyncGenerator[str, None]:
     """يشغّل LangGraph كعمود فقري لرحلة chat ويعيد حمولة موحدة قابلة للبث (HTTP legacy fallback)."""
-    if not app_graph:
+    _graph = app_graph
+    if not _graph and request:
+        _graph = getattr(request.app.state, "app_graph", None)
+    if _graph is None:
         raise RuntimeError("LangGraph instance is required but was not found on app.state")
     requested_conversation_id = context.get("conversation_id") if context else None
     safe_conversation_id = _safe_conversation_id(requested_conversation_id)
@@ -2065,6 +2069,7 @@ async def chat_messages_endpoint(
             objective,
             context,
             app_graph=getattr(request.app.state, "app_graph", None),
+            request=request,
             history_messages=history_messages,
         )
         final_content = ""
