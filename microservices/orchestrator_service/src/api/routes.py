@@ -1506,7 +1506,7 @@ async def _stream_chat_langgraph(
                 checkpointer_available=_checkpointer_available,
                 checkpoint_has_state=_checkpoint_has_state,
             )
-            inputs: dict[str, object] = {"messages": graph_messages}
+            inputs: dict[str, object] = {"messages": graph_messages, "query": prepared_objective}
             inputs = _merge_admin_inputs(inputs, admin_payload if chat_scope == "admin" else None)
             state_dict = inputs
             payload_messages = state_dict.get("messages", [])
@@ -1794,7 +1794,7 @@ async def _run_chat_langgraph(
         checkpointer_available=_checkpointer_available,
         checkpoint_has_state=_checkpoint_has_state,
     )
-    inputs: dict[str, object] = {"messages": graph_messages}
+    inputs: dict[str, object] = {"messages": graph_messages, "query": prepared_objective}
     inputs = _merge_admin_inputs(inputs, admin_payload)
 
     final_resp = None
