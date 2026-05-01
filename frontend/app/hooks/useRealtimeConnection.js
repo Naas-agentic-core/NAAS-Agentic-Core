@@ -48,7 +48,9 @@ export function useRealtimeConnection(wsUrl, token, eventNamespace = "default") 
     try {
         const wsUrlObj = new URL(wsUrl);
         wsUrlObj.searchParams.append("token", token);
-        wsUrlObj.searchParams.append("session_id", connectionIdRef.current);
+        if (!wsUrlObj.searchParams.has("session_id")) {
+            wsUrlObj.searchParams.append("session_id", connectionIdRef.current);
+        }
         const ws = new WebSocket(wsUrlObj.toString(), ["jwt", token]);
         wsRef.current = ws;
 

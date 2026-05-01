@@ -49,8 +49,22 @@ const getWsBase = () => {
 const buildWebSocketUrlSafe = (baseUrl, endpoint, token) => {
     try {
         const wsUrl = new URL(endpoint, baseUrl);
-        // Token is passed in header/protocol by useRealtimeConnection.
-        // REMOVED query param appending to prevent "double method" drift.
+        // Use a persistent session ID for the browser session
+        let sessionId = '';
+        if (typeof sessionStorage !== 'undefined') {
+            sessionId = sessionStorage.getItem('agent_session_id');
+            if (!sessionId) {
+                sessionId = typeof crypto !== "undefined" && crypto.randomUUID
+                    ? crypto.randomUUID()
+                    : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+                sessionStorage.setItem('agent_session_id', sessionId);
+            }
+        } else {
+            // Fallback for SSR/non-browser
+            sessionId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+        }
+
+        wsUrl.searchParams.append("session_id", sessionId);
         return wsUrl.toString();
     } catch (error) {
         errorTracker.reportError(error, { message: 'Invalid WebSocket URL parts' });
@@ -319,10 +333,16 @@ export const useAgentSocket = (endpoint, token, onConversationUpdate) => {
         const clientRequestId = generateId();
         activeRequestIdRef.current = clientRequestId;
 
+        let sessionId = undefined;
+        if (typeof sessionStorage !== 'undefined') {
+            sessionId = sessionStorage.getItem('agent_session_id');
+        }
+
         const payload = {
             question: text,
             client_request_id: clientRequestId,
             client_context_messages: buildClientContextMessages(messages, text),
+            session_id: sessionId,
             ...metadata,
         };
         if (conversationId !== null && conversationId !== undefined) {
