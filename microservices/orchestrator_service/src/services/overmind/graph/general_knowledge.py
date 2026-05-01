@@ -4,8 +4,7 @@ from langchain_core.messages import AIMessage
 
 from microservices.orchestrator_service.src.core.ai_gateway import get_ai_client
 
-from .main import AgentState
-from .main import format_conversation_history
+from .main import AgentState, format_conversation_history
 
 logger = logging.getLogger("graph")
 
