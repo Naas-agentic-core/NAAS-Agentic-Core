@@ -1060,9 +1060,8 @@ def create_unified_graph(admin_app=None, checkpointer=None):
 
     from .admin import AdminAgentNode
     from .general_knowledge import GeneralKnowledgeNode
-    from .supervisor import SupervisorNode as ImportedSupervisorNode
 
-    graph.add_node("supervisor", ImportedSupervisorNode())
+    graph.add_node("supervisor", SupervisorNode())
     graph.add_node("query_rewriter", QueryRewriterNode())
     graph.add_node("query_analyzer", query_analyzer_node())
     graph.add_node("retriever", internal_retriever_node())
