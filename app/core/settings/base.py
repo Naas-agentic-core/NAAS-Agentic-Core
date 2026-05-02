@@ -16,6 +16,12 @@ import os
 from typing import Literal
 from urllib.parse import urlparse
 
+# Override DATABASE_URL with APP_DATABASE_URL at import time so pydantic-settings
+# picks up the Supabase URL instead of the Replit-managed local Postgres.
+_app_db = os.environ.get("APP_DATABASE_URL")
+if _app_db:
+    os.environ["DATABASE_URL"] = _app_db
+
 from pydantic import Field, ValidationInfo, computed_field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -55,8 +61,19 @@ class BaseServiceSettings(BaseSettings):
         "INFO", description="Logging level"
     )
 
-    # Database
+    # Database — APP_DATABASE_URL takes priority over the Replit-managed DATABASE_URL
+    APP_DATABASE_URL: str | None = Field(None, description="Override database connection URL")
     DATABASE_URL: str | None = Field(None, description="Database connection URL")
+
+    @model_validator(mode="before")
+    @classmethod
+    def prefer_app_database_url(cls, values: dict) -> dict:
+        """Use APP_DATABASE_URL when set, falling back to DATABASE_URL."""
+        import os
+        app_db = values.get("APP_DATABASE_URL") or os.environ.get("APP_DATABASE_URL")
+        if app_db:
+            values["DATABASE_URL"] = app_db
+        return values
 
     # Security
     SECRET_KEY: str = Field(
