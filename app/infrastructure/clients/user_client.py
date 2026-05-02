@@ -34,7 +34,7 @@ class UserServiceClient:
         self.base_url = resolved_url.rstrip("/")
         self.config = HTTPClientConfig(
             name="user-service-client",
-            timeout=10.0,  # Fail fast for auth
+            timeout=1.0,  # Fail fast for auth
             max_connections=50,
         )
         self.secret_key = settings.SECRET_KEY

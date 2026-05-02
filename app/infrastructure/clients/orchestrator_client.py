@@ -384,7 +384,7 @@ class OrchestratorClient:
                 response: httpx.Response | None = None
 
                 async for attempt in AsyncRetrying(
-                    stop=stop_after_attempt(2),
+                    stop=stop_after_attempt(1),
                     wait=wait_exponential(multiplier=1, min=1, max=4),
                     retry=retry_if_exception_type((httpx.ConnectError, httpx.TimeoutException)),
                     reraise=True,
