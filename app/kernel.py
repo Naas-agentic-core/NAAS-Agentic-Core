@@ -234,6 +234,14 @@ class RealityKernel:
         except Exception:
             logger.warning("⚠️ Failed to start Redis Event Bridge", exc_info=True)
 
+        # Pre-warm LangGraph local engine (catches import errors at startup)
+        try:
+            from app.services.chat.local_graph import get_local_graph
+            get_local_graph()
+            logger.info("✅ LangGraph local engine initialized")
+        except Exception:
+            logger.warning("⚠️ LangGraph local engine failed to initialize", exc_info=True)
+
         logger.info("✅ System Ready")
         try:
             yield
