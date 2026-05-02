@@ -1,9 +1,11 @@
 modules = ["python-3.12", "bash", "web", "nodejs-20"]
 [agent]
 expertMode = true
+stack = "BEST_EFFORT_FALLBACK"
 
 [nix]
 channel = "stable-25_05"
+packages = ["cacert", "cargo", "freetype", "glibcLocales", "lcms2", "libiconv", "libimagequant", "libjpeg", "libtiff", "libuv", "libwebp", "libxcrypt", "libyaml", "openjpeg", "openssl", "pkg-config", "postgresql", "rustc", "tcl", "tesseract", "tk", "zlib"]
 
 [workflows]
 runButton = "Project"
@@ -25,25 +27,25 @@ args = "Backend"
 name = "Frontend"
 author = "agent"
 
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "npm run dev"
-waitForPort = 5000
-
 [workflows.workflow.metadata]
 outputType = "webview"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "cd frontend && npm run dev"
+waitForPort = 5000
 
 [[workflows.workflow]]
 name = "Backend"
 author = "agent"
 
+[workflows.workflow.metadata]
+outputType = "console"
+
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
 waitForPort = 8000
-
-[workflows.workflow.metadata]
-outputType = "console"
 
 [[ports]]
 localPort = 5000
@@ -57,3 +59,11 @@ externalPort = 8000
 deploymentTarget = "static"
 build = ["npm", "run", "build"]
 publicDir = "app/static/dist"
+
+[userenv]
+
+[userenv.shared]
+FRONTEND_URL = "https://d858e77b-0a73-42e2-be9c-ea2b1dc70eed-00-2301u7h21bqlv.janeway.replit.dev"
+ENVIRONMENT = "development"
+BACKEND_CORS_ORIGINS = "[\"https://d858e77b-0a73-42e2-be9c-ea2b1dc70eed-00-2301u7h21bqlv.janeway.replit.dev\",\"http://localhost:5000\",\"http://localhost:3000\"]"
+ALLOWED_HOSTS = "[\"d858e77b-0a73-42e2-be9c-ea2b1dc70eed-00-2301u7h21bqlv.janeway.replit.dev\",\"localhost\",\"127.0.0.1\"]"

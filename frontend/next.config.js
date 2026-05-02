@@ -1,9 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
     async rewrites() {
-      // NOTE: These rewrites are only for HTTP traffic.
-      // Do NOT rely on Next.js rewrites for WebSockets (ws/wss) as they do not support Upgrade headers correctly.
-      // Use NEXT_PUBLIC_WS_URL to connect directly to the WebSocket backend or a dedicated Reverse Proxy (Nginx/Caddy).
       return [
         {
           source: '/api/:path*',
@@ -25,6 +22,7 @@ const nextConfig = {
         }
       ]
     },
+    allowedDevOrigins: ['*.replit.dev', '*.janeway.replit.dev', '*.replit.app'],
 };
 
 module.exports = nextConfig;
