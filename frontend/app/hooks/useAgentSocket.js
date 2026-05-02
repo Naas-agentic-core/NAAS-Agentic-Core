@@ -167,9 +167,13 @@ export const useAgentSocket = (endpoint, token, onConversationUpdate) => {
     const activeConversationIdRef = useRef(null);
     const activeRequestIdRef = useRef(null);
 
-    // Construct WebSocket URL
-    const wsBase = getWsBase();
-    const wsUrl = wsBase && endpoint ? buildWebSocketUrlSafe(wsBase, endpoint, token) : null;
+    // Construct WebSocket URL only on the client to avoid SSR/client mismatch
+    const [wsUrl, setWsUrl] = useState(null);
+    useEffect(() => {
+        const wsBase = getWsBase();
+        const url = wsBase && endpoint ? buildWebSocketUrlSafe(wsBase, endpoint, token) : null;
+        setWsUrl(url);
+    }, [endpoint, token]);
 
     // Use the robust connection hook
     const eventNamespace = endpoint || 'default';

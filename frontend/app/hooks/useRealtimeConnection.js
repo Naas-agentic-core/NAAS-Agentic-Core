@@ -33,11 +33,13 @@ export function useRealtimeConnection(wsUrl, token, eventNamespace = "default") 
   const mountedRef = useRef(true);
   const reconnectTimeoutRef = useRef(null);
   const pendingQueue = useRef([]);
-  const connectionIdRef = useRef(
-    typeof crypto !== "undefined" && crypto.randomUUID
-      ? crypto.randomUUID()
-      : `${Date.now()}-${Math.random().toString(36).slice(2)}`
-  );
+  const connectionIdRef = useRef(null);
+  if (connectionIdRef.current === null) {
+    connectionIdRef.current =
+      typeof crypto !== "undefined" && crypto.randomUUID
+        ? crypto.randomUUID()
+        : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  }
 
   const connect = useCallback(() => {
     if (!wsUrl || !token) return;
