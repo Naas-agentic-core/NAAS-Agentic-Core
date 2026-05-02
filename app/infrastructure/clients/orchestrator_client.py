@@ -142,25 +142,55 @@ class OrchestratorClient:
             logger.warning("local_retrieval_fallback_failed", exc_info=True)
             return None
 
-    async def _build_local_general_chat_response(self, question: str) -> str | None:
+    @staticmethod
+    def _format_history_for_prompt(history_messages: list[dict[str, str]]) -> str:
+        """يحوّل قائمة رسائل المحادثة إلى نص سياق منسّق للـ prompt."""
+        lines: list[str] = []
+        for msg in history_messages[-20:]:
+            role = str(msg.get("role", "")).strip()
+            content = str(msg.get("content", "")).replace("\x00", "").strip()
+            if not content or role not in {"user", "assistant"}:
+                continue
+            label = "المستخدم" if role == "user" else "المساعد"
+            lines.append(f"{label}: {content}")
+        return "\n".join(lines)
+
+    async def _build_local_general_chat_response(
+        self,
+        question: str,
+        history_messages: list[dict[str, str]] | None = None,
+    ) -> str | None:
         """
         يولد إجابة محلية عامة عبر بوابة الذكاء عند تعطل orchestrator.
 
         هذا المسار يُستخدم فقط كملاذ أخير بعد فشل مسارات fallback المتخصصة
         (عدّ الملفات والاسترجاع التعليمي)، بهدف إبقاء الدردشة الأساسية متاحة
         في بيئات التطوير مثل Codespaces.
+        يحتفظ الآن بسياق المحادثة الكامل لمنع ظاهرة عمى السياق (Context Blindness).
         """
         sanitized_question = question.replace("\x00", "").strip()
         if not sanitized_question:
             return None
 
         local_system_prompt = (
-            "أنت مساعد عربي احترافي داخل بيئة تطوير. "
-            "قدّم إجابة مباشرة ومفيدة باختصار ووضوح دون الإشارة إلى تفاصيل داخلية."
+            "أنت مساعد ذكي واسع المعرفة. "
+            "أجب بدقة مباشرة على سؤال المستخدم مع الاستناد إلى سياق المحادثة السابقة "
+            "عند وجود ضمائر أو إشارات مرجعية. لا تشر إلى تفاصيل داخلية."
         )
         ai_client = get_ai_client()
         try:
-            response_text = await ai_client.send_message(local_system_prompt, sanitized_question)
+            if history_messages:
+                history_text = self._format_history_for_prompt(history_messages)
+                if history_text:
+                    user_message = (
+                        f"سياق المحادثة السابقة:\n{history_text}\n\nالسؤال الحالي: {sanitized_question}"
+                    )
+                else:
+                    user_message = sanitized_question
+            else:
+                user_message = sanitized_question
+
+            response_text = await ai_client.send_message(local_system_prompt, user_message)
         except Exception:
             logger.warning("local_general_chat_fallback_failed", exc_info=True)
             return None
@@ -413,7 +443,8 @@ class OrchestratorClient:
             is_exercise_retrieval = self._exercise_retrieval_decision(question)
             if not is_file_intelligence and not is_exercise_retrieval:
                 local_general_chat_response = await self._build_local_general_chat_response(
-                    question
+                    question,
+                    history_messages=history_messages,
                 )
                 if local_general_chat_response:
                     yield local_general_chat_response
