@@ -18,8 +18,12 @@ from urllib.parse import urlparse
 
 # Override DATABASE_URL with APP_DATABASE_URL at import time so pydantic-settings
 # picks up the Supabase URL instead of the Replit-managed local Postgres.
+# Also rewrite port 6543 (PgBouncer transaction mode, no prepared statements)
+# to port 5432 (Supabase session mode, full prepared statement support).
 _app_db = os.environ.get("APP_DATABASE_URL")
 if _app_db:
+    if ":6543/" in _app_db:
+        _app_db = _app_db.replace(":6543/", ":5432/")
     os.environ["DATABASE_URL"] = _app_db
 
 from pydantic import Field, ValidationInfo, computed_field, field_validator, model_validator
