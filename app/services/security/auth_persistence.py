@@ -54,6 +54,7 @@ class AuthPersistence:
                 status
             )
             VALUES (:external_id, :full_name, :email, :password_hash, :is_admin, :is_active, :status)
+            RETURNING id
             """
         )
         result = await self.db.execute(
@@ -70,7 +71,7 @@ class AuthPersistence:
         )
         await self.db.commit()
 
-        created_id = int(result.lastrowid)
+        created_id = int(result.scalar())
         created_user = await self.get_user_by_id(created_id)
         if created_user is None:
             raise RuntimeError("تعذر تحميل المستخدم بعد إنشائه")
