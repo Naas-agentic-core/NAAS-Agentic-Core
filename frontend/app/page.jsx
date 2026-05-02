@@ -1,15 +1,9 @@
-"use client";
-
-import dynamic from "next/dynamic";
-
-const CogniForgeApp = dynamic(() => import("./components/CogniForgeApp"), {
-  ssr: false,
-});
+import ClientOnlyApp from "./ClientOnlyApp";
 
 export default function Home() {
   return (
     <main>
-      <CogniForgeApp />
+      <ClientOnlyApp />
     </main>
   );
 }
