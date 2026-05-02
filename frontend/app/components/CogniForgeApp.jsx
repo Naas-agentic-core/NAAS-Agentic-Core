@@ -118,7 +118,7 @@ const AuthScreen = ({ onLogin }) => {
     );
 };
 
-const DashboardLayout = ({ user, onLogout }) => {
+const DashboardLayout = ({ user, token, onLogout }) => {
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     const [isAgentSidebarOpen, setIsAgentSidebarOpen] = useState(false);
     const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -131,7 +131,6 @@ const DashboardLayout = ({ user, onLogout }) => {
     const historyEndpoint = user.is_admin ? (id) => `/admin/api/conversations/${id}` : (id) => `/api/chat/conversations/${id}`;
 
     const fetchConversations = useCallback(async () => {
-         const token = localStorage.getItem('token');
          try {
              const res = await fetch(apiUrl(`${convEndpoint}?limit=50`), {
                  headers: { 'Authorization': `Bearer ${token}` }
@@ -156,12 +155,11 @@ const DashboardLayout = ({ user, onLogout }) => {
         fetchConversations();
     }, [fetchConversations]);
 
-    const { messages, sendMessage, status, conversationId, setConversationId, clearMessages, setMessages } = useAgentSocket(endpoint, localStorage.getItem('token'), fetchConversations);
+    const { messages, sendMessage, status, conversationId, setConversationId, clearMessages, setMessages } = useAgentSocket(endpoint, token, fetchConversations);
 
     const loadConversation = async (id) => {
         setIsSidebarOpen(false);
         setConversationId(id);
-        const token = localStorage.getItem('token');
         try {
             const res = await fetch(apiUrl(historyEndpoint(id)), {
                 headers: { 'Authorization': `Bearer ${token}` }
@@ -373,7 +371,7 @@ const App = () => {
     if (isLoading) return <div className="loading-screen"><i className="fas fa-circle-notch fa-spin"></i><h2>جاري تهيئة النظام...</h2></div>;
     if (!token || !user) return <AuthScreen onLogin={handleLogin} />;
 
-    return <DashboardLayout user={user} onLogout={logout} />;
+    return <DashboardLayout user={user} token={token} onLogout={logout} />;
 };
 
 export default function CogniForgeApp() {
