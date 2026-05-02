@@ -68,7 +68,7 @@ const LoginForm = ({ onLogin, onToggle }) => {
     );
 };
 
-const RegisterForm = ({ onToggle }) => {
+const RegisterForm = ({ onToggle, onLogin }) => {
     const [name, setName] = useState('');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
@@ -85,12 +85,22 @@ const RegisterForm = ({ onToggle }) => {
                 body: JSON.stringify({ full_name: name, email, password })
             });
             if (res.ok) {
-                alert('Registration successful');
-                onToggle();
+                const loginRes = await fetch(apiUrl('/api/security/login'), {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, password })
+                });
+                if (loginRes.ok) {
+                    const data = await loginRes.json();
+                    onLogin(data.access_token, data.user);
+                } else {
+                    onToggle();
+                }
             } else {
-                setError((await res.json()).detail || 'Failed');
+                const body = await res.json();
+                setError(body.detail || body.message || 'فشل إنشاء الحساب');
             }
-        } catch (e) { setError('Error'); }
+        } catch (e) { setError('خطأ في الاتصال'); }
         finally { setLoading(false); }
     };
 
@@ -113,7 +123,7 @@ const AuthScreen = ({ onLogin }) => {
     const [isLogin, setIsLogin] = useState(true);
     return (
         <div className="login-container">
-            {isLogin ? <LoginForm onLogin={onLogin} onToggle={() => setIsLogin(false)} /> : <RegisterForm onToggle={() => setIsLogin(true)} />}
+            {isLogin ? <LoginForm onLogin={onLogin} onToggle={() => setIsLogin(false)} /> : <RegisterForm onToggle={() => setIsLogin(true)} onLogin={onLogin} />}
         </div>
     );
 };
