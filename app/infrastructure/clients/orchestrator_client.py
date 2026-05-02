@@ -155,6 +155,29 @@ class OrchestratorClient:
             lines.append(f"{label}: {content}")
         return "\n".join(lines)
 
+    async def _build_local_graph_response(
+        self,
+        question: str,
+        conversation_id: int | None,
+        history_messages: list[dict[str, str]] | None = None,
+    ) -> str | None:
+        """
+        يشغّل محرك LangGraph المحلي (local_graph.py) ويعيد الرد النهائي.
+        يستخدم MemorySaver مع thread_id=conversation_id لاستمرارية السياق.
+        يعود None عند أي فشل دون أن يُسقط الـ fallback chain.
+        """
+        try:
+            from app.services.chat.local_graph import run_local_graph
+
+            return await run_local_graph(
+                question=question,
+                conversation_id=conversation_id,
+                history_messages=history_messages,
+            )
+        except Exception:
+            logger.warning("local_graph_response_failed", exc_info=True)
+            return None
+
     async def _build_local_general_chat_response(
         self,
         question: str,
@@ -439,6 +462,17 @@ class OrchestratorClient:
                 yield local_retrieval_response
                 return
 
+            # ── LangGraph local engine (replaces raw general-chat fallback) ──
+            graph_response = await self._build_local_graph_response(
+                question=question,
+                conversation_id=conversation_id,
+                history_messages=history_messages,
+            )
+            if graph_response:
+                yield graph_response
+                return
+
+            # Ultimate safety net: raw LLM call (no graph, no state)
             is_file_intelligence = self._file_intelligence_decision(question)[0]
             is_exercise_retrieval = self._exercise_retrieval_decision(question)
             if not is_file_intelligence and not is_exercise_retrieval:
