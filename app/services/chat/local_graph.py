@@ -16,7 +16,6 @@ import logging
 import re
 from typing import TypedDict
 
-from langchain_core.messages import AIMessage, HumanMessage
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import END, StateGraph
 
@@ -51,10 +50,7 @@ _SYSTEM_PROMPTS = {
         "عند وجود ضمائر أو إشارات مرجعية. "
         "لا تُشر إلى تفاصيل داخلية أو بنية النظام."
     ),
-    "chat": (
-        "أنت مساعد ودود للطلاب الجزائريين. "
-        "رد بشكل طبيعي ومختصر باللغة العربية."
-    ),
+    "chat": ("أنت مساعد ودود للطلاب الجزائريين. رد بشكل طبيعي ومختصر باللغة العربية."),
 }
 
 
@@ -119,9 +115,7 @@ async def _chat_node(state: LocalChatState) -> dict:
 
     history_text = _format_history(history)
     if history_text:
-        user_message = (
-            f"سياق المحادثة السابقة:\n{history_text}\n\nالسؤال الحالي: {question}"
-        )
+        user_message = f"سياق المحادثة السابقة:\n{history_text}\n\nالسؤال الحالي: {question}"
     else:
         user_message = question
 
