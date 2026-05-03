@@ -14,7 +14,7 @@ from typing import TYPE_CHECKING
 
 import jwt
 
-os.environ.setdefault("ENVIRONMENT", "testing")
+os.environ["ENVIRONMENT"] = "testing"
 os.environ.setdefault("LLM_MOCK_MODE", "1")
 os.environ.setdefault("LOG_LEVEL", "DEBUG")
 os.environ.setdefault("PROJECT_NAME", "CogniForgeTest")

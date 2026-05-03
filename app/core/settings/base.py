@@ -283,6 +283,23 @@ class AppSettings(BaseServiceSettings):
         return self
 
     @model_validator(mode="after")
+    def ensure_test_hosts_in_testing(self) -> "AppSettings":
+        """يضمن وجود مضيفي الاختبار في ALLOWED_HOSTS عند تشغيل الاختبارات.
+
+        يُضاف ``testserver`` (المضيف الافتراضي لـ Starlette TestClient) و``test``
+        تلقائياً عند ``ENVIRONMENT=testing`` بصرف النظر عن قيمة متغير البيئة
+        ``ALLOWED_HOSTS``، مما يمنع ``TrustedHostMiddleware`` من رفض اتصالات
+        WebSocket أثناء تنفيذ مجموعة الاختبارات.
+        """
+        if self.ENVIRONMENT == "testing":
+            required = {"testserver", "test", "localhost", "127.0.0.1"}
+            current = set(self.ALLOWED_HOSTS)
+            missing = required - current
+            if missing:
+                self.ALLOWED_HOSTS = list(current | missing)
+        return self
+
+    @model_validator(mode="after")
     def validate_production_security(self) -> "AppSettings":
         """ضوابط صارمة لأمان بيئات الإنتاج."""
         if self.ENVIRONMENT in ("production", "staging"):
