@@ -1,0 +1,55 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(uvicorn:*)",
+      "Bash(pytest:*)",
+      "Bash(ruff:*)",
+      "Bash(isort:*)",
+      "Bash(npm run*)",
+      "Bash(python -m*)",
+      "Bash(python3 -m*)",
+      "Bash(python3 -c*)",
+      "Bash(curl:*)",
+      "Bash(ls:*)",
+      "Bash(cat:*)",
+      "Bash(grep:*)",
+      "Bash(find:*)",
+      "Bash(echo:*)",
+      "Bash(mkdir:*)",
+      "Bash(chmod:*)",
+      "Bash(bash scripts/*)",
+      "Read(**)",
+      "Write(app/**)",
+      "Write(frontend/**)",
+      "Write(tests/**)",
+      "Write(scripts/**)",
+      "Write(docs/**)",
+      "Write(.claude/**)",
+      "Write(CLAUDE.md)"
+    ],
+    "deny": [
+      "Bash(git commit*)",
+      "Bash(git push*)",
+      "Bash(git reset*)",
+      "Bash(git rebase*)",
+      "Bash(rm -rf*)",
+      "Bash(pip install*)",
+      "Bash(npm install*)",
+      "Bash(npm uninstall*)",
+      "Write(app/core/db_schema_config.py)",
+      "Write(app/core/settings/base.py)",
+      "Write(app/infrastructure/clients/orchestrator_client.py)",
+      "Write(app/services/security/auth_persistence.py)",
+      "Write(.env*)",
+      "Write(.replit)",
+      "Write(replit.nix)",
+      "Write(docker-compose.yml)",
+      "Write(Dockerfile)"
+    ]
+  },
+  "model": "claude-sonnet-4-5",
+  "env": {
+    "PYTHONPATH": "/home/runner/workspace",
+    "ENVIRONMENT": "development"
+  }
+}

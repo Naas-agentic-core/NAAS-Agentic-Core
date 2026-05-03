@@ -1,70 +1,60 @@
 {
-  "name": "CogniForge - Ultimate Edition",
+  "name": "CogniForge Dev Environment",
   "dockerComposeFile": ["docker-compose.host.yml"],
   "service": "web",
   "workspaceFolder": "/app",
-
-  // --- القوة المطلقة ---
-  // العمل بصلاحيات الروت داخل بيئة التطوير فقط
   "remoteUser": "root",
 
   "remoteEnv": {
     "HOME": "/root",
-    "PYTHONUNBUFFERED": "1"
+    "PYTHONUNBUFFERED": "1",
+    "PYTHONPATH": "/app",
+    "ENVIRONMENT": "development",
+    "APP_DATABASE_URL": "${localEnv:APP_DATABASE_URL}",
+    "DATABASE_URL": "${localEnv:DATABASE_URL}",
+    "OPENROUTER_API_KEY": "${localEnv:OPENROUTER_API_KEY}",
+    "OPENAI_API_KEY": "${localEnv:OPENAI_API_KEY}",
+    "SECRET_KEY": "${localEnv:SECRET_KEY}"
   },
 
-  // Ensure Dockerfile CMD/ENTRYPOINT is overridden to keep container alive
   "overrideCommand": true,
   "command": ["sleep", "infinity"],
 
-  // 1. Initialize: Local setup (Optional, usually implicit)
-  // "initializeCommand": "bash .devcontainer/local-setup.sh",
-
-  // 2. Post Create: Environment configuration (Fast Path < 5s)
-  "postCreateCommand": "bash .devcontainer/on-create.sh",
-
-  // 3. Post Start: Launch background supervisor (Non-blocking)
+  "postCreateCommand": "bash .devcontainer/setup.sh",
   "postStartCommand": "bash .devcontainer/on-start.sh",
-
-  // 4. Post Attach: Display status only (Informational, no execution)
   "postAttachCommand": "bash .devcontainer/on-attach.sh",
 
-  // STRICT PORT CONFIGURATION
-  // "forwardPorts" makes them available locally.
-  "forwardPorts": [8000, 3000],
-
-  // "appPort" is the property specific to VS Code Web / Codespaces
-  // to indicate which ports are actually served by the application.
-  "appPort": ["8000", "3000"],
+  "forwardPorts": [8000, 5000, 3000, 5432],
+  "appPort": ["8000", "5000"],
 
   "portsAttributes": {
-      "8000": {
-        "label": "CogniForge Application",
-        "onAutoForward": "notify",
-        "visibility": "public",
-        "protocol": "http",
-        "requireLocalPort": false
-      },
-      "3000": {
-        "label": "CogniForge Next Gateway",
-        "onAutoForward": "openBrowser",
-        "visibility": "public",
-        "protocol": "http",
-        "requireLocalPort": false
-      },
-      // Explicitly ignore common noise ports
-      "5000": { 
-        "onAutoForward": "ignore",
-        "label": "Unused Port"
-      },
-      "5432": { 
-        "onAutoForward": "ignore",
-        "label": "Database (Internal)"
-      }
+    "8000": {
+      "label": "Backend API (FastAPI)",
+      "onAutoForward": "notify",
+      "visibility": "public",
+      "protocol": "http"
+    },
+    "5000": {
+      "label": "Frontend (Next.js)",
+      "onAutoForward": "openBrowser",
+      "visibility": "public",
+      "protocol": "http"
+    },
+    "3000": {
+      "label": "Next.js Alt",
+      "onAutoForward": "silent"
+    },
+    "5432": {
+      "label": "PostgreSQL (Internal)",
+      "onAutoForward": "ignore"
+    }
   },
 
   "features": {
     "ghcr.io/devcontainers/features/github-cli:1": {},
+    "ghcr.io/devcontainers/features/node:1": {
+      "version": "20"
+    },
     "ghcr.io/devcontainers/features/common-utils:2": {
       "installZsh": true,
       "configureZshAsDefaultShell": true,
@@ -78,21 +68,37 @@
         "ms-python.python",
         "ms-python.vscode-pylance",
         "charliermarsh.ruff",
+        "ms-python.isort",
+        "dbaeumer.vscode-eslint",
+        "esbenp.prettier-vscode",
+        "bradlc.vscode-tailwindcss",
+        "dsznajder.es7-react-js-snippets",
         "usernamehw.errorlens",
         "eamodio.gitlens",
         "humao.rest-client",
-        "mechatroner.rainbow-csv"
+        "mechatroner.rainbow-csv",
+        "tamasfe.even-better-toml",
+        "redhat.vscode-yaml"
       ],
       "settings": {
         "terminal.integrated.defaultProfile.linux": "zsh",
         "python.defaultInterpreterPath": "/usr/local/bin/python",
         "editor.formatOnSave": true,
+        "editor.rulers": [100],
+        "editor.tabSize": 4,
+        "files.trimTrailingWhitespace": true,
         "[python]": {
           "editor.defaultFormatter": "charliermarsh.ruff",
           "editor.codeActionsOnSave": {
-             "source.fixAll": "explicit",
-             "source.organizeImports": "explicit"
+            "source.fixAll.ruff": "explicit",
+            "source.organizeImports.ruff": "explicit"
           }
+        },
+        "[javascript]": {
+          "editor.defaultFormatter": "esbenp.prettier-vscode"
+        },
+        "[javascriptreact]": {
+          "editor.defaultFormatter": "esbenp.prettier-vscode"
         }
       }
     }
