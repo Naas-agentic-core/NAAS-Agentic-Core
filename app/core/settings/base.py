@@ -74,6 +74,7 @@ class BaseServiceSettings(BaseSettings):
     def prefer_app_database_url(cls, values: dict) -> dict:
         """Use APP_DATABASE_URL when set, falling back to DATABASE_URL."""
         import os
+
         app_db = values.get("APP_DATABASE_URL") or os.environ.get("APP_DATABASE_URL")
         if app_db:
             values["DATABASE_URL"] = app_db

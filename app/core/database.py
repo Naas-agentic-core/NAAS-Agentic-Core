@@ -32,9 +32,7 @@ def _is_supabase_url(host: str | None, port: int | None) -> bool:
     """Return True for any Supabase connection."""
     if host and "supabase.com" in host:
         return True
-    if port == 6543:
-        return True
-    return False
+    return port == 6543
 
 
 def create_db_engine(settings: BaseServiceSettings) -> AsyncEngine:
@@ -65,7 +63,7 @@ def create_db_engine(settings: BaseServiceSettings) -> AsyncEngine:
 
     is_supabase = _is_supabase_url(url_obj.host, url_obj.port)
 
-    if is_supabase:
+    if is_supabase and url_obj.port == 6543:
         # Rewrite port 6543 (PgBouncer transaction mode) → 5432 (session mode).
         # Port 6543 uses PgBouncer which keeps prepared statement names in its
         # own cache across logical connections. This causes asyncpg to hit
@@ -73,9 +71,8 @@ def create_db_engine(settings: BaseServiceSettings) -> AsyncEngine:
         # because the collision happens at the PgBouncer protocol layer.
         # Port 5432 connects directly to the Postgres session pool on Supabase,
         # which correctly handles statement_cache_size=0.
-        if url_obj.port == 6543:
-            url_obj = url_obj.set(port=5432)
-            logger.info("Rewrote Supabase port 6543 → 5432 (session mode)")
+        url_obj = url_obj.set(port=5432)
+        logger.info("Rewrote Supabase port 6543 → 5432 (session mode)")
 
     url_obj = url_obj.set(query=qs)
     db_url = url_obj.render_as_string(hide_password=False)
@@ -94,7 +91,9 @@ def create_db_engine(settings: BaseServiceSettings) -> AsyncEngine:
         # pooler.supabase.com proxies still share state across connections.
         connect_args["statement_cache_size"] = 0
         connect_args["prepared_statement_cache_size"] = 0
-        logger.info(f"Supabase database (NullPool, no prepared statements, port {url_obj.port}): {settings.SERVICE_NAME}")
+        logger.info(
+            f"Supabase database (NullPool, no prepared statements, port {url_obj.port}): {settings.SERVICE_NAME}"
+        )
         return create_async_engine(
             db_url,
             echo=settings.DEBUG,
