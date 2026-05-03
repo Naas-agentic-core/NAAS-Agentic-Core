@@ -205,9 +205,7 @@ class OrchestratorClient:
             if history_messages:
                 history_text = self._format_history_for_prompt(history_messages)
                 if history_text:
-                    user_message = (
-                        f"سياق المحادثة السابقة:\n{history_text}\n\nالسؤال الحالي: {sanitized_question}"
-                    )
+                    user_message = f"سياق المحادثة السابقة:\n{history_text}\n\nالسؤال الحالي: {sanitized_question}"
                 else:
                     user_message = sanitized_question
             else:

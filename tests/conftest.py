@@ -300,6 +300,10 @@ def db_lifecycle(event_loop: asyncio.AbstractEventLoop, request: pytest.FixtureR
 
         engine = _get_engine()
 
+        # Force-close all pooled connections so drop_all is never blocked
+        # by a transaction left open by a previous TestClient thread.
+        await engine.dispose()
+
         # 1. Drop all tables to ensure clean slate (avoids FK issues)
         async with engine.begin() as connection:
             await connection.run_sync(SQLModel.metadata.drop_all)

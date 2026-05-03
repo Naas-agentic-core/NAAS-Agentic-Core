@@ -65,7 +65,7 @@ class UnifiedObservabilityService:
 
         # Microservice Sync
         self._sync_task: asyncio.Task | None = None
-        self._stop_event = asyncio.Event()
+        self._stop_event: asyncio.Event | None = None
 
         from app.services.boundaries.observability_client import ObservabilityServiceClient
 
@@ -73,15 +73,20 @@ class UnifiedObservabilityService:
 
     async def start_background_sync(self) -> None:
         """Start the background metrics synchronization task."""
-        if self._sync_task is None or self._sync_task.done():
-            self._stop_event.clear()
-            self._sync_task = asyncio.create_task(self._background_sync_loop())
-            logger.info("Unified Observability background sync started.")
+        if self._sync_task is not None and not self._sync_task.done():
+            self._sync_task.cancel()
+            with contextlib.suppress(asyncio.CancelledError, Exception):
+                await self._sync_task
+            self._sync_task = None
+        self._stop_event = asyncio.Event()
+        self._sync_task = asyncio.create_task(self._background_sync_loop())
+        logger.info("Unified Observability background sync started.")
 
     async def stop_background_sync(self) -> None:
         """Stop the background metrics synchronization task."""
         if self._sync_task:
-            self._stop_event.set()
+            if self._stop_event is not None:
+                self._stop_event.set()
             with contextlib.suppress(asyncio.CancelledError):
                 await self._sync_task
             self._sync_task = None
@@ -90,12 +95,15 @@ class UnifiedObservabilityService:
 
     async def _background_sync_loop(self) -> None:
         """Periodic loop to flush metrics to the microservice."""
-        while not self._stop_event.is_set():
+        while self._stop_event is None or not self._stop_event.is_set():
             try:
                 await self._flush_metrics_to_microservice()
             except Exception as e:
                 logger.error(f"Error in background sync loop: {e}")
 
+            if self._stop_event is None:
+                await asyncio.sleep(5.0)
+                continue
             # Sleep with check for stop event
             try:
                 await asyncio.wait_for(self._stop_event.wait(), timeout=5.0)
