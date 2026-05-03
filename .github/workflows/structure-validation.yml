@@ -2,9 +2,9 @@ name: 🔍 Structure Validation (Critical)
 
 on:
   pull_request:
-    branches: [main, develop]
+    branches: [main]
   push:
-    branches: [main, develop, 'copilot/**']
+    branches: [main]
     paths:
       - 'app/**'
       - 'tests/**'
