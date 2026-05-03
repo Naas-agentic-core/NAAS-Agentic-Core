@@ -67,3 +67,7 @@ FRONTEND_URL = "https://d858e77b-0a73-42e2-be9c-ea2b1dc70eed-00-2301u7h21bqlv.ja
 ENVIRONMENT = "development"
 BACKEND_CORS_ORIGINS = "[\"https://d858e77b-0a73-42e2-be9c-ea2b1dc70eed-00-2301u7h21bqlv.janeway.replit.dev\",\"http://localhost:5000\",\"http://localhost:3000\"]"
 ALLOWED_HOSTS = "[\"d858e77b-0a73-42e2-be9c-ea2b1dc70eed-00-2301u7h21bqlv.janeway.replit.dev\",\"localhost\",\"127.0.0.1\"]"
+
+[postMerge]
+path = "scripts/post-merge.sh"
+timeoutMs = 120000
