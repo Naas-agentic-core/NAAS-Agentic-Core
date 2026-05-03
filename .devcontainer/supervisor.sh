@@ -253,7 +253,7 @@ launch_frontend() {
         else
             lifecycle_info "Frontend Launcher: Starting Next.js dev server..."
             # Using exec to replace the subshell with the process
-            (cd frontend && exec npm run dev -- --hostname 0.0.0.0 --port "$FRONTEND_PORT") &
+            (cd frontend && exec npm run dev -- -p "$FRONTEND_PORT") &
             FRONTEND_PID=$!
             lifecycle_set_state "next_pid" "$FRONTEND_PID"
             lifecycle_info "Frontend Launcher: Next.js dev server started (PID: $FRONTEND_PID)"

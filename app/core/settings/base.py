@@ -260,6 +260,14 @@ class AppSettings(BaseServiceSettings):
         if not self.CODESPACES:
             return self
 
+        # Dynamically inject Codespaces domain if available
+        if self.CODESPACE_NAME and self.GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN:
+            preview_domain = f"{self.CODESPACE_NAME}-3000.{self.GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN}"
+            self.ALLOWED_HOSTS.append(preview_domain)
+            self.BACKEND_CORS_ORIGINS.append(f"https://{preview_domain}")
+            preview_domain_8000 = f"{self.CODESPACE_NAME}-8000.{self.GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN}"
+            self.ALLOWED_HOSTS.append(preview_domain_8000)
+
         env_to_attr = {
             "USER_SERVICE_URL": "USER_SERVICE_URL",
             "RESEARCH_AGENT_URL": "RESEARCH_AGENT_URL",
