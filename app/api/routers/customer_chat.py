@@ -334,6 +334,7 @@ async def chat_stream_ws(
 
             complete_ai_response = ""
             assistant_message_persisted = False
+            orchestrator_persisted = False
             pending_terminal_event: dict[str, object] | None = None
             stream_task: asyncio.Task[None] | None = None
             stream_error: HTTPException | Exception | None = None
@@ -349,6 +350,7 @@ async def chat_stream_ws(
                 ) -> None:
                     nonlocal pending_terminal_event
                     nonlocal complete_ai_response
+                    nonlocal orchestrator_persisted
                     async for event in orchestrator_client.chat_with_agent(
                         question=q,
                         user_id=actor.id,
@@ -377,6 +379,9 @@ async def chat_stream_ws(
 
                         event_type = normalized_event.get("type")
                         if event_type in {"complete", "assistant_final"}:
+                            # Detect orchestrator persistence signal
+                            if normalized_event.get("persisted") is True:
+                                orchestrator_persisted = True
                             pending_terminal_event = _bind_stream_metadata(
                                 normalized_event, lc_id, request_id
                             )
@@ -422,26 +427,34 @@ async def chat_stream_ws(
 
                 if (
                     not assistant_message_persisted
+                    and not orchestrator_persisted
                     and complete_ai_response
                     and local_conversation_id is not None
                 ):
-                    try:
-                        async with async_session_factory() as db:
-                            persistence_service = CustomerChatBoundaryService(db)
-                            await persistence_service.save_message(
-                                conversation_id=local_conversation_id,
-                                role=MessageRole.ASSISTANT,
-                                content=complete_ai_response.replace("\x00", ""),
+                    # Orchestrator did NOT persist — Monolith must handle it
+                    for _attempt in range(2):
+                        try:
+                            async with async_session_factory() as db:
+                                persistence_service = CustomerChatBoundaryService(db)
+                                await persistence_service.save_message(
+                                    conversation_id=local_conversation_id,
+                                    role=MessageRole.ASSISTANT,
+                                    content=complete_ai_response.replace("\x00", ""),
+                                )
+                                assistant_message_persisted = True
+                            break
+                        except Exception as persistence_exc:
+                            logger.error(
+                                (
+                                    "Failed to persist customer assistant message locally "
+                                    f"for conversation {local_conversation_id} "
+                                    f"(attempt {_attempt + 1}/2): {persistence_exc}"
+                                ),
+                                exc_info=True,
                             )
-                            assistant_message_persisted = True
-                    except Exception as persistence_exc:
-                        logger.error(
-                            (
-                                "Failed to persist customer assistant message locally "
-                                f"for conversation {local_conversation_id}: {persistence_exc}"
-                            ),
-                            exc_info=True,
-                        )
+                elif orchestrator_persisted:
+                    # Orchestrator confirmed persistence — skip local write
+                    assistant_message_persisted = True
                 if assistant_message_persisted:
                     if pending_terminal_event is not None:
                         await websocket.send_json(pending_terminal_event)

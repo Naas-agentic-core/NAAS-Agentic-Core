@@ -276,7 +276,11 @@ class OrchestratorClient:
             type=event_type_map.get(raw_type, ChatEventType.ASSISTANT_DELTA),
             payload=ChatEventPayload(**safe_payload),
         )
-        return envelope.model_dump(exclude_none=True)
+        result = envelope.model_dump(exclude_none=True)
+        # Preserve orchestrator persistence signal for conditional-write coordination
+        if isinstance(raw_event, dict) and "persisted" in raw_event:
+            result["persisted"] = bool(raw_event["persisted"])
+        return result
 
     @staticmethod
     def _sanitize_error_for_user(*, request_id: str) -> dict[str, object]:
@@ -452,12 +456,22 @@ class OrchestratorClient:
         if fallback_enabled:
             local_file_count_response = await self._build_local_file_count_response(question)
             if local_file_count_response:
-                yield local_file_count_response
+                yield self._normalize_stream_event(
+                    {"type": "assistant_delta", "payload": {"content": local_file_count_response}}
+                )
+                yield self._normalize_stream_event(
+                    {"type": "assistant_final", "payload": {"content": ""}}
+                )
                 return
 
             local_retrieval_response = await self._build_local_retrieval_response(question)
             if local_retrieval_response:
-                yield local_retrieval_response
+                yield self._normalize_stream_event(
+                    {"type": "assistant_delta", "payload": {"content": local_retrieval_response}}
+                )
+                yield self._normalize_stream_event(
+                    {"type": "assistant_final", "payload": {"content": ""}}
+                )
                 return
 
             # ── LangGraph local engine (replaces raw general-chat fallback) ──
@@ -467,7 +481,12 @@ class OrchestratorClient:
                 history_messages=history_messages,
             )
             if graph_response and not str(graph_response).startswith("⚠️ System Alert"):
-                yield graph_response
+                yield self._normalize_stream_event(
+                    {"type": "assistant_delta", "payload": {"content": graph_response}}
+                )
+                yield self._normalize_stream_event(
+                    {"type": "assistant_final", "payload": {"content": ""}}
+                )
                 return
 
             # Ultimate safety net: raw LLM call (no graph, no state)
@@ -479,17 +498,29 @@ class OrchestratorClient:
                     history_messages=history_messages,
                 )
                 if local_general_chat_response and not str(local_general_chat_response).startswith("⚠️ System Alert"):
-                    yield local_general_chat_response
+                    yield self._normalize_stream_event(
+                        {"type": "assistant_delta", "payload": {"content": local_general_chat_response}}
+                    )
+                    yield self._normalize_stream_event(
+                        {"type": "assistant_final", "payload": {"content": ""}}
+                    )
                     return
 
+        # All paths exhausted — yield a proper error event (NOT raw JSON)
         try:
-            yield json.dumps(
-                self._sanitize_error_for_user(request_id=request_id), ensure_ascii=False
+            yield self._normalize_stream_event(
+                self._sanitize_error_for_user(request_id=request_id)
+            )
+            yield self._normalize_stream_event(
+                {"type": "assistant_final", "payload": {"content": ""}}
             )
         except Exception as e:
             logger.error(f"Failed to chat with agent: {e}", exc_info=True)
-            yield json.dumps(
-                self._sanitize_error_for_user(request_id=request_id), ensure_ascii=False
+            yield self._normalize_stream_event(
+                self._sanitize_error_for_user(request_id=request_id)
+            )
+            yield self._normalize_stream_event(
+                {"type": "assistant_final", "payload": {"content": ""}}
             )
 
     @staticmethod
