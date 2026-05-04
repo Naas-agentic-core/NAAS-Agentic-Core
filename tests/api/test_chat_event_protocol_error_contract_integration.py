@@ -19,6 +19,7 @@ async def test_customer_ws_admin_actor_emits_assistant_error_when_flag_enabled(t
     mock_actor = SimpleNamespace(id=1, is_active=True, is_admin=True)
     mock_db = AsyncMock()
     mock_db.get.return_value = mock_actor
+    mock_db.expunge = lambda _actor: None
 
     test_app.dependency_overrides[get_customer_db] = lambda: mock_db
 
@@ -44,8 +45,17 @@ async def test_admin_ws_non_admin_actor_emits_assistant_error_when_flag_enabled(
     mock_actor = SimpleNamespace(id=1, is_active=True, is_admin=False)
     mock_db = AsyncMock()
     mock_db.get.return_value = mock_actor
+    mock_db.expunge = lambda _actor: None
 
-    test_app.dependency_overrides[get_admin_db] = lambda: mock_db
+    class _MockSessionContext:
+        def __init__(self, db: AsyncMock) -> None:
+            self._db = db
+
+        async def __aenter__(self) -> AsyncMock:
+            return self._db
+
+        async def __aexit__(self, exc_type, exc, tb) -> None:
+            return None
 
     with patch.dict("os.environ", {"CHAT_USE_UNIFIED_EVENT_ENVELOPE": "1"}, clear=False):
         with patch(
@@ -53,9 +63,13 @@ async def test_admin_ws_non_admin_actor_emits_assistant_error_when_flag_enabled(
             return_value=("valid_token", "json"),
         ):
             with patch("app.api.routers.admin.decode_user_id", return_value=1):
-                with TestClient(test_app) as client:
-                    with client.websocket_connect("/admin/api/chat/ws") as websocket:
-                        payload = websocket.receive_json()
+                with patch(
+                    "app.api.routers.admin.async_session_factory",
+                    return_value=_MockSessionContext(mock_db),
+                ):
+                    with TestClient(test_app) as client:
+                        with client.websocket_connect("/admin/api/chat/ws") as websocket:
+                            payload = websocket.receive_json()
 
     assert payload["type"] == "assistant_error"
     assert payload["contract_version"] == "v1"
@@ -69,8 +83,17 @@ async def test_admin_ws_empty_question_emits_assistant_error_when_flag_enabled(t
     mock_actor = SimpleNamespace(id=1, is_active=True, is_admin=True)
     mock_db = AsyncMock()
     mock_db.get.return_value = mock_actor
+    mock_db.expunge = lambda _actor: None
 
-    test_app.dependency_overrides[get_admin_db] = lambda: mock_db
+    class _MockSessionContext:
+        def __init__(self, db: AsyncMock) -> None:
+            self._db = db
+
+        async def __aenter__(self) -> AsyncMock:
+            return self._db
+
+        async def __aexit__(self, exc_type, exc, tb) -> None:
+            return None
 
     with patch.dict("os.environ", {"CHAT_USE_UNIFIED_EVENT_ENVELOPE": "1"}, clear=False):
         with patch(
@@ -106,7 +129,7 @@ async def test_customer_ws_dispatch_http_exception_emits_assistant_error_when_fl
         ):
             with patch("app.api.routers.customer_chat.decode_user_id", return_value=1):
                 with patch(
-                    "app.infrastructure.clients.orchestrator_client.OrchestratorClient.chat_with_agent",
+                    "app.api.routers.customer_chat.orchestrator_client.chat_with_agent",
                     side_effect=HTTPException(status_code=422, detail="dispatch failed"),
                 ):
                     with TestClient(test_app) as client:
@@ -128,6 +151,17 @@ async def test_admin_ws_dispatch_http_exception_emits_assistant_error_when_flag_
     mock_actor = SimpleNamespace(id=1, is_active=True, is_admin=True)
     mock_db = AsyncMock()
     mock_db.get.return_value = mock_actor
+    mock_db.expunge = lambda _actor: None
+
+    class _MockSessionContext:
+        def __init__(self, db: AsyncMock) -> None:
+            self._db = db
+
+        async def __aenter__(self) -> AsyncMock:
+            return self._db
+
+        async def __aexit__(self, exc_type, exc, tb) -> None:
+            return None
 
     test_app.dependency_overrides[get_admin_db] = lambda: mock_db
 
@@ -138,13 +172,17 @@ async def test_admin_ws_dispatch_http_exception_emits_assistant_error_when_flag_
         ):
             with patch("app.api.routers.admin.decode_user_id", return_value=1):
                 with patch(
-                    "app.infrastructure.clients.orchestrator_client.OrchestratorClient.chat_with_agent",
-                    side_effect=HTTPException(status_code=409, detail="admin dispatch failed"),
+                    "app.api.routers.admin.async_session_factory",
+                    return_value=_MockSessionContext(mock_db),
                 ):
-                    with TestClient(test_app) as client:
-                        with client.websocket_connect("/admin/api/chat/ws") as websocket:
-                            websocket.send_json({"question": "hello"})
-                            payload = websocket.receive_json()
+                    with patch(
+                        "app.api.routers.admin.orchestrator_client.chat_with_agent",
+                        side_effect=HTTPException(status_code=409, detail="admin dispatch failed"),
+                    ):
+                        with TestClient(test_app) as client:
+                            with client.websocket_connect("/admin/api/chat/ws") as websocket:
+                                websocket.send_json({"question": "hello"})
+                                payload = websocket.receive_json()
 
     assert payload["type"] == "assistant_error"
     assert payload["contract_version"] == "v1"
