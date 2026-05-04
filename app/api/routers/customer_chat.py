@@ -269,6 +269,10 @@ async def chat_stream_ws(
                         original_conversation_id,
                     )
                     local_conversation_id = local_conversation.id
+                    logger.info(
+                        "[WRITE_DECISION] conversation_id=%s role=user action=WRITE",
+                        local_conversation_id,
+                    )
                     await persistence_service.save_message(
                         local_conversation_id,
                         MessageRole.USER,
@@ -427,34 +431,53 @@ async def chat_stream_ws(
 
                 if (
                     not assistant_message_persisted
-                    and not orchestrator_persisted
                     and complete_ai_response
                     and local_conversation_id is not None
                 ):
-                    # Orchestrator did NOT persist — Monolith must handle it
-                    for _attempt in range(2):
-                        try:
-                            async with async_session_factory() as db:
-                                persistence_service = CustomerChatBoundaryService(db)
-                                await persistence_service.save_message(
-                                    conversation_id=local_conversation_id,
-                                    role=MessageRole.ASSISTANT,
-                                    content=complete_ai_response.replace("\x00", ""),
+                    if orchestrator_persisted:
+                        # Orchestrator confirmed persistence — skip local write
+                        logger.info(
+                            "[WRITE_DECISION] conversation_id=%s role=assistant "
+                            "orchestrator_persisted=True action=SKIP",
+                            local_conversation_id,
+                        )
+                        assistant_message_persisted = True
+                    else:
+                        # Orchestrator did NOT persist — Monolith must handle it (Fail-Safe)
+                        logger.warning(
+                            "[WRITE_DECISION] conversation_id=%s role=assistant "
+                            "orchestrator_persisted=False action=WRITE (Fail-Safe) "
+                            "- Absence of signal treated as failure.",
+                            local_conversation_id,
+                        )
+                        for _attempt in range(2):
+                            try:
+                                async with async_session_factory() as db:
+                                    persistence_service = CustomerChatBoundaryService(db)
+                                    await persistence_service.save_message(
+                                        conversation_id=local_conversation_id,
+                                        role=MessageRole.ASSISTANT,
+                                        content=complete_ai_response.replace("\x00", ""),
+                                    )
+                                    assistant_message_persisted = True
+                                    logger.info("[DATA_LOSS_PREVENTED] Fallback persistence succeeded.")
+                                break
+                            except Exception as persistence_exc:
+                                logger.error(
+                                    (
+                                        "Failed to persist customer assistant message locally "
+                                        f"for conversation {local_conversation_id} "
+                                        f"(attempt {_attempt + 1}/2): {persistence_exc}"
+                                    ),
+                                    exc_info=True,
                                 )
-                                assistant_message_persisted = True
-                            break
-                        except Exception as persistence_exc:
+                        
+                        if not assistant_message_persisted:
                             logger.error(
-                                (
-                                    "Failed to persist customer assistant message locally "
-                                    f"for conversation {local_conversation_id} "
-                                    f"(attempt {_attempt + 1}/2): {persistence_exc}"
-                                ),
-                                exc_info=True,
+                                "[CRITICAL_DATA_LOSS] Fallback persistence completely failed for "
+                                f"conversation {local_conversation_id}."
                             )
-                elif orchestrator_persisted:
-                    # Orchestrator confirmed persistence — skip local write
-                    assistant_message_persisted = True
+
                 if assistant_message_persisted:
                     if pending_terminal_event is not None:
                         await websocket.send_json(pending_terminal_event)
