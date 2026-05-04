@@ -466,7 +466,7 @@ class OrchestratorClient:
                 conversation_id=conversation_id,
                 history_messages=history_messages,
             )
-            if graph_response:
+            if graph_response and not str(graph_response).startswith("⚠️ System Alert"):
                 yield graph_response
                 return
 
@@ -478,7 +478,7 @@ class OrchestratorClient:
                     question,
                     history_messages=history_messages,
                 )
-                if local_general_chat_response:
+                if local_general_chat_response and not str(local_general_chat_response).startswith("⚠️ System Alert"):
                     yield local_general_chat_response
                     return
 

@@ -86,11 +86,11 @@ def create_db_engine(settings: BaseServiceSettings) -> AsyncEngine:
         connect_args["ssl"] = ctx
         logger.info(f"SSL enabled (mode: {ssl_mode})")
 
+    # Disable prepared statement caches for asyncpg to avoid pooler incompatibilities.
+    connect_args["statement_cache_size"] = 0
+    connect_args["prepared_statement_cache_size"] = 0
+
     if is_supabase:
-        # Disable prepared statement cache — required even on port 5432 because
-        # pooler.supabase.com proxies still share state across connections.
-        connect_args["statement_cache_size"] = 0
-        connect_args["prepared_statement_cache_size"] = 0
         logger.info(
             f"Supabase database (NullPool, no prepared statements, port {url_obj.port}): {settings.SERVICE_NAME}"
         )
