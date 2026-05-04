@@ -1140,6 +1140,7 @@ async def _ensure_conversation(
     user_id: int,
     question: str,
     requested_conversation_id: int | None,
+    skip_user_message: bool = False,
 ) -> tuple[int, list[dict[str, str]]]:
     """ينشئ أو يتحقق من المحادثة ويحفظ رسالة المستخدم لضمان اتساق التاريخ."""
     is_admin_scope = chat_scope == "admin"
@@ -1310,18 +1311,20 @@ async def _ensure_conversation(
     else:
         conversation_id = await _create_new_conversation(user_id, question, is_admin_scope, session)
 
-    try:
-        async with asyncio.timeout(5.0):
-            await session.execute(
-                insert_message_query,
-                {
-                    "conversation_id": int(conversation_id),
-                    "role": "user",
-                    "content": question.replace("\x00", ""),
-                },
-            )
-    except TimeoutError as e:
-        raise HTTPException(status_code=504, detail="Database timeout inserting message") from e
+    # Skip user message INSERT when Monolith compatibility facade already persisted it
+    if not skip_user_message:
+        try:
+            async with asyncio.timeout(5.0):
+                await session.execute(
+                    insert_message_query,
+                    {
+                        "conversation_id": int(conversation_id),
+                        "role": "user",
+                        "content": question.replace("\x00", ""),
+                    },
+                )
+        except TimeoutError as e:
+            raise HTTPException(status_code=504, detail="Database timeout inserting message") from e
     await session.commit()
 
     if conv_metadata_to_import is not None and conversation_id is not None:
@@ -2451,6 +2454,8 @@ async def chat_with_agent_endpoint(
 
     # Validate admin explicitly from JWT payload
     is_admin = _is_admin_payload(auth_payload)
+    # Detect if request comes from Monolith compatibility facade
+    is_compatibility_facade = bool(context.get("compatibility_facade"))
 
     if is_admin:
 
@@ -2559,6 +2564,7 @@ async def chat_with_agent_endpoint(
                             user_id=request.user_id,
                             question=full_user_message,
                             requested_conversation_id=request.conversation_id,
+                            skip_user_message=is_compatibility_facade,
                         )
                         await _persist_assistant_message(
                             session=db_session,
@@ -2569,6 +2575,10 @@ async def chat_with_agent_endpoint(
                     yield await _serialize_stream_frame(
                         {"type": "assistant_delta", "payload": {"content": "\n\n✅ [DB SAVED]"}}
                     )
+                    # Signal Monolith that Orchestrator already persisted both messages
+                    yield await _serialize_stream_frame(
+                        {"type": "assistant_final", "payload": {"content": response_text}, "persisted": True}
+                    )
                 except Exception as e:
                     error_msg = str(e)
                     yield await _serialize_stream_frame(
@@ -2577,10 +2587,10 @@ async def chat_with_agent_endpoint(
                             "payload": {"content": f"\n\n🚨 **SYSTEM DB ERROR:** {error_msg}"},
                         }
                     )
-
-                yield await _serialize_stream_frame(
-                    {"type": "assistant_final", "payload": {"content": response_text}}
-                )
+                    # DB write failed — Monolith must handle persistence
+                    yield await _serialize_stream_frame(
+                        {"type": "assistant_final", "payload": {"content": response_text}, "persisted": False}
+                    )
             except Exception:
                 request_id = str(uuid.uuid4())
                 logger.error(
@@ -2650,6 +2660,7 @@ async def chat_with_agent_endpoint(
             full_user_message = request.question
             full_ai_response = "".join(ai_chunks)
             if full_ai_response:
+                orchestrator_persisted = False
                 try:
                     async with async_session_factory() as db_session:
                         conv_id, _ = await _ensure_conversation(
@@ -2658,6 +2669,7 @@ async def chat_with_agent_endpoint(
                             user_id=request.user_id,
                             question=full_user_message,
                             requested_conversation_id=request.conversation_id,
+                            skip_user_message=is_compatibility_facade,
                         )
                         await _persist_assistant_message(
                             session=db_session,
@@ -2665,6 +2677,7 @@ async def chat_with_agent_endpoint(
                             conversation_id=conv_id,
                             content=full_ai_response,
                         )
+                    orchestrator_persisted = True
                     yield await _serialize_stream_frame(
                         {"type": "assistant_delta", "payload": {"content": "\n\n✅ [DB SAVED]"}}
                     )
@@ -2676,7 +2689,15 @@ async def chat_with_agent_endpoint(
                             "payload": {"content": f"\n\n🚨 **SYSTEM DB ERROR:** {error_msg}"},
                         }
                     )
-            if final_chunk:
+                # Signal Monolith whether Orchestrator handled persistence
+                final_frame = {
+                    "type": "assistant_final",
+                    "payload": {"content": full_ai_response},
+                    "persisted": orchestrator_persisted,
+                }
+                yield await _serialize_stream_frame(final_frame)
+            elif final_chunk:
+                # No AI response to persist — forward original final_chunk without persistence flag
                 yield await _serialize_stream_frame(final_chunk)
 
         except Exception:
