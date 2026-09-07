@@ -15,7 +15,7 @@
     "axios": "^1.18.0",
     "http-proxy": "^1.18.1",
     "katex": "^0.18.4",
-    "next": "16.3.1",
+    "next": "16.3.3",
     "react": "19.2.8",
     "react-dom": "19.2.8",
     "react-markdown": "^10.1.0",
@@ -24,7 +24,7 @@
     "ws": "^8.18.0"
   },
   "devDependencies": {
-    "eslint": "^10.8.1",
-    "eslint-config-next": "^16.3.1"
+    "eslint": "^10.9.1",
+    "eslint-config-next": "^16.3.3"
   }
 }
