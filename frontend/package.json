@@ -12,7 +12,7 @@
     "typecheck": "npx -y -p typescript@5.6.3 tsc -p tsconfig.check.json"
   },
   "dependencies": {
-    "axios": "^1.18.0",
+    "axios": "^1.20.0",
     "http-proxy": "^1.18.1",
     "katex": "^0.18.4",
     "next": "16.3.1",
