@@ -46,7 +46,7 @@ async def test_local_retrieval_stream_preserves_behavior_on_telemetry_failure(mo
         async def _stream_markdown_typing(self, content):
             yield content
 
-    client = FakeClient()
+    FakeClient()
 
     with caplog.at_level(logging.WARNING):
         from app.infrastructure.clients.orchestrator.local_fallback import _mark_fallback
