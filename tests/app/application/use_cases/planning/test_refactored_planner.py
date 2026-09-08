@@ -39,7 +39,7 @@ class TestRefactoredPlanner:
             validator=MockValidator(),
             optimizer=planner.config.optimizer,
             context_analyzer=planner.config.context_analyzer,
-            task_generator=planner.config.task_generator
+            task_generator=planner.config.task_generator,
         )
 
         with pytest.raises(ValueError, match=r"Invalid plan:.*Mock validation error"):
