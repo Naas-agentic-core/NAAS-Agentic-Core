@@ -8,8 +8,6 @@ from pydantic import BaseModel
 
 from microservices.memory_agent.src.domain.concept_graph import Concept
 from microservices.memory_agent.src.schemas.knowledge_schemas import (
-    BatchRelationsRequest,
-    BatchRelationsResponse,
     ReadinessRequest,
     ReadinessResponse,
 )
@@ -86,15 +84,6 @@ async def get_learning_path(
 ):
     """يجد مسار تعلم."""
     return await service.get_learning_path(payload.from_concept, payload.to_concept)
-
-
-@router.post("/concepts/batch/relations", response_model=BatchRelationsResponse)
-async def get_batch_relations(
-    payload: BatchRelationsRequest,
-    service: KnowledgeService = Depends(get_service),
-):
-    """يستخرج العلاقات لمجموعة من المفاهيم دفعة واحدة."""
-    return await service.get_batch_relations(payload)
 
 
 @router.post("/readiness", response_model=ReadinessResponse)
