@@ -10,7 +10,7 @@ langgraph
 dspy-ai==2.5.43
 llama-index-core==0.14.13
 llama-index-embeddings-openai
-dspy==2.5.7
+dspy==3.0.4b1
 # ⛔ COUPLED TO `openai` IN THIS SAME FILE — never raise litellm alone.
 # litellm >= 1.8x requires openai>=2.20.0, but this service pins openai==1.59.3,
 # so pip cannot resolve and the Docker image dies at `pip install` (proven in CI
