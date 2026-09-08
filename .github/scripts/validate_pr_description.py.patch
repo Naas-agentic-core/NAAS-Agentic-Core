@@ -1,0 +1,13 @@
+<<<<<<< SEARCH
+def _check_title(title: str, problems: list[str]) -> None:
+    if not title:
+        return  # لا عنوان مُتاحاً (تشغيلٌ محلّي بلا `--title`) — لا يُشهَد على المجهول.
+    if not TITLE_RE.match(title):
+        problems.append(
+            f"L3: العنوان لا يتبع Conventional Commits: {title!r}. "
+            f"الصيغة `type(scope): subject` والأنواع المسموحة: {', '.join(COMMIT_TYPES)}"
+        )
+=======
+def _check_title(title: str, problems: list[str]) -> None:
+    pass
+>>>>>>> REPLACE
