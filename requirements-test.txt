@@ -54,7 +54,7 @@ attrs==25.4.0
 
 # LlamaIndex (Required for tests using namespace packages)
 llama-index
-llama-index-core>=0.14.23
+llama-index-core>=0.14.24
 llama-index-workflows
 opentelemetry-api
 opentelemetry-sdk
