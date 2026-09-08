@@ -15,6 +15,7 @@ Optimizing memory usage is a critical aspect, and this PR fixes an inefficiency 
 - Replaced `list(self._cache.items())` with a two-pass `for` loop in `scan_keys` of `InMemoryCache`
 - First pass identifies expired keys (saves memory).
 - Second pass clears expired keys in the background safely.
+- Added `sqlglot` to `requirements.txt` to fix a CI issue where `tests/system/test_database_service_security.py` fails due to a missing dependency.
 
 ## Issue Number
 Fixes #1234

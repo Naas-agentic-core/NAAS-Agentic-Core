@@ -20,7 +20,7 @@ except ImportError:
 logger = logging.getLogger("api_gateway")
 
 
-async def websocket_proxy(client_ws: WebSocket, target_url: str):
+async def websocket_proxy(client_ws: WebSocket, target_url: str):  # noqa: PLR0912
     """
     Proxies a WebSocket connection from the client to the target URL.
     Handles bi-directional communication and connection lifecycle.
