@@ -241,18 +241,16 @@ for tool_name in ADMIN_TOOL_CONTRACT:
                 payload = {}
             tool_fn = get_registry().get(name)
             if not tool_fn:
-                raise HTTPException(
-                    status_code=404, detail="Tool not found in registry"
-                )
+                raise HTTPException(status_code=404, detail="Tool not found in registry")
 
             try:
                 import asyncio
 
                 if hasattr(tool_fn, "ainvoke"):
                     result = await tool_fn.ainvoke(payload)
-                elif asyncio.iscoroutinefunction(
-                    tool_fn
-                ) or asyncio.iscoroutinefunction(getattr(tool_fn, "invoke", None)):
+                elif asyncio.iscoroutinefunction(tool_fn) or asyncio.iscoroutinefunction(
+                    getattr(tool_fn, "invoke", None)
+                ):
                     result = await tool_fn(**payload)
                 elif hasattr(tool_fn, "invoke"):
                     result = tool_fn.invoke(payload)
@@ -283,9 +281,7 @@ for tool_name in ADMIN_TOOL_CONTRACT:
                 "parameters": {},
             }
 
-        get_admin_tool_schema.__name__ = (
-            f"get_admin_tool_schema_{name.replace('.', '_')}"
-        )
+        get_admin_tool_schema.__name__ = f"get_admin_tool_schema_{name.replace('.', '_')}"
         return get_admin_tool_schema
 
     def _make_health(name: str):
@@ -293,9 +289,7 @@ for tool_name in ADMIN_TOOL_CONTRACT:
             tool_fn = get_registry().get(name)
             return {"name": name, "status": "healthy" if tool_fn else "unavailable"}
 
-        get_admin_tool_health.__name__ = (
-            f"get_admin_tool_health_{name.replace('.', '_')}"
-        )
+        get_admin_tool_health.__name__ = f"get_admin_tool_health_{name.replace('.', '_')}"
         return get_admin_tool_health
 
     router.post(
@@ -352,27 +346,19 @@ async def list_customer_conversations(
         ORDER BY created_at DESC, id DESC
         LIMIT :limit
         """)
-    async with _psycopg_session_factory_proxy(
-        default_factory=async_session_factory
-    ) as session:
-        rows = (
-            await session.execute(query, {"user_id": user_id, "limit": limit})
-        ).fetchall()
+    async with _psycopg_session_factory_proxy(default_factory=async_session_factory) as session:
+        rows = (await session.execute(query, {"user_id": user_id, "limit": limit})).fetchall()
     return [
         {
             "conversation_id": int(row.id),
             "title": str(row.title or ""),
-            "created_at": (
-                row.created_at.isoformat() if row.created_at is not None else None
-            ),
+            "created_at": (row.created_at.isoformat() if row.created_at is not None else None),
         }
         for row in rows
     ]
 
 
-@router.get(
-    "/api/chat/conversations/{conversation_id}", summary="Customer conversation details"
-)
+@router.get("/api/chat/conversations/{conversation_id}", summary="Customer conversation details")
 async def get_customer_conversation(
     conversation_id: int,
     authorization: str | None = Header(default=None),
@@ -403,27 +389,19 @@ async def list_admin_conversations(
         ORDER BY created_at DESC, id DESC
         LIMIT :limit
         """)
-    async with _psycopg_session_factory_proxy(
-        default_factory=async_session_factory
-    ) as session:
-        rows = (
-            await session.execute(query, {"user_id": user_id, "limit": limit})
-        ).fetchall()
+    async with _psycopg_session_factory_proxy(default_factory=async_session_factory) as session:
+        rows = (await session.execute(query, {"user_id": user_id, "limit": limit})).fetchall()
     return [
         {
             "conversation_id": int(row.id),
             "title": str(row.title or ""),
-            "created_at": (
-                row.created_at.isoformat() if row.created_at is not None else None
-            ),
+            "created_at": (row.created_at.isoformat() if row.created_at is not None else None),
         }
         for row in rows
     ]
 
 
-@router.get(
-    "/admin/api/conversations/{conversation_id}", summary="Admin conversation details"
-)
+@router.get("/admin/api/conversations/{conversation_id}", summary="Admin conversation details")
 async def get_admin_conversation(
     conversation_id: int,
     authorization: str | None = Header(default=None),
@@ -445,9 +423,7 @@ def _row_to_conversation_summary(row: object) -> dict[str, object]:
     return {
         "conversation_id": int(row.id),
         "title": str(row.title or ""),
-        "created_at": (
-            row.created_at.isoformat() if row.created_at is not None else None
-        ),
+        "created_at": (row.created_at.isoformat() if row.created_at is not None else None),
     }
 
 
@@ -466,11 +442,7 @@ async def _fetch_conversation_messages(
     (CodeScene: Code Duplication). هذا الموحّد يغلق الثغرة التي تُنسى فيها
     أيّ إعادة صياغة في أحد المسارين فقط.
     """
-    if (
-        require_admin_payload
-        and jwt_payload is not None
-        and not _is_admin_payload(jwt_payload)
-    ):
+    if require_admin_payload and jwt_payload is not None and not _is_admin_payload(jwt_payload):
         raise HTTPException(status_code=403, detail="forbidden")
     check_query = text(f"""
         SELECT id, title, created_at
@@ -483,9 +455,7 @@ async def _fetch_conversation_messages(
         WHERE conversation_id = :conversation_id
         ORDER BY id ASC
         """)
-    async with _psycopg_session_factory_proxy(
-        default_factory=async_session_factory
-    ) as session:
+    async with _psycopg_session_factory_proxy(default_factory=async_session_factory) as session:
         conv_row = (
             await session.execute(
                 check_query, {"conversation_id": conversation_id, "user_id": user_id}
@@ -507,9 +477,7 @@ async def _fetch_conversation_messages(
             {
                 "role": str(msg.role),
                 "content": str(msg.content),
-                "created_at": (
-                    msg.created_at.isoformat() if msg.created_at is not None else None
-                ),
+                "created_at": (msg.created_at.isoformat() if msg.created_at is not None else None),
             }
             for msg in message_rows
         ],
@@ -556,9 +524,7 @@ async def chat_messages_endpoint(
                 user_id=user_id,
             )
 
-    async with _psycopg_session_factory_proxy(
-        default_factory=async_session_factory
-    ) as session:
+    async with _psycopg_session_factory_proxy(default_factory=async_session_factory) as session:
         conversation_id, history_messages = await _ensure_conversation(
             session=session,
             chat_scope=chat_scope,
@@ -696,9 +662,7 @@ async def admin_chat_ws_stategraph(websocket: WebSocket) -> None:
         return
 
     try:
-        auth_payload = jwt.decode(
-            token, get_settings().SECRET_KEY, algorithms=["HS256"]
-        )
+        auth_payload = jwt.decode(token, get_settings().SECRET_KEY, algorithms=["HS256"])
         user_id = int(auth_payload.get("sub", auth_payload.get("user_id", 0)) or 0)
         if user_id <= 0:
             raise HTTPException(status_code=401, detail="Invalid user")
@@ -723,9 +687,7 @@ def _get_mission_status_payload(status: str) -> dict[str, str | None]:
 
 
 def _serialize_mission(mission: Mission) -> MissionResponse:
-    status_payload = _get_mission_status_payload(
-        getattr(mission.status, "value", mission.status)
-    )
+    status_payload = _get_mission_status_payload(getattr(mission.status, "value", mission.status))
     return MissionResponse(
         id=mission.id,
         objective=mission.objective,
@@ -784,9 +746,7 @@ async def chat_with_agent_endpoint(
     trace_context = extract_trace_context(fastapi_req)
     user_id, auth_payload = _decode_auth_payload_or_401(authorization)
     request.user_id = user_id  # Override body user_id with JWT user_id
-    logger.info(
-        f"Agent Chat Request: {request.question[:50]}... User: {request.user_id}"
-    )
+    logger.info(f"Agent Chat Request: {request.question[:50]}... User: {request.user_id}")
 
     turn = _build_chat_turn(request, user_id, auth_payload, trace_context)
     # ⛔ كان هذا السطر يستخدم `turn.identity` — وهو غير موجود في AgentChatTurn
@@ -852,9 +812,7 @@ async def create_mission_endpoint(
         ) from e
 
 
-@router.get(
-    "/missions/{mission_id}", response_model=MissionResponse, summary="Get Mission"
-)
+@router.get("/missions/{mission_id}", response_model=MissionResponse, summary="Get Mission")
 async def get_mission_endpoint(
     mission_id: int,
     req: Request,
@@ -894,9 +852,7 @@ async def get_mission_events_endpoint(
     return [
         MissionEventResponse(
             event_type=(
-                evt.event_type.value
-                if hasattr(evt.event_type, "value")
-                else str(evt.event_type)
+                evt.event_type.value if hasattr(evt.event_type, "value") else str(evt.event_type)
             ),
             mission_id=evt.mission_id,
             timestamp=evt.created_at,
@@ -935,9 +891,7 @@ async def stream_mission_ws(
     subscription = event_bus.subscribe(channel)
 
     try:
-        async with _psycopg_session_factory_proxy(
-            default_factory=async_session_factory
-        ) as session:
+        async with _psycopg_session_factory_proxy(default_factory=async_session_factory) as session:
             state_manager = MissionStateManager(session)
             mission = await state_manager.get_mission(mission_id)
             if not mission:
@@ -945,9 +899,7 @@ async def stream_mission_ws(
                 return
 
             status_payload = _get_mission_status_payload(mission.status.value)
-            await websocket.send_json(
-                {"type": "mission_status", "payload": status_payload}
-            )
+            await websocket.send_json({"type": "mission_status", "payload": status_payload})
 
             events = await state_manager.get_mission_events(mission_id)
             for evt in events:
@@ -977,18 +929,14 @@ async def stream_mission_ws(
             except StopAsyncIteration:
                 break
             except TimeoutError:
-                await websocket.close(
-                    code=1011, reason="Timeout waiting for mission events"
-                )
+                await websocket.close(code=1011, reason="Timeout waiting for mission events")
                 break
 
             canonical_event = _canonicalize_mission_event(event)
             if canonical_event is None:
                 continue
 
-            await websocket.send_json(
-                {"type": "mission_event", "payload": canonical_event}
-            )
+            await websocket.send_json({"type": "mission_event", "payload": canonical_event})
 
             if canonical_event["event_type"] in ("mission_completed", "mission_failed"):
                 # Fetch final status
@@ -999,9 +947,7 @@ async def stream_mission_ws(
                     m = await sm.get_mission(mission_id)
                     if m:
                         status_p = _get_mission_status_payload(m.status.value)
-                        await websocket.send_json(
-                            {"type": "mission_status", "payload": status_p}
-                        )
+                        await websocket.send_json({"type": "mission_status", "payload": status_p})
                 break
 
     except WebSocketDisconnect:
@@ -1024,9 +970,7 @@ async def stream_mission_ws(
 class ComposeRequest(BaseModel):
     """طلب تشغيل Skills Composition Pipeline."""
 
-    query: str = Field(
-        ..., min_length=1, max_length=2000, description="سؤال الطالب أو المهمة"
-    )
+    query: str = Field(..., min_length=1, max_length=2000, description="سؤال الطالب أو المهمة")
     correlation_id: str | None = Field(
         default=None,
         description="معرف التتبع الموزع (يُولَّد تلقائياً إذا لم يُعطَ)",

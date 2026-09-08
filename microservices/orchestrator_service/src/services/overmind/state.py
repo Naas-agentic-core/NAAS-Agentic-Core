@@ -230,7 +230,9 @@ class MissionStateManager:
             payload = self._business_payload(outbox)
 
             # Extract persisted event_id from outbox internal metadata if available
-            raw_payload = outbox["payload_json"] if isinstance(outbox, dict) else outbox.payload_json
+            raw_payload = (
+                outbox["payload_json"] if isinstance(outbox, dict) else outbox.payload_json
+            )
             event_id = None
             if isinstance(raw_payload, dict):
                 event_id = raw_payload.get("__event_id")
@@ -681,10 +683,14 @@ class MissionStateManager:
             )
             try:
                 await self.event_bus.publish(f"mission:{mission_id}", message)
-                await self._set_outbox_status({"id": outbox_id}, status="published", published_at=utc_now())
+                await self._set_outbox_status(
+                    {"id": outbox_id}, status="published", published_at=utc_now()
+                )
             except Exception as e:
                 await self._set_outbox_status({"id": outbox_id}, status="failed")
-                logger.warning(f"Failed to publish event to Redis: {e}. Outbox record ID: {outbox_id}")
+                logger.warning(
+                    f"Failed to publish event to Redis: {e}. Outbox record ID: {outbox_id}"
+                )
             return
 
         # 1. Log Event (Source of Truth)

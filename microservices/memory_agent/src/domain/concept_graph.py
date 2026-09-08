@@ -483,6 +483,25 @@ class ConceptGraph:
 
         return all_prereqs
 
+    def get_batch_relations(self, concept_ids: list[str]) -> dict[str, list[str]]:
+        """
+        يستخرج المتطلبات السابقة لمجموعة من المفاهيم.
+        يعيد قاموساً حيث المفتاح هو معرف المفهوم والقيمة هي قائمة بمتطلباته
+        الموجودة فقط ضمن القائمة المطلوبة.
+        """
+        result = {}
+        target_set = set(concept_ids)
+
+        for cid in concept_ids:
+            if cid in self.nodes:
+                # نحتفظ فقط بالمتطلبات التي تنتمي للقائمة المطلوبة
+                prereqs = [p for p in self.nodes[cid].prerequisites if p in target_set]
+                result[cid] = prereqs
+            else:
+                result[cid] = []
+
+        return result
+
     def visualize(self) -> str:
         """يولّد تمثيل نصي للرسم البياني."""
 

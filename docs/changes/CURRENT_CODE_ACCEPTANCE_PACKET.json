@@ -4,9 +4,16 @@
   "status": "READY_FOR_GATE",
   "decision": "D-277",
   "changed_paths": [
-    "docs/changes/CURRENT_CODE_ACCEPTANCE_PACKET.json",
-    "app/services/billing/vouchers.py",
-    "tests/services/test_voucher_redemption.py"
+    "app/infrastructure/clients/memory_client.py",
+    "app/services/knowledge/prerequisite_checker.py",
+    "docs/contracts/openapi/memory_agent-openapi.json",
+    "microservices/memory_agent/src/api/knowledge.py",
+    "microservices/memory_agent/src/domain/concept_graph.py",
+    "microservices/memory_agent/src/schemas/knowledge_schemas.py",
+    "microservices/memory_agent/src/services/knowledge_service.py",
+    "tests/microservices/test_knowledge_readiness.py",
+    "tests/services/test_prerequisite_checker_batch.py",
+    "docs/changes/CURRENT_CODE_ACCEPTANCE_PACKET.json"
   ],
   "standards": [
     "system-design-primer"
@@ -156,12 +163,46 @@
     "owner": "curriculum-governance"
   },
   "git_change_snapshot": {
-    "base_ref": "200cef507bb03d8c9120847e58819cac028393ec",
+    "base_ref": "origin/main",
     "changed_paths_excluding_packet": [
-      ".runtime/truth_table.lock.json",
-      "app/static/js/legacy-app.jsx"
+      "app/api/routers/ws_proxy.py",
+      "app/core/db_schema_config.py",
+      "app/infrastructure/clients/memory_client.py",
+      "app/infrastructure/clients/orchestrator/chat_turn.py",
+      "app/infrastructure/clients/orchestrator/local_fallback.py",
+      "app/infrastructure/clients/orchestrator/probability_ui.py",
+      "app/infrastructure/clients/orchestrator/turn_fallback.py",
+      "app/infrastructure/clients/orchestrator/turn_preempts_deterministic.py",
+      "app/services/billing/vouchers.py",
+      "app/services/capabilities/exercise_retrieval.py",
+      "app/services/knowledge/prerequisite_checker.py",
+      "app/services/skills/retrieval_rerank_skill.py",
+      "app/services/system/database_service.py",
+      "docs/contracts/openapi/memory_agent-openapi.json",
+      "microservices/api_gateway/websockets.py",
+      "microservices/memory_agent/src/api/knowledge.py",
+      "microservices/memory_agent/src/domain/concept_graph.py",
+      "microservices/memory_agent/src/schemas/knowledge_schemas.py",
+      "microservices/memory_agent/src/services/knowledge_service.py",
+      "microservices/orchestrator_service/src/api/routes.py",
+      "microservices/orchestrator_service/src/services/overmind/state.py",
+      "requirements-prod.txt",
+      "tests/infrastructure/clients/orchestrator/test_probability_ui_regex.py",
+      "tests/infrastructure/config/test_env_reader.py",
+      "tests/microservices/orchestrator_service/test_d117_layer_separation.py",
+      "tests/microservices/test_chat_stream_persistence.py",
+      "tests/microservices/test_knowledge_readiness.py",
+      "tests/microservices/test_mission_outbox_publish_safety.py",
+      "tests/microservices/test_orchestrator_client_resilience.py",
+      "tests/microservices/test_orchestrator_event_bus_publish_contract.py",
+      "tests/services/test_entitlement_index.py",
+      "tests/services/test_prerequisite_checker_batch.py",
+      "tests/services/test_retrieval_rerank_skill.py",
+      "tests/shared/http_client/test_correlated.py",
+      "tests/system/test_database_service_security.py",
+      "tests/unit/auth/test_jwt_handler.py"
     ],
-    "content_sha256_excluding_packet": "b12dc1ae4f0e9a87bfee4c4e1930ad070daa3db16590837b90e0409003a64187",
+    "content_sha256_excluding_packet": "b9cff38773fa6f509447569d8cce2d418d3526eac0096b75549f75d26bc705ad",
     "refreshed_on": "2026-08-21",
     "refresh_command": "python3 scripts/research/refresh_acceptance_diff_snapshot.py"
   }

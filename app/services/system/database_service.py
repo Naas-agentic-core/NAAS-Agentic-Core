@@ -51,7 +51,9 @@ def _is_safe_sqlglot_query(sql: str) -> bool:  # noqa: PLR0911
         }
 
         for node in ast.find_all(exp.Expression):
-            if isinstance(node, (exp.Delete, exp.Update, exp.Insert, exp.Drop, exp.Alter, exp.Command)):
+            if isinstance(
+                node, (exp.Delete, exp.Update, exp.Insert, exp.Drop, exp.Alter, exp.Command)
+            ):
                 return False
             if isinstance(node, exp.Into):
                 return False
@@ -121,14 +123,20 @@ class DatabaseService:
     async def create_record(self, table_name: str, data: dict[str, object]) -> dict[str, object]:
         raise NotImplementedError("خدمة إنشاء السجل غير مفعلة حتى يتم تنفيذها بالكامل.")
 
-    async def update_record(self, table_name: str, record_id: int, data: dict[str, object]) -> dict[str, object]:
+    async def update_record(
+        self, table_name: str, record_id: int, data: dict[str, object]
+    ) -> dict[str, object]:
         raise NotImplementedError("خدمة تحديث السجل غير مفعلة حتى يتم تنفيذها بالكامل.")
 
     async def delete_record(self, table_name: str, record_id: int) -> dict[str, object]:
         raise NotImplementedError("خدمة حذف السجل غير مفعلة حتى يتم تنفيذها بالكامل.")
 
     async def execute_query(  # noqa: PLR0912, PLR0915
-        self, sql: str, params: dict[str, Any] | None = None, require_admin: bool = True, caller_identity: str = "unknown"
+        self,
+        sql: str,
+        params: dict[str, Any] | None = None,
+        require_admin: bool = True,
+        caller_identity: str = "unknown",
     ) -> dict[str, object]:
         if require_admin and (not caller_identity or caller_identity == "unknown"):
             raise ValueError("غير مصرح لك بتنفيذ الاستعلام.")
@@ -161,11 +169,15 @@ class DatabaseService:
                 raise ValueError("الاستعلام فارغ.")
             upper_sql = normalized.upper()
             if not upper_sql.startswith(_READ_ONLY_PREFIXES) or _FORBIDDEN_SQL.search(upper_sql):
-                self.logger.warning(f"AUDIT_LOG: execute_query rejected | sql_hash={sql_hash} reason='regex_blocked'")
+                self.logger.warning(
+                    f"AUDIT_LOG: execute_query rejected | sql_hash={sql_hash} reason='regex_blocked'"
+                )
                 raise ValueError("يسمح فقط باستعلامات القراءة بدون أوامر متعددة.")
 
             if not _is_safe_sqlglot_query(sql):
-                self.logger.warning(f"AUDIT_LOG: execute_query rejected | sql_hash={sql_hash} reason='parser_blocked'")
+                self.logger.warning(
+                    f"AUDIT_LOG: execute_query rejected | sql_hash={sql_hash} reason='parser_blocked'"
+                )
                 raise ValueError("الاستعلام مرفوض من قبل المحلل الأمني (يسمح فقط بالقراءة).")
 
             start_time = asyncio.get_event_loop().time()

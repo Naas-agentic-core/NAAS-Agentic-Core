@@ -258,8 +258,10 @@ async def test_relay_processing_staleness_uses_last_attempt_timestamp_when_avail
     assert result == {"processed": 0, "published": 0, "failed": 0, "skipped": 1}
     assert bus.published_messages == []
 
+
 class _FakeRawSession:
     """محاكاة لجلسة psycopg الخام."""
+
     def __init__(self, should_fail=False):
         self.should_fail = should_fail
         self.inserts = []
@@ -274,13 +276,15 @@ class _FakeRawSession:
         class _Result:
             def fetchone(self):
                 return (99,)
+
         return _Result()
+
 
 @pytest.mark.asyncio
 async def test_log_event_raw_path_publishes_with_event_id() -> None:
     session = _FakeRawSession()
     bus = _FakeEventBus(should_fail=False)
-    manager = MissionStateManager(session=session, event_bus=bus) # type: ignore
+    manager = MissionStateManager(session=session, event_bus=bus)  # type: ignore
 
     await manager.log_event(
         mission_id=42,
@@ -297,11 +301,12 @@ async def test_log_event_raw_path_publishes_with_event_id() -> None:
     assert len(outbox_inserts) == 1
     assert "__event_id" in outbox_inserts[0]
 
+
 @pytest.mark.asyncio
 async def test_log_event_raw_path_does_not_publish_on_db_error() -> None:
     session = _FakeRawSession(should_fail=True)
     bus = _FakeEventBus(should_fail=False)
-    manager = MissionStateManager(session=session, event_bus=bus) # type: ignore
+    manager = MissionStateManager(session=session, event_bus=bus)  # type: ignore
 
     with pytest.raises(RuntimeError, match="DB Error"):
         await manager.log_event(

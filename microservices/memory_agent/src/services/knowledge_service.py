@@ -11,6 +11,8 @@ from microservices.memory_agent.src.domain.concept_graph import (
     get_concept_graph,
 )
 from microservices.memory_agent.src.schemas.knowledge_schemas import (
+    BatchRelationsRequest,
+    BatchRelationsResponse,
     ReadinessRequest,
     ReadinessResponse,
 )
@@ -47,6 +49,11 @@ class KnowledgeService:
     async def get_learning_path(self, from_concept: str, to_concept: str) -> list[Concept]:
         """يجد مسار تعلم."""
         return self.graph.get_learning_path(from_concept, to_concept)
+
+    async def get_batch_relations(self, payload: BatchRelationsRequest) -> BatchRelationsResponse:
+        """يستخرج العلاقات لمجموعة من المفاهيم دفعة واحدة."""
+        prerequisites = self.graph.get_batch_relations(payload.concept_ids)
+        return BatchRelationsResponse(prerequisites=prerequisites)
 
     async def check_readiness(self, payload: ReadinessRequest) -> ReadinessResponse:
         """

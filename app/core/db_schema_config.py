@@ -652,9 +652,7 @@ REQUIRED_SCHEMA: Final[dict[str, TableSchemaConfig]] = {
         "indexes": {
             "linked_mission_id": 'CREATE INDEX IF NOT EXISTS "ix_admin_conversations_linked_mission_id" ON "admin_conversations"("linked_mission_id")'
         },
-        "index_names": {
-            "linked_mission_id": "ix_admin_conversations_linked_mission_id"
-        },
+        "index_names": {"linked_mission_id": "ix_admin_conversations_linked_mission_id"},
         "create_table": (
             'CREATE TABLE IF NOT EXISTS "admin_conversations"('
             '"id" SERIAL PRIMARY KEY,'
@@ -1108,9 +1106,7 @@ REQUIRED_SCHEMA: Final[dict[str, TableSchemaConfig]] = {
     },
     "mission_events": {
         "columns": ["id", "mission_id", "event_type", "payload_json", "created_at"],
-        "auto_fix": {
-            "payload_json": 'ALTER TABLE "mission_events" ADD COLUMN "payload_json" TEXT'
-        },
+        "auto_fix": {"payload_json": 'ALTER TABLE "mission_events" ADD COLUMN "payload_json" TEXT'},
         "indexes": {
             "mission_id": 'CREATE INDEX IF NOT EXISTS "ix_mission_events_mission_id" ON "mission_events"("mission_id")'
         },

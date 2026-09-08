@@ -54,6 +54,7 @@ async def test_event_bus_publish_serializes_dict_payload() -> None:
     assert channel == "mission:2"
     assert json.loads(raw) == payload
 
+
 @pytest.mark.asyncio
 async def test_event_bus_publish_serializes_with_event_id() -> None:
     """يثبت أن الحدث المنشور يتضمن event_id كـ string إذا تم توفيره."""
@@ -67,7 +68,7 @@ async def test_event_bus_publish_serializes_with_event_id() -> None:
     from microservices.orchestrator_service.src.models.mission import MissionEventType
     from microservices.orchestrator_service.src.services.overmind.state import MissionStateManager
 
-    manager = MissionStateManager(session=None, event_bus=bus) # type: ignore
+    manager = MissionStateManager(session=None, event_bus=bus)  # type: ignore
 
     message = manager._build_event_bus_message(
         mission_id=3,

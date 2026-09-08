@@ -121,3 +121,4 @@ llama-index-vector-stores-supabase
 # uses llama_index.core without ever setting Settings.embed_model.
 langgraph-sdk==0.3.15
 dspy
+sqlglot==25.17.0

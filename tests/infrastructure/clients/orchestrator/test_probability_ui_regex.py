@@ -43,6 +43,4 @@ class TestProbabilityUIRegex:
             assert result["tree"]["children"][0]["children"][0]["p"] == 0.5
         else:
             assert result["tree"]["children"][0]["p"] == expected_probs[0]
-            assert (
-                result["tree"]["children"][0]["children"][0]["p"] == expected_probs[1]
-            )
+            assert result["tree"]["children"][0]["children"][0]["p"] == expected_probs[1]

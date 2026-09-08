@@ -172,9 +172,7 @@ class VoucherService:
         now = datetime.now(UTC)
         if row is None or _as_utc(row.expires_at) <= now:
             return EntitlementStatus(active=False, plan=None, expires_at=None)
-        return EntitlementStatus(
-            active=True, plan=row.plan, expires_at=_as_utc(row.expires_at)
-        )
+        return EntitlementStatus(active=True, plan=row.plan, expires_at=_as_utc(row.expires_at))
 
 
 __all__ = [

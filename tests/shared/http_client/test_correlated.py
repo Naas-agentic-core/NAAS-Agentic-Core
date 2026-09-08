@@ -12,6 +12,7 @@ from shared.http_client import correlated
 def isolate_provider(monkeypatch):
     monkeypatch.setattr(correlated, "_provider", None)
 
+
 def test_explicit_id_wins_over_provider():
     def spy_provider():
         raise RuntimeError("Provider should not be called")
@@ -19,6 +20,7 @@ def test_explicit_id_wins_over_provider():
     correlated.set_correlation_provider(spy_provider)
     result = correlated.current_correlation_id(explicit="explicit-123")
     assert result == "explicit-123"
+
 
 def test_explicit_falsy_falls_through_to_provider():
     provider = Mock(return_value="ambient-123")
@@ -33,16 +35,19 @@ def test_explicit_falsy_falls_through_to_provider():
     assert result == "ambient-123"
     provider.assert_called_once()
 
+
 def test_provider_returns_value():
     correlated.set_correlation_provider(lambda: "ambient-456")
     result = correlated.current_correlation_id()
     assert result == "ambient-456"
+
 
 @pytest.mark.parametrize("falsy_value", [None, ""])
 def test_provider_returns_none_or_falsy_falls_back_to_generated(falsy_value):
     correlated.set_correlation_provider(lambda: falsy_value)
     result = correlated.current_correlation_id()
     assert uuid.UUID(result)
+
 
 def test_provider_exception_falls_back_to_generated_uuid():
     def raising_provider():
@@ -52,6 +57,7 @@ def test_provider_exception_falls_back_to_generated_uuid():
     result = correlated.current_correlation_id()
     assert uuid.UUID(result)
 
+
 def test_provider_base_exception_not_swallowed():
     def base_raising_provider():
         raise KeyboardInterrupt()
@@ -60,6 +66,7 @@ def test_provider_base_exception_not_swallowed():
     with pytest.raises(KeyboardInterrupt):
         correlated.current_correlation_id()
 
+
 def test_generated_path_is_valid_uuid_and_unique():
     result1 = correlated.current_correlation_id()
     result2 = correlated.current_correlation_id()
@@ -67,6 +74,7 @@ def test_generated_path_is_valid_uuid_and_unique():
     assert uuid.UUID(result1)
     assert uuid.UUID(result2)
     assert result1 != result2
+
 
 def test_provider_is_called_at_most_once_per_call():
     provider = Mock(return_value="ambient-value")
@@ -94,6 +102,7 @@ def test_traceparent_format_and_determinism(monkeypatch):
     # Different correlation id should yield a different traceparent
     result3 = correlated._traceparent("different-id")
     assert result1 != result3
+
 
 def test_correlation_headers_formats_correctly(monkeypatch):
     mock_uuid = Mock()
@@ -124,7 +133,9 @@ async def test_correlated_client_sets_headers_and_closes():
 
     transport = httpx.MockTransport(mock_handler)
 
-    async with correlated.correlated_client(transport=transport, correlation_id="explicit-context-id") as client:
+    async with correlated.correlated_client(
+        transport=transport, correlation_id="explicit-context-id"
+    ) as client:
         # Before we actually send a request, let's verify that the client has the headers injected
         assert client.headers["X-Correlation-ID"] == "explicit-context-id"
         assert "traceparent" in client.headers
@@ -140,6 +151,7 @@ async def test_correlated_client_sets_headers_and_closes():
     # Ensure client closed on context exit
     assert client_ref.is_closed is True
 
+
 @pytest.mark.asyncio
 async def test_correlated_client_uses_ambient_when_no_explicit():
     correlated.set_correlation_provider(lambda: "ambient-id-for-client")
@@ -152,6 +164,7 @@ async def test_correlated_client_uses_ambient_when_no_explicit():
     async with correlated.correlated_client(transport=transport) as client:
         assert client.headers["X-Correlation-ID"] == "ambient-id-for-client"
         assert "traceparent" in client.headers
+
 
 def test_set_correlation_provider_can_reset_to_none():
     correlated.set_correlation_provider(lambda: "ambient")

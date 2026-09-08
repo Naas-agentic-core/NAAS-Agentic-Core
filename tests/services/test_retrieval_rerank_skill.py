@@ -15,9 +15,7 @@ def test_retrieval_telemetry_silenced_exception(monkeypatch, caplog):
             raise RuntimeError("Simulated Prometheus error")
 
     # Mock _INVOCATIONS in the module to use our mock
-    monkeypatch.setattr(
-        "app.services.skills.retrieval_rerank_skill._INVOCATIONS", MockLabels()
-    )
+    monkeypatch.setattr("app.services.skills.retrieval_rerank_skill._INVOCATIONS", MockLabels())
 
     # Ensure we capture debug logs from the right logger
     with caplog.at_level(logging.DEBUG, logger="cogniforge.skills.retrieval_rerank"):
@@ -26,8 +24,7 @@ def test_retrieval_telemetry_silenced_exception(monkeypatch, caplog):
 
     # Assert that the correct log message is recorded
     assert (
-        "Failed to record retrieval telemetry (stage=test_stage, status=test_status)"
-        in caplog.text
+        "Failed to record retrieval telemetry (stage=test_stage, status=test_status)" in caplog.text
     )
     # Assert that exc_info was included (traceback is present)
     assert "Traceback (most recent call last):" in caplog.text

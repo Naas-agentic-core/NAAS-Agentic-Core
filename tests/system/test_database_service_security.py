@@ -8,8 +8,10 @@ from app.services.system.database_service import DatabaseService, _is_safe_sqlgl
 class DummyContextManager:
     async def __aenter__(self):
         return self
+
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         pass
+
 
 def test_is_safe_sqlglot_query():
     # Allowed
@@ -20,7 +22,9 @@ def test_is_safe_sqlglot_query():
 
     # Rejected
     assert _is_safe_sqlglot_query("SELECT 1; DROP TABLE users") is False
-    assert _is_safe_sqlglot_query("WITH d AS (DELETE FROM users RETURNING *) SELECT * FROM d") is False
+    assert (
+        _is_safe_sqlglot_query("WITH d AS (DELETE FROM users RETURNING *) SELECT * FROM d") is False
+    )
     assert _is_safe_sqlglot_query("SELECT * INTO t2 FROM t1") is False
     assert _is_safe_sqlglot_query("SELECT 1 FROM t FOR UPDATE") is False
     assert _is_safe_sqlglot_query("SELECT pg_sleep(10)") is False
@@ -31,6 +35,7 @@ def test_is_safe_sqlglot_query():
     assert _is_safe_sqlglot_query("SELECT lo_export(1, '/tmp/file')") is False
     assert _is_safe_sqlglot_query("SELECT dblink('dbname=foo', 'SELECT 1')") is False
     assert _is_safe_sqlglot_query("SELECT set_config('role', 'admin', false)") is False
+
 
 @pytest.mark.asyncio
 async def test_execute_query_allow_list():
@@ -50,11 +55,14 @@ async def test_execute_query_allow_list():
     assert res["status"] == "success"
     assert res["rows"] == [{"col1": "val1"}]
 
-    res2 = await service.execute_query("SELECT * FROM users WHERE id = :id", params={"id": 1}, caller_identity="admin")
+    res2 = await service.execute_query(
+        "SELECT * FROM users WHERE id = :id", params={"id": 1}, caller_identity="admin"
+    )
     assert res2["status"] == "success"
     call_args = mock_session.execute.call_args
     assert call_args[0][1] == {"id": 1}
     assert "WHERE id = :id" in str(call_args[0][0])
+
 
 @pytest.mark.asyncio
 async def test_execute_query_deny_list():
@@ -69,17 +77,27 @@ async def test_execute_query_deny_list():
     assert res2["status"] == "error"
     assert "مرفوض من قبل المحلل الأمني" in res2["message"]
 
-    res3 = await service.execute_query("SELECT 1; UPDATE users SET role='admin'", caller_identity="admin")
+    res3 = await service.execute_query(
+        "SELECT 1; UPDATE users SET role='admin'", caller_identity="admin"
+    )
     assert res3["status"] == "error"
     assert "يسمح فقط باستعلامات القراءة" in res3["message"]
 
-    res4 = await service.execute_query("WITH d AS (DELETE FROM users RETURNING *) SELECT * FROM d", caller_identity="admin")
+    res4 = await service.execute_query(
+        "WITH d AS (DELETE FROM users RETURNING *) SELECT * FROM d", caller_identity="admin"
+    )
     assert res4["status"] == "error"
-    assert "مرفوض من قبل المحلل الأمني" in res4["message"] or "يسمح فقط باستعلامات القراءة" in res4["message"]
+    assert (
+        "مرفوض من قبل المحلل الأمني" in res4["message"]
+        or "يسمح فقط باستعلامات القراءة" in res4["message"]
+    )
 
-    res5 = await service.execute_query("SELECT pg_read_file('/etc/passwd')", caller_identity="admin")
+    res5 = await service.execute_query(
+        "SELECT pg_read_file('/etc/passwd')", caller_identity="admin"
+    )
     assert res5["status"] == "error"
     assert "مرفوض من قبل المحلل الأمني" in res5["message"]
+
 
 @pytest.mark.asyncio
 async def test_execute_query_row_cap():
@@ -100,6 +118,7 @@ async def test_execute_query_row_cap():
     assert res["row_count"] == 1000
     mock_result.fetchmany.assert_called_with(1000)
 
+
 @pytest.mark.asyncio
 async def test_sqlite_readonly():
     mock_session = AsyncMock()
@@ -118,6 +137,7 @@ async def test_sqlite_readonly():
     assert "PRAGMA query_only = 1" in str(call_args[0][0][0])
     assert "PRAGMA query_only = 0" in str(call_args[2][0][0])
 
+
 @pytest.mark.asyncio
 async def test_execute_query_auth():
     mock_session = AsyncMock()
@@ -128,6 +148,7 @@ async def test_execute_query_auth():
 
     with pytest.raises(ValueError, match="غير مصرح لك بتنفيذ الاستعلام"):
         await service.execute_query("SELECT 1", require_admin=True, caller_identity="unknown")
+
 
 @pytest.mark.asyncio
 async def test_execute_query_db_error():

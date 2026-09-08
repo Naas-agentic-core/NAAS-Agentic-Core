@@ -27,9 +27,7 @@ def test_get_jwt_handler_initialization():
 
 def test_get_jwt_handler_missing_secret_first_call():
     """Test that calling without a secret key on the first call raises ValueError."""
-    with pytest.raises(
-        ValueError, match="secret_key is required for first initialization"
-    ):
+    with pytest.raises(ValueError, match="secret_key is required for first initialization"):
         get_jwt_handler()
 
 
@@ -82,9 +80,7 @@ def test_verify_token_expired():
     handler = JWTHandler(secret_key="secret")
 
     # Create a token that is already expired
-    token = handler.create_access_token(
-        subject="user_123", expires_delta=timedelta(minutes=-10)
-    )
+    token = handler.create_access_token(subject="user_123", expires_delta=timedelta(minutes=-10))
 
     # Verify with the handler
     payload = handler.verify_token(token)

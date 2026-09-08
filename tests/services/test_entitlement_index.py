@@ -25,6 +25,4 @@ def test_entitlement_has_composite_index():
             user_id_index = idx
             break
 
-    assert (
-        user_id_index is None
-    ), "Standalone user_id index should be removed from the model"
+    assert user_id_index is None, "Standalone user_id index should be removed from the model"

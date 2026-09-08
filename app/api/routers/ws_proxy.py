@@ -32,6 +32,16 @@ import websockets
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from websockets.exceptions import ConnectionClosed
 
+try:
+    from websockets.exceptions import InvalidStatus
+except ImportError:
+    InvalidStatus = None
+
+try:
+    from websockets.legacy.exceptions import InvalidStatusCode
+except ImportError:
+    InvalidStatusCode = None
+
 logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["WebSocket Proxy"])
@@ -130,9 +140,39 @@ async def _proxy_websocket(
 
             async def upstream_to_client() -> None:
                 """يُمرِّر رسائل upstream إلى المتصفح."""
+                import json
+                import re
+
                 try:
                     async for message in upstream_ws:
                         if isinstance(message, str):
+                            msg_lower = message.strip().lower()
+                            if msg_lower.startswith("<!doctype") or msg_lower.startswith("<html"):
+                                title_match = re.search(
+                                    r"<title>(.*?)</title>", message, re.IGNORECASE
+                                )
+                                snippet = (
+                                    f"title={title_match.group(1)[:100]!r}"
+                                    if title_match
+                                    else f"snippet={message[:200]!r}"
+                                )
+                                logger.error(
+                                    "ws_proxy.html_bleed_intercepted snippet=%s",
+                                    snippet,
+                                )
+                                await client_ws.send_text(
+                                    json.dumps(
+                                        {
+                                            "type": "error",
+                                            "payload": {
+                                                "code": "WS_HTML_BLEED",
+                                                "details": "Upstream returned HTML instead of JSON",
+                                            },
+                                        }
+                                    )
+                                )
+                                await client_ws.close(code=1011)
+                                break
                             await client_ws.send_text(message)
                         else:
                             await client_ws.send_bytes(message)
@@ -180,6 +220,51 @@ async def _proxy_websocket(
             pass
 
     except Exception as exc:
+        is_invalid_status = InvalidStatus and isinstance(exc, InvalidStatus)
+        is_invalid_status_code = InvalidStatusCode and isinstance(exc, InvalidStatusCode)
+
+        if is_invalid_status or is_invalid_status_code:
+            status_code = getattr(exc, "status_code", None)
+            if hasattr(exc, "response") and exc.response:
+                status_code = getattr(exc.response, "status_code", status_code)
+                body = getattr(exc.response, "body", b"")
+            else:
+                body = b""
+
+            body_str = body.decode("utf-8", errors="ignore").strip().lower()
+            if body_str.startswith("<!doctype") or body_str.startswith("<html"):
+                import json
+                import re
+
+                body_orig = body.decode("utf-8", errors="ignore")
+                title_match = re.search(r"<title>(.*?)</title>", body_orig, re.IGNORECASE)
+                snippet = (
+                    f"title={title_match.group(1)[:100]!r}"
+                    if title_match
+                    else f"snippet={body_orig[:200]!r}"
+                )
+                logger.error(
+                    "ws_proxy.upstream_invalid_status_html_bleed status=%s snippet=%s",
+                    status_code,
+                    snippet,
+                )
+                try:
+                    await client_ws.send_text(
+                        json.dumps(
+                            {
+                                "type": "error",
+                                "payload": {
+                                    "code": "WS_HTML_BLEED",
+                                    "details": "Upstream returned HTML instead of JSON",
+                                },
+                            }
+                        )
+                    )
+                    await client_ws.close(code=1011)
+                except Exception:
+                    pass
+                return
+
         logger.error("ws_proxy.unexpected_error url=%s error=%s", upstream_url, exc)
         with contextlib.suppress(Exception):
             await client_ws.close(code=1011)

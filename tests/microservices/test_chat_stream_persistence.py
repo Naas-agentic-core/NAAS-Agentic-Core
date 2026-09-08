@@ -10,9 +10,7 @@ from microservices.orchestrator_service.src.api import routes
 
 @pytest.fixture
 def mock_dependencies(monkeypatch):
-    monkeypatch.setattr(
-        routes, "_decode_auth_payload_or_401", lambda _x: (1, {"sub": "1"})
-    )
+    monkeypatch.setattr(routes, "_decode_auth_payload_or_401", lambda _x: (1, {"sub": "1"}))
 
     async def mock_ensure_conversation(*args, **kwargs):
         return (42, [])  # conversation_id, history_messages
@@ -79,17 +77,13 @@ async def test_generator_persistence_logging(caplog, mock_dependencies, monkeypa
     assert chunks[1] == "invalid json 1"
     assert chunks[2] == '{"type": "assistant_delta", "payload": {"content": " World"}}'
     assert chunks[3] == "invalid json 2"
-    assert (
-        chunks[4]
-        == '{"type": "assistant_final", "payload": {"content": "Hello World"}}'
-    )
+    assert chunks[4] == '{"type": "assistant_final", "payload": {"content": "Hello World"}}'
 
     # 2. Assert exactly one WARNING is emitted for the first failure
     warnings = [
         r
         for r in caplog.records
-        if r.levelname == "WARNING"
-        and "stream_chunk_content_extraction_failed" in r.getMessage()
+        if r.levelname == "WARNING" and "stream_chunk_content_extraction_failed" in r.getMessage()
     ]
     assert len(warnings) == 1
 

@@ -1070,9 +1070,9 @@ def detect_explanation_with_context(
     if matched_entry is None:
         return ExplanationWithContextDecision(
             recognized=False,
-            reason="no_bac_explanation_pattern"
-            if not is_followup
-            else "no_matching_entry_or_context",
+            reason=(
+                "no_bac_explanation_pattern" if not is_followup else "no_matching_entry_or_context"
+            ),
         )
 
     # المرحلة 3: جلب المحتوى الكامل (نص + إجابة نموذجية)
@@ -1166,6 +1166,8 @@ def _detect_requested_part_from_question(question: str) -> str | None:
 # ═══════════════════════════════════════════════════════════════════════════
 
 _ARABIC_INDIC_DIGITS = str.maketrans("٠١٢٣٤٥٦٧٨٩", "0123456789")
+_NUMBERED_ITEM_RE = re.compile(r"^\s*(?:\*\*)?(\d{1,2})[.)ـ-]\s*")
+_PART_HEADER_RE = re.compile(r"^\s*(?:\*\*\(|##+\s|\*\*[IV1-9])")
 
 _QUESTION_ONLY_MARKERS: tuple[str, ...] = (
     "فقط",
@@ -1255,9 +1257,6 @@ def _extract_numbered_question(display_content: str, question_number: int) -> st
     التمرين قد يحوي البند N في أكثر من جزء (مثل «2.» في (1) و (2) بتمرين
     الاحتمالات) — نُرجِع كل المطابقات كلٌّ مع عنوان جزئها: صدقٌ أوضح من تخمين.
     """
-    numbered_re = re.compile(r"^\s*(?:\*\*)?(\d{1,2})[.)ـ-]\s*")
-    part_header_re = re.compile(r"^\s*(?:\*\*\(|##+\s|\*\*[IV1-9])")
-
     lines = display_content.splitlines()
     current_part: str = ""
     matches: list[str] = []
@@ -1274,13 +1273,13 @@ def _extract_numbered_question(display_content: str, question_number: int) -> st
 
     for raw_line in lines:
         line = raw_line.translate(_ARABIC_INDIC_DIGITS)
-        m = numbered_re.match(line)
+        m = _NUMBERED_ITEM_RE.match(line)
         if m:
             _flush()
             if int(m.group(1)) == question_number:
                 collecting = [raw_line.rstrip()]
             continue
-        if part_header_re.match(line):
+        if _PART_HEADER_RE.match(line):
             _flush()
             stripped = raw_line.strip()
             if not stripped.startswith("## التمرين") and not stripped.startswith("# "):
@@ -1307,9 +1306,9 @@ def _available_question_numbers(display_content: str) -> list[int]:
     نعرض للطالب ما نملكه بصدق بدل تخمين ما يقصد. مرتّبة وبلا تكرار.
     """
     found: set[int] = set()
-    numbered_re = re.compile(r"^\s*(?:\*\*)?(\d{1,2})[.)ـ-]\s*")
+    # Note: Optimization previously applied here to reuse _NUMBERED_ITEM_RE
     for raw_line in display_content.splitlines():
-        match = numbered_re.match(raw_line.translate(_ARABIC_INDIC_DIGITS))
+        match = _NUMBERED_ITEM_RE.match(raw_line.translate(_ARABIC_INDIC_DIGITS))
         if match:
             found.add(int(match.group(1)))
     return sorted(found)

@@ -18,9 +18,7 @@ logger = logging.getLogger("orchestrator-client")
 class TurnFallbackMixin:
     """سلسلة الـ fallback المحلية المحروسة — منقولة حرفياً من ذيل chat_with_agent."""
 
-    async def _stage_local_fallback(
-        self, ctx: TurnContext
-    ) -> AsyncGenerator[dict | str, None]:
+    async def _stage_local_fallback(self, ctx: TurnContext) -> AsyncGenerator[dict | str, None]:
         """سلسلة الـ fallback المحلية المحروسة (D-047/D-048/ISS-053) — خلف REQUIRE_ORCHESTRATOR=0."""
         question = ctx.question
         history_messages = ctx.history_messages
@@ -46,9 +44,7 @@ class TurnFallbackMixin:
                 parent_context=_root_ctx,
                 tags={"fallback_step": "file_intelligence"},
             )
-        local_file_count_response = await self._build_local_file_count_response(
-            question
-        )
+        local_file_count_response = await self._build_local_file_count_response(question)
         try:
             if _fb_ctx:
                 obs.end_span(
@@ -96,9 +92,7 @@ class TurnFallbackMixin:
         ret_streamed_any = False
         ret_streamed_chars = 0
         try:
-            async for chunk in self._stream_local_retrieval_response(
-                question, history_messages
-            ):
+            async for chunk in self._stream_local_retrieval_response(question, history_messages):
                 if not chunk:
                     continue
                 ret_streamed_any = True
@@ -275,9 +269,7 @@ class TurnFallbackMixin:
 
         # Ultimate safety net: STREAMING raw LLM call (no graph, no state) — D-047
         is_file_intelligence = self._file_intelligence_decision(question)[0]
-        is_exercise_retrieval = self._exercise_retrieval_decision(
-            question, history_messages
-        )
+        is_exercise_retrieval = self._exercise_retrieval_decision(question, history_messages)
         if not is_file_intelligence and not is_exercise_retrieval:
             _gc_t0 = time.perf_counter()
             _gc_ctx = None
