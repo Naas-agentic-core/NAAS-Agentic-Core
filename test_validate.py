@@ -1,7 +1,7 @@
 import os
 import sys
 
-sys.path.insert(0, os.path.abspath('.github/scripts'))
+sys.path.insert(0, os.path.abspath(".github/scripts"))
 import validate_pr_description
 
 body = """### What
@@ -40,4 +40,6 @@ validate_pr_description._check_test_evidence(sections, probs)
 validate_pr_description._check_bugfix_reproduction(body, sections, probs)
 validate_pr_description._check_linked_issue(body, probs)
 
-print(probs)
+import logging
+
+logging.getLogger(__name__).info(probs)
