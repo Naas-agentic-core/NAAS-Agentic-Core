@@ -221,19 +221,23 @@ class InMemoryCache(CacheBackend):
         """
         async with self._lock:
             keys = []
+            to_delete = []
             now = time.time()
-            # ننسخ المفاتيح لتجنب مشاكل التعديل أثناء التكرار إذا احتجنا لذلك،
-            # لكننا هنا نقرأ فقط.
-            for key, (_, expire_at) in list(self._cache.items()):
+            # نتجنب نسخ القاموس بأكمله باستخدام حلقة تمريرتين
+            # لتجنب مشكلة تغيير حجم القاموس أثناء التكرار
+            for key, (_, expire_at) in self._cache.items():
                 if now > expire_at:
-                    # تنظيف الكسول (Lazy cleanup) أثناء البحث قد يكون مفيداً
-                    # هنا نزيل القفل والعنصر للحفاظ على الذاكرة.
-                    del self._cache[key]
-                    self._remove_key_lock(key)
+                    to_delete.append(key)
                     continue
 
                 if fnmatch.fnmatch(key, pattern):
                     keys.append(key)
+
+            # تنظيف الكسول (Lazy cleanup) للعناصر المنتهية
+            for key in to_delete:
+                del self._cache[key]
+                self._remove_key_lock(key)
+
             return keys
 
     async def set_add(self, key: str, members: list[str], ttl: int | None = None) -> bool:
