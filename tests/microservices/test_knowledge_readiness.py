@@ -61,3 +61,33 @@ def test_readiness_endpoint(mock_init_db):
     assert data["concept_id"] == "unknown_concept_123"
     assert data["is_ready"] is True  # Logic permits proceeding if unknown
     assert "غير موجود" in data["recommendation"]
+
+
+@patch("microservices.memory_agent.main.init_db", new_callable=AsyncMock)
+def test_batch_relations_endpoint(mock_init_db):
+    from microservices.memory_agent.main import create_app
+    from microservices.memory_agent.security import verify_service_token
+
+    app = create_app()
+    app.dependency_overrides[verify_service_token] = mock_verify_token
+
+    client = TestClient(app)
+
+    # conditional_prob requires combinations
+    payload = {"concept_ids": ["conditional_prob", "combinations", "random_variable"]}
+    response = client.post("/knowledge/concepts/batch/relations", json=payload)
+    assert response.status_code == 200
+    data = response.json()
+    assert "prerequisites" in data
+
+    prereqs = data["prerequisites"]
+    assert "combinations" in prereqs["conditional_prob"]
+    assert prereqs["combinations"] == []
+
+    # Test with unknown concept
+    payload = {"concept_ids": ["unknown_concept_123"]}
+    response = client.post("/knowledge/concepts/batch/relations", json=payload)
+    assert response.status_code == 200
+    data = response.json()
+    assert "prerequisites" in data
+    assert data["prerequisites"]["unknown_concept_123"] == []

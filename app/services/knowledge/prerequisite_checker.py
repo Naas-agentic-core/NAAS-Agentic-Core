@@ -6,6 +6,7 @@
 """
 
 import logging
+from collections import deque
 from dataclasses import dataclass
 
 from app.infrastructure.clients.memory_client import MemoryClient, get_memory_client
@@ -94,24 +95,48 @@ class PrerequisiteChecker:
                 if concept:
                     all_concepts.add(concept.concept_id)
 
-        # ترتيب طوبولوجي
-        # ordered = []
-        # remaining = list(all_concepts)
+        # الترتيب الطوبولوجي باستخدام Kahn's algorithm
+        all_concepts_list = list(all_concepts)
 
-        # تحذير: هذا الترتيب الطوبولوجي كان يعتمد على الوصول المتزامن للرسم البياني.
-        # الآن مع Async، قد يكون بطيئاً جداً إذا قمنا بطلب لكل مفهوم.
-        # للتبسيط، سنحاول ترتيب ما لدينا.
+        # استدعاء العلاقات دفعة واحدة
+        relations = await self.client.get_batch_prerequisites(all_concepts_list)
 
-        # نحتاج لجلب العلاقات لبناء الترتيب.
-        # هذا قد يتطلب endpoint جديد في API لجلب العلاقات لمجموعة مفاهيم دفعة واحدة.
-        # لكن للآن، سنستخدم نهجاً بسيطاً: الترتيب كما جاء أو بناءً على check_readiness.
+        # حساب in_degree وبناء قائمة الجوار
+        in_degree = dict.fromkeys(all_concepts_list, 0)
+        graph = {cid: [] for cid in all_concepts_list}
 
-        # نظرًا لتعقيد الترتيب الطوبولوجي عبر الشبكة (N+1 problem)، سنقوم بتبسيط المنطق مؤقتاً
-        # ليعيد القائمة كما هي مع إضافة المفقودين في البداية.
+        for cid, prereqs in relations.items():
+            for prereq in prereqs:
+                if prereq in graph:
+                    graph[prereq].append(cid)
+                    in_degree[cid] += 1
 
-        # TODO: Implement Batch Graph Query in Microservice
+        # استخدام الترتيب الأصلي في الإضافة كترتيب ثانوي عند التعادل لضمان الحتمية
+        # لضمان ترتيب مستقر، نقوم بفرز العقد التي ليس لها متطلبات
+        ready_nodes = [cid for cid in all_concepts_list if in_degree[cid] == 0]
+        # ترتيب العقد الجاهزة أبجدياً لضمان ترتيب حتمي
+        ready_nodes.sort()
 
-        return list(all_concepts)
+        queue = deque(ready_nodes)
+        ordered = []
+
+        while queue:
+            current = queue.popleft()
+            ordered.append(current)
+
+            # للحفاظ على الترتيب الحتمي للأبناء
+            neighbors = sorted(graph[current])
+            for neighbor in neighbors:
+                in_degree[neighbor] -= 1
+                if in_degree[neighbor] == 0:
+                    queue.append(neighbor)
+
+        if len(ordered) != len(all_concepts_list):
+            logger.warning("تم اكتشاف حلقة (cycle) في ترتيب المفاهيم الطوبولوجي.")
+            # في حال وجود حلقة، نعيد جميع المفاهيم مرتبة أبجدياً بشكل حتمي لتجنب فقدان مفاهيم أو تعطل النظام
+            return sorted(all_concepts_list)
+
+        return ordered
 
 
 # Singleton

@@ -133,6 +133,14 @@ class MemoryClient:
         data = await self._post("/knowledge/paths", payload=payload)
         return [Concept(**item) for item in data] if data else []
 
+    async def get_batch_prerequisites(self, concept_ids: list[str]) -> dict[str, list[str]]:
+        """يستخرج العلاقات لمجموعة من المفاهيم دفعة واحدة."""
+        payload = {"concept_ids": concept_ids}
+        data = await self._post("/knowledge/concepts/batch/relations", payload)
+        if data and "prerequisites" in data:
+            return data["prerequisites"]
+        return {}
+
     async def check_readiness(
         self, concept_id: str, mastery_levels: dict[str, float]
     ) -> ReadinessResult | None:

@@ -10,6 +10,21 @@ class ReadinessRequest(BaseModel):
     )
 
 
+class BatchRelationsRequest(BaseModel):
+    """طلب فحص العلاقات بالجملة."""
+
+    concept_ids: list[str] = Field(..., description="قائمة معرفات المفاهيم")
+
+
+class BatchRelationsResponse(BaseModel):
+    """استجابة العلاقات بالجملة."""
+
+    prerequisites: dict[str, list[str]] = Field(
+        ...,
+        description="المتطلبات السابقة لكل مفهوم (المفاتيح هي concept_id، والقيم هي قائمة المتطلبات)",
+    )
+
+
 class ReadinessResponse(BaseModel):
     """نتيجة فحص الجاهزية."""
 
