@@ -5,6 +5,7 @@
 مثل الحذف بناءً على الأنماط (Patterns) أو العلامات (Tags).
 """
 
+import asyncio
 import logging
 
 from app.caching.base import CacheBackend
@@ -34,10 +35,8 @@ class InvalidationManager:
         if not keys:
             return 0
 
-        count = 0
-        for key in keys:
-            if await self.backend.delete(key):
-                count += 1
+        results = await asyncio.gather(*(self.backend.delete(key) for key in keys))
+        count = sum(1 for r in results if r)
 
         logger.info(f"🧹 Invalidated {count} keys matching pattern '{pattern}'")
         return count
@@ -71,11 +70,9 @@ class InvalidationManager:
         if not keys:
             return 0
 
-        count = 0
         # حذف المفاتيح الفعلية
-        for key in keys:
-            if await self.backend.delete(key):
-                count += 1
+        results = await asyncio.gather(*(self.backend.delete(key) for key in keys))
+        count = sum(1 for r in results if r)
 
         # حذف سجل العلامة نفسه
         await self.backend.delete(tag_key)
