@@ -86,6 +86,10 @@ class AvailableModels:
     # ISS-079 (D-067 — 2026-05-17): نماذج عاملة موثَّقة بـ tests/integration/live
     GPT_OSS_20B_FREE = "openai/gpt-oss-20b:free"
     GPT_OSS_120B_FREE = "openai/gpt-oss-120b:free"
+    # ISS-LLM-CHAIN (2026-09-08): ثوابتٌ بأسماءٍ صريحة لعائلة gemma-4 — النموذجان
+    # الوحيدان في هذه السلسلة اللذان يملكان endpoints حيّة على OpenRouter اليوم.
+    GEMMA_4_26B_A4B_IT_FREE = "google/gemma-4-26b-a4b-it:free"
+    GEMMA_4_31B_IT_FREE = "google/gemma-4-31b-it:free"
 
 
 class ActiveModels:
@@ -121,14 +125,20 @@ class ActiveModels:
     # gpt-oss-120b نهائياً (404) ⇒ إعادة ترقية gpt-oss-20b (تعافى من 429 —
     # مُتحقَّق حياً عربي+LaTeX finish=stop). gemma-4 بإصداريه بعده (GOOD حياً)؛
     # gpt-oss-120b في الذيل كفتحة تعافٍ آلي (mirror لسلسلة المونوليث — D-013).
-    PRIMARY = _resolve_primary_model(AvailableModels.GPT_OSS_20B_FREE)
+    # ISS-LLM-CHAIN (2026-09-08 — «النظام لا يجيب»): فحصٌ حيّ لـ OpenRouter
+    # `/api/v1/models/<id>/endpoints` كشف أن كل نماذج gpt-oss وnemotron في هذه
+    # السلسلة صارت بلا endpoints (404 «No endpoints found»)، وأن gemma-4
+    # بإصداريه هما الوحيدان الحيّان. النتيجة: PRIMARY القديم كان ميتاً، وكل
+    # مستهلك يستدعيه بلا سلسلة احتياط يفشل كليّاً.
+    # القرار: تدوير السلسلة بلا حذف (mirror لسلسلة المونوليث — D-013).
+    PRIMARY = _resolve_primary_model(AvailableModels.GEMMA_4_26B_A4B_IT_FREE)
     LOW_COST = PRIMARY
     GATEWAY_PRIMARY = PRIMARY
     GATEWAY_FALLBACK_1 = (
-        AvailableModels.GEMINI_2_FLASH_EXP_FREE
-    )  # gemma-4-26b — GOOD حياً 2026-07-14
-    GATEWAY_FALLBACK_2 = "google/gemma-4-31b-it:free"  # GOOD حياً 2026-07-14 — عربي+LaTeX
-    GATEWAY_FALLBACK_3 = AvailableModels.NEMOTRON_3_NANO  # works on short prompts (guarded)
+        AvailableModels.GEMMA_4_31B_IT_FREE
+    )  # ✅ حيّ 2026-09-08 — عربي+LaTeX
+    GATEWAY_FALLBACK_2 = AvailableModels.GPT_OSS_20B_FREE  # ❌ 0 endpoints اليوم — فتحة تعافٍ
+    GATEWAY_FALLBACK_3 = AvailableModels.NEMOTRON_3_NANO  # ❌ 0 endpoints اليوم (guarded)
     GATEWAY_FALLBACK_4 = AvailableModels.GPT_OSS_120B_FREE  # ميت 404 — فتحة تعافٍ آلي
     GATEWAY_FALLBACK_5 = "nvidia/nemotron-nano-9b-v2:free"  # ملاذ أخير؛ محميّ بالحُرّاس (D-177: FIRST_TOKEN_TIMEOUT يحدّ تعليقه 62s؛ nemotron-3-super-120b يبقى محظوراً ISS-107)
     TIER_NANO = PRIMARY
