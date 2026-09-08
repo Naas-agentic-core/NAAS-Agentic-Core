@@ -121,16 +121,26 @@ const parseAssistantErrorEnvelope = (rawData) => {
  * @param {string} token - The authentication token.
  * @returns {{ state: string, sendMessage: (data: any) => void }}
  */
-export function useRealtimeConnection(wsUrl, token, eventNamespace = "default") {
+export function useRealtimeConnection(
+  wsUrl,
+  token,
+  eventNamespace = "default",
+) {
   // ISS-096 (2026-05-28): wsUrl/token/eventNamespace يُخزَّنون في refs حتى
   // connect useCallback لا يتغير عند تغيّرهم → useEffect الرئيسي لا يُعيد
   // التشغيل → لا cleanup → لا إغلاق مفاجئ للـ WebSocket أثناء الدردشة.
   const wsUrlRef = useRef(wsUrl);
   const tokenRef = useRef(token);
   const eventNamespaceRef = useRef(eventNamespace);
-  useEffect(() => { wsUrlRef.current = wsUrl; }, [wsUrl]);
-  useEffect(() => { tokenRef.current = token; }, [token]);
-  useEffect(() => { eventNamespaceRef.current = eventNamespace; }, [eventNamespace]);
+  useEffect(() => {
+    wsUrlRef.current = wsUrl;
+  }, [wsUrl]);
+  useEffect(() => {
+    tokenRef.current = token;
+  }, [token]);
+  useEffect(() => {
+    eventNamespaceRef.current = eventNamespace;
+  }, [eventNamespace]);
 
   const wsRef = useRef(null);
   const retries = useRef(0);
@@ -198,15 +208,15 @@ export function useRealtimeConnection(wsUrl, token, eventNamespace = "default") 
       if (!mountedRef.current) return;
       // فحص: ربما عاد internal state إلى connected في هذه اللحظة.
       // ولا نُظهر "reconnecting" لو internal لم يعد منقطعاً.
-      const stillDisconnected = !wsRef.current ||
-        (wsRef.current.readyState !== WebSocket.OPEN);
+      const stillDisconnected =
+        !wsRef.current || wsRef.current.readyState !== WebSocket.OPEN;
       if (!stillDisconnected) return;
       setUiState("reconnecting");
       // المرحلة 2: بعد OFFLINE_GRACE_MS من الفقد الأصلي، أظهر "offline".
       uiPromotionTimerRef.current = setTimeout(() => {
         if (!mountedRef.current) return;
-        const stillOff = !wsRef.current ||
-          (wsRef.current.readyState !== WebSocket.OPEN);
+        const stillOff =
+          !wsRef.current || wsRef.current.readyState !== WebSocket.OPEN;
         if (!stillOff) return;
         console.warn("[WS] offline grace expired — showing offline UI");
         setUiState("offline");
@@ -277,526 +287,576 @@ export function useRealtimeConnection(wsUrl, token, eventNamespace = "default") 
   }, []);
 
   // بدء heartbeat — ping/pong للكشف عن stale connections
-  const startHeartbeat = useCallback((ws) => {
-    stopHeartbeat();
-    heartbeatIntervalRef.current = setInterval(() => {
-      if (!ws || ws.readyState !== WebSocket.OPEN) {
-        stopHeartbeat();
-        return;
-      }
-      try {
-        ws.send(JSON.stringify({ type: "ping" }));
-      } catch {
-        stopHeartbeat();
-        return;
-      }
-      // ISS-101 (D-WS-PROXY-002 — 2026-05-30): الـ heartbeat لم يعد يُغلق الاتصال.
-      //
-      // الكارثة المُصلَحة: كان `ws.close(1001,"heartbeat_timeout")` يقطع اتصالات
-      // حيّة-لكن-بطيئة (دور طويل، أو pong تأخّر عبر سلسلة الـ proxy) → reconnect
-      // متكرر (close 1001) → إجابات مقطوعة + تأرجح. تشخيص حيّ أظهر اتصالات تُغلق
-      // بـ 1001 بعد session_ready/conversation_init مباشرة وقبل deltas.
-      //
-      // الكشف عن الاتصال الميت فعلاً مضمون من طبقتين أدنى: uvicorn protocol
-      // ping/pong (`--ws-ping-interval 20 --ws-ping-timeout 30`) يُغلق نصف-المفتوح
-      // من جهة الخادم، والمتصفح يُطلق onclose(1006) عند موت TCP → reconnect صحيح.
-      // لذا نكتفي هنا بـ ping تطبيقي (يُبقي proxies/NAT دافئة، والخادم يردّ pong
-      // فيُلغي أي مؤقّت عبر D-WS-FLAP-005) — بلا إغلاق استباقي.
-      heartbeatTimeoutRef.current = setTimeout(() => {
-        if (ws && ws.readyState === WebSocket.OPEN) {
-          console.info(
-            "[WS] heartbeat: no app-level pong within window — keeping connection " +
-              "(uvicorn protocol ping + browser will recycle if truly dead)"
-          );
+  const startHeartbeat = useCallback(
+    (ws) => {
+      stopHeartbeat();
+      heartbeatIntervalRef.current = setInterval(() => {
+        if (!ws || ws.readyState !== WebSocket.OPEN) {
+          stopHeartbeat();
+          return;
         }
-      }, HEARTBEAT_TIMEOUT);
-    }, HEARTBEAT_INTERVAL);
-  }, [stopHeartbeat]);
+        try {
+          ws.send(JSON.stringify({ type: "ping" }));
+        } catch {
+          stopHeartbeat();
+          return;
+        }
+        // ISS-101 (D-WS-PROXY-002 — 2026-05-30): الـ heartbeat لم يعد يُغلق الاتصال.
+        //
+        // الكارثة المُصلَحة: كان `ws.close(1001,"heartbeat_timeout")` يقطع اتصالات
+        // حيّة-لكن-بطيئة (دور طويل، أو pong تأخّر عبر سلسلة الـ proxy) → reconnect
+        // متكرر (close 1001) → إجابات مقطوعة + تأرجح. تشخيص حيّ أظهر اتصالات تُغلق
+        // بـ 1001 بعد session_ready/conversation_init مباشرة وقبل deltas.
+        //
+        // الكشف عن الاتصال الميت فعلاً مضمون من طبقتين أدنى: uvicorn protocol
+        // ping/pong (`--ws-ping-interval 20 --ws-ping-timeout 30`) يُغلق نصف-المفتوح
+        // من جهة الخادم، والمتصفح يُطلق onclose(1006) عند موت TCP → reconnect صحيح.
+        // لذا نكتفي هنا بـ ping تطبيقي (يُبقي proxies/NAT دافئة، والخادم يردّ pong
+        // فيُلغي أي مؤقّت عبر D-WS-FLAP-005) — بلا إغلاق استباقي.
+        heartbeatTimeoutRef.current = setTimeout(() => {
+          if (ws && ws.readyState === WebSocket.OPEN) {
+            console.info(
+              "[WS] heartbeat: no app-level pong within window — keeping connection " +
+                "(uvicorn protocol ping + browser will recycle if truly dead)",
+            );
+          }
+        }, HEARTBEAT_TIMEOUT);
+      }, HEARTBEAT_INTERVAL);
+    },
+    [stopHeartbeat],
+  );
 
   const connect = useCallback(() => {
     // ISS-096: اقرأ من refs — لا closure على wsUrl/token/eventNamespace.
     const wsUrl = wsUrlRef.current;
     const token = tokenRef.current;
     if (!wsUrl || !token) return;
-    if (wsRef.current && (wsRef.current.readyState === WebSocket.OPEN || wsRef.current.readyState === WebSocket.CONNECTING)) return;
+    if (
+      wsRef.current &&
+      (wsRef.current.readyState === WebSocket.OPEN ||
+        wsRef.current.readyState === WebSocket.CONNECTING)
+    )
+      return;
 
     // D-WS-002: "reconnecting" بدلاً من "offline" أثناء المحاولات
     setState(retries.current > 0 ? "reconnecting" : "connecting");
 
     try {
-        const wsUrlObj = new URL(wsUrl);
+      const wsUrlObj = new URL(wsUrl);
 
-        // ISS-WS-001: token يُرسَل عبر query param فقط.
-        // الكود القديم كان يُرسله في ["jwt", token] subprotocol —
-        // Codespaces edge proxy وcarrier-NAT وBrave Mobile تحذفه → 4401.
-        // query param يعمل عبر كل الشبكات لأنه جزء من URL وليس header.
-        if (token) {
-            wsUrlObj.searchParams.set("token", token);
-        }
-        if (!wsUrlObj.searchParams.has("session_id")) {
-            wsUrlObj.searchParams.set("session_id", connectionIdRef.current);
-        }
-        // ISS-101: بصمة البناء — server.js يُسجِّلها لإثبات نسخة JS المُحمَّلة فعلاً.
-        wsUrlObj.searchParams.set("cb", CLIENT_BUILD);
+      // ISS-WS-001: token يُرسَل عبر query param فقط.
+      // الكود القديم كان يُرسله في ["jwt", token] subprotocol —
+      // Codespaces edge proxy وcarrier-NAT وBrave Mobile تحذفه → 4401.
+      // query param يعمل عبر كل الشبكات لأنه جزء من URL وليس header.
+      if (token) {
+        wsUrlObj.searchParams.set("token", token);
+      }
+      if (!wsUrlObj.searchParams.has("session_id")) {
+        wsUrlObj.searchParams.set("session_id", connectionIdRef.current);
+      }
+      // ISS-101: بصمة البناء — server.js يُسجِّلها لإثبات نسخة JS المُحمَّلة فعلاً.
+      wsUrlObj.searchParams.set("cb", CLIENT_BUILD);
 
-        // Log auth transport mode بدون تسريب token value
-        const authMode = token ? "query_param" : "none";
-        const safeUrl = wsUrlObj.toString().replace(/token=[^&]+/, "token=[REDACTED]");
-        console.info(
-            `[WS] connecting auth_mode=${authMode} attempt=${retries.current + 1}/${MAX_RETRIES} url=${safeUrl}`
-        );
+      // Log auth transport mode بدون تسريب token value
+      const authMode = token ? "query_param" : "none";
+      const safeUrl = wsUrlObj
+        .toString()
+        .replace(/token=[^&]+/, "token=[REDACTED]");
+      console.info(
+        `[WS] connecting auth_mode=${authMode} attempt=${retries.current + 1}/${MAX_RETRIES} url=${safeUrl}`,
+      );
 
-        // لا subprotocols — يُبسِّط الـ handshake ويتجنب رفض proxies
-        const ws = new WebSocket(wsUrlObj.toString());
-        wsRef.current = ws;
+      // لا subprotocols — يُبسِّط الـ handshake ويتجنب رفض proxies
+      const ws = new WebSocket(wsUrlObj.toString());
+      wsRef.current = ws;
 
-        ws.onopen = () => {
-          if (mountedRef.current) {
-            // D-WS-FLAP-003: ألغِ أي debounce timer من المحاولة السابقة —
-            // إن كنّا في نافذة "reconnecting" قصيرة ولم نُظهر الحالة بعد،
-            // الآن نُلغي ذلك ونبقى على "connected".
-            if (stateDebounceRef.current) {
-              clearTimeout(stateDebounceRef.current);
-              stateDebounceRef.current = null;
-            }
-
-            // D-WS-FLAP-003: سجّل وقت الفتح الناجح — يُستخدم في onclose للتمييز.
-            openedAtRef.current = Date.now();
-            // D-WS-FLAP-004: علِّم أنّ الاتصال نجح مرة على الأقل — UI sync useEffect
-            // سيرى هذا ويُحدِّث uiState إلى "connected" فوراً.
-            everConnectedRef.current = true;
-            lastConnectedAtRef.current = Date.now();
-            // D-WS-FLAP-004 (REGRESSION FIX 2026-05-26): ألغِ UI promotion timer
-            // المجدوَل — تعافينا، لا حاجة لإظهار "reconnecting".
-            // كان هذا السطر يشير إلى `offlineGraceTimerRef` المحذوف بعد refactor،
-            // ما يُسبب ReferenceError ويُحطِّم الـ onopen handler — وبالتالي
-            // "متصل" لم تظهر أبداً للمستخدم.
-            if (uiPromotionTimerRef.current) {
-              clearTimeout(uiPromotionTimerRef.current);
-              uiPromotionTimerRef.current = null;
-            }
-
-            const wasReconnect = retries.current > 0;
-            retries.current = 0;
-            // D-WS-AUTH-001: reset عداد 4401 — اتصال ناجح يُلغي أي شك في الـ token.
-            fatalRetries.current = 0;
-            // ألغِ أي probe HTTP جاري (مش محتاج لو الاتصال نجح)
-            if (revalidateAbortRef.current) {
-              revalidateAbortRef.current.abort();
-              revalidateAbortRef.current = null;
-            }
-            setState(wasReconnect ? "recovered" : "connected");
-            // ISS-101 (D-WS-KICK-DIAG): breadcrumb — اتصال ناجح (مع/بدون reconnect).
-            clientLog("ws_open", { was_reconnect: wasReconnect });
-
-            // بعد recovery → انتقل إلى connected بعد لحظة قصيرة للـ UI feedback
-            if (wasReconnect) {
-              setTimeout(() => {
-                if (mountedRef.current) setState("connected");
-              }, 500);
-            }
-
-            // بدء heartbeat للكشف عن stale connections
-            startHeartbeat(ws);
-
-            // Flush pending messages
-            if (pendingQueue.current.length > 0) {
-                console.log(`[WS] Flushing ${pendingQueue.current.length} pending messages`);
-                while (pendingQueue.current.length > 0) {
-                    const msg = pendingQueue.current.shift();
-                    try { ws.send(JSON.stringify(msg)); } catch { /* ignore */ }
-                }
-            }
-          }
-        };
-
-        // ISS-STREAM-004: Delta batching via requestAnimationFrame
-        // Problem: 400+ delta chunks arrive in <4s → 400+ dispatchEvent calls →
-        //          400+ React setState calls → machine-gun re-renders that freeze UI.
-        // Fix: buffer delta chunks and flush them in a single batch per animation frame.
-        //      Non-delta events (conversation_init, persisted, error, etc.) are dispatched
-        //      immediately to preserve correct lifecycle ordering.
-        const deltaBuffer = [];
-        let rafPending = false;
-
-        const flushDeltaBuffer = () => {
-          rafPending = false;
-          if (!mountedRef.current || deltaBuffer.length === 0) return;
-
-          // ISS-DELTA-BUG-001 (2026-05-28): حفظ baseEvent قبل splice —
-          // deltaBuffer.splice(0) يُفرغ المصفوفة فوراً، فـ deltaBuffer[0] بعدها = undefined.
-          // النتيجة القديمة: baseEvent={} → mergedEvent بدون _connection_id/_event_namespace
-          // → useAgentSocket يستقبل event بدون metadata → قد يُرفض أو يُعالَج بشكل خاطئ.
-          const baseEvent = deltaBuffer[deltaBuffer.length - 1] || {};
-
-          // Merge all buffered delta content into a single chunk
-          const merged = deltaBuffer.splice(0).reduce((acc, ev) => {
-            const content = ev.payload?.content;
-            if (typeof content === 'string') acc += content;
-            return acc;
-          }, '');
-
-          if (!merged) return;
-
-          // Use the last buffered event as the envelope, replace content with merged
-          const mergedEvent = {
-            ...baseEvent,
-            type: 'assistant_delta',
-            payload: { ...(baseEvent.payload || {}), content: merged },
-          };
-
-          window.dispatchEvent(new CustomEvent('agent:event', { detail: mergedEvent }));
-          window.dispatchEvent(new CustomEvent(`agent:event:${eventNamespaceRef.current}`, { detail: mergedEvent }));
-        };
-
-        const scheduleDeltaFlush = () => {
-          if (!rafPending) {
-            rafPending = true;
-            requestAnimationFrame(flushDeltaBuffer);
-          }
-        };
-
-        ws.onmessage = (event) => {
-          if (!mountedRef.current) return;
-
-          // ISS-098 (D-WS-FLAP-005 — 2026-05-29): أي رسالة واردة تُثبت أن
-          // الاتصال حيّ، فتُلغي timeout الـ heartbeat — ليس pong فقط.
-          //
-          // الجذر: الـ backend receive loop محجوب أثناء `await stream_task`
-          // طوال بثّ الإجابة، فلا يستطيع قراءة ping العميل والردّ بـ pong.
-          // مع زمن Supabase + إجابة طويلة، يتجاوز الدور الواحد
-          // HEARTBEAT_TIMEOUT (90s) → close(1001) كاذب → reconnect →
-          // الإجابة الجارية تضيع ("لا يرد عن الأسئلة" للأسئلة الطويلة).
-          // تدفّق الـ deltas نفسه دليل قاطع على أن الاتصال حيّ، لذا نُلغي
-          // الـ timeout عند أي رسالة. (الاتصال الميت فعلاً لا يُرسل شيئاً
-          // فيبقى الـ timeout يعمل ويُطلق reconnect بشكل صحيح.)
-          if (heartbeatTimeoutRef.current) {
-            clearTimeout(heartbeatTimeoutRef.current);
-            heartbeatTimeoutRef.current = null;
-          }
-
-          // معالجة pong من heartbeat — لا نُعالجه كبيانات
-          if (typeof event.data === "string" && event.data.includes('"type":"pong"')) {
-            return;
-          }
-
-          // Bug A fix: detect HTML error pages (Next.js DevTools 500 bleed).
-          // When the backend crashes, Next.js dev server may intercept the 500
-          // and stream back a raw HTML page containing <nextjs-portal> or
-          // <!DOCTYPE html>. Guard here before JSON.parse so the HTML never
-          // reaches the chat renderer as text content.
-          if (typeof event.data === "string") {
-            const trimmed = event.data.trimStart();
-            if (trimmed.startsWith("<") || trimmed.startsWith("<!DOCTYPE")) {
-              console.error("[WS] Received HTML instead of JSON — backend 500 error page intercepted by Next.js DevTools. Suppressing HTML bleed.", event.data.slice(0, 200));
-              window.dispatchEvent(
-                new CustomEvent("agent:notification", {
-                  detail: { level: "error", message: "حدث خطأ في الخادم. يرجى المحاولة مرة أخرى." },
-                })
-              );
-              window.dispatchEvent(
-                new CustomEvent("agent:event", {
-                  detail: {
-                    type: "assistant_final",
-                    payload: { content: "" },
-                    _connection_id: connectionIdRef.current,
-                    _event_namespace: eventNamespaceRef.current,
-                  },
-                })
-              );
-              return;
-            }
-          }
-
-          const directAssistantError = parseAssistantErrorEnvelope(event.data);
-          if (directAssistantError) {
-            window.dispatchEvent(
-              new CustomEvent("agent:notification", {
-                detail: { level: "error", message: String(directAssistantError) },
-              })
-            );
-            return;
-          }
-
-          try {
-            const data = JSON.parse(event.data);
-            const enrichedData = {
-              ...data,
-              _connection_id: connectionIdRef.current,
-              _event_namespace: eventNamespaceRef.current,
-            };
-
-            const eventType = data?.type;
-            const isDelta = eventType === 'delta' || eventType === 'assistant_delta';
-
-            if (isDelta) {
-              // Buffer delta events — flush once per animation frame (~16ms)
-              deltaBuffer.push(enrichedData);
-              scheduleDeltaFlush();
-            } else {
-              // Flush any pending deltas before dispatching lifecycle events
-              // to preserve correct ordering (e.g. deltas before assistant_final)
-              if (deltaBuffer.length > 0) flushDeltaBuffer();
-
-              window.dispatchEvent(
-                new CustomEvent("agent:event", {
-                  detail: enrichedData,
-                })
-              );
-              window.dispatchEvent(
-                new CustomEvent(`agent:event:${eventNamespaceRef.current}`, {
-                  detail: enrichedData,
-                })
-              );
-            }
-          } catch (e) {
-            console.warn("Failed to parse WebSocket message:", e);
-          }
-        };
-
-        ws.onerror = (err) => {
-          if (mountedRef.current) {
-              // degraded وليس offline — onclose سيُقرِّر ما إذا كان يجب إعادة الاتصال
-              setState("degraded");
-          }
-          console.warn("[WS] error", {
-            url: ws.url,
-            readyState: ws.readyState,
-            error: err?.message || "unknown",
-          });
-        };
-
-        ws.onclose = (e) => {
-          if (!mountedRef.current) {
-            // الـ component unmounted أو الـ effect cleanup قيد التنفيذ — تجاهل تماماً.
-            return;
-          }
-
-          // D-WS-FLAP-003: لو الـ ws الذي أُغلق ليس wsRef.current الحالي،
-          // فهذا close لاتصال قديم (race condition من إعادة render). تجاهل.
-          if (wsRef.current && wsRef.current !== ws) {
-            console.info(
-              "[WS] ignoring close of stale ws (replaced by newer connection)",
-              { code: e.code, reason: e.reason }
-            );
-            return;
-          }
-
-          wsRef.current = null;
-          stopHeartbeat();
-
-          // D-WS-FLAP-003: قياس مدة الاتصال — يفرّق بين close فوري وعابر.
-          const sessionMs = openedAtRef.current
-            ? Date.now() - openedAtRef.current
-            : 0;
-          const wasStable = sessionMs >= STABLE_THRESHOLD_MS;
-
-          console.warn("[WS] closed", {
-            url: ws.url,
-            code: e.code,
-            reason: e.reason,
-            wasClean: e.wasClean,
-            session_ms: sessionMs,
-            was_stable: wasStable,
-          });
-          // ISS-101 (D-WS-KICK-DIAG): breadcrumb — يُسجِّل كل إغلاق (كوده + المدة)
-          // ليُظهر السجل التسلسل الكامل (connect → close → reconnect) المؤدّي للطرد،
-          // لا الحدث الأخير فقط. حاسم لتشخيص الطرد على الجوال بلا devtools.
-          clientLog("ws_close", {
-            code: e.code,
-            reason: String(e.reason || "").slice(0, 60),
-            session_ms: sessionMs,
-            attempt: retries.current,
-          });
-
-          // D-WS-AUTH-001 (2026-05-26) → D-WS-KICK-001 (ISS-097): 4401/4403
-          // ─────────────────────────────────────────────────────────────────
-          // 4401 قد يكون transient في بيئات mobile/Codespaces:
-          //   - DB lag → db.get(User) returns None / يرمي استثناء
-          //   - clock skew بين client و server
-          //   - Codespaces proxy / carrier-NAT حذف auth header
-          //   - خلل WS من جهة الخادم (race، إغلاق مفاجئ)
-          //
-          // الـ flow (D-WS-KICK-001 — لا حدّ يُترجَم إلى طرد):
-          //   1. probe HTTP /me لتأكيد صلاحية الـ token:
-          //      - 401/403 → الـ token ميت حقاً → fire auth_error (المسار الوحيد)
-          //      - 200 (valid) أو network/unknown → الـ token سليم → أعد الاتصال
-          //   2. لا تسجيل خروج أبداً ما دام /me لا يُؤكِّد البطلان.
-          if (FATAL_CODES.has(e.code)) {
-            fatalRetries.current += 1;
-
-            console.warn("[WS] Auth-related close — investigating", {
-              code: e.code,
-              reason: e.reason,
-              attempt: fatalRetries.current,
-            });
-
-            // ─────────────────────────────────────────────────────────────────
-            // D-WS-KICK-001 (ISS-097 — 2026-05-29): WS 4401 لا يُسجِّل الخروج وحده.
-            // ─────────────────────────────────────────────────────────────────
-            // الكارثة المُشخَّصة: الكود القديم كان يُطلق `agent:auth_error`
-            // (→ logout → "محادثة جديدة") بعد MAX_FATAL_RETRIES إغلاقات 4401
-            // *بدون* تأكيد أن الـ token فعلاً منتهٍ. مع FATAL_RETRY_DELAY_MS=2s،
-            // كان ذلك طرداً خلال ~6-8 ثوانٍ — حتى عندما يكون الـ token صالحاً
-            // تماماً. أي خلل WS من جهة الخادم (db.get transient، blip شبكي،
-            // race) كان يُترجَم إلى تسجيل خروج كارثي.
-            //
-            // القاعدة الجديدة (لا تُكسر بدون ADR): المسار **الوحيد** إلى
-            // `agent:auth_error` هو probe HTTP `/me` يُرجع 401/403 صراحةً
-            // (= الـ token ميت حقاً). أي نتيجة أخرى (200 = صالح، أو
-            // network/unknown = الخادم غير قابل للوصول) → نُبقي الجلسة
-            // ونُعيد الاتصال بـ exponential backoff. لا طرد أبداً ما دام
-            // الـ token صالحاً.
-            //
-            // إذا انتهى الـ token حقاً (بعد 8 ساعات) → /me يُرجع 401 → طرد
-            // نظيف (سلوك صحيح). وحتى حينها، FIX-B يستعيد آخر محادثة بعد
-            // إعادة الدخول فلا يفقد المستخدم سياقه.
-            if (revalidateAbortRef.current) {
-              revalidateAbortRef.current.abort();
-            }
-            const abortCtl =
-              typeof AbortController !== "undefined" ? new AbortController() : null;
-            revalidateAbortRef.current = abortCtl;
-            const timeoutId = setTimeout(() => {
-              if (abortCtl) abortCtl.abort();
-            }, REVALIDATION_TIMEOUT_MS);
-
-            // إعادة محاولة transient موحَّدة: backoff تصاعدي عبر عدّاد retries
-            // العام (لا عدّاد fatal منفصل) — فإن ظل الخادم 4401 إلى ما لا نهاية
-            // مع token صالح، نصل أخيراً إلى "offline" (الخادم معطّل) لا
-            // "auth_error" (الجلسة منتهية). هذان حدثان مختلفان تماماً.
-            const retryTransientAuth = (probe) => {
-              if (!mountedRef.current) return;
-              retries.current += 1;
-              if (retries.current >= MAX_RETRIES) {
-                console.error(
-                  `[WS] 4401 persisted ${MAX_RETRIES}× with valid/unknown token — ` +
-                    `server unreachable, declaring offline (NOT auth_error).`
-                );
-                setState("offline");
-                return;
-              }
-              setState(retries.current <= 1 ? "degraded" : "reconnecting");
-              if (typeof window !== "undefined") {
-                window.dispatchEvent(
-                  new CustomEvent("agent:transient_auth_warning", {
-                    detail: { code: e.code, attempt: retries.current, probe },
-                  })
-                );
-              }
-              const delay = Math.min(Math.pow(2, retries.current - 1) * 500, MAX_BACKOFF);
-              const jitter = Math.floor(Math.random() * 500);
-              clearTimeout(reconnectTimeoutRef.current);
-              reconnectTimeoutRef.current = setTimeout(connect, delay + jitter);
-            };
-
-            clientLog("ws_fatal_close", { code: e.code, reason: String(e.reason || "").slice(0, 80) });
-            revalidateTokenViaHttp(wsUrl, token, abortCtl?.signal)
-              .then((result) => {
-                clearTimeout(timeoutId);
-                if (!mountedRef.current) return;
-                console.info("[WS] Token revalidation result:", result);
-                clientLog("ws_revalidate_result", { code: e.code, result });
-
-                if (result === "invalid") {
-                  // المسار الوحيد للطرد: /me أكّد أن الـ token ميت حقاً.
-                  console.error("[WS] Token confirmed invalid via /me — escalating to auth_error.");
-                  setState("auth_error");
-                  if (typeof window !== "undefined") {
-                    window.dispatchEvent(
-                      new CustomEvent("agent:auth_error", {
-                        detail: { code: e.code, reason: "token_invalid_confirmed_via_http" },
-                      })
-                    );
-                  }
-                  return;
-                }
-
-                // result === "valid" أو "unknown" → الـ token سليم، الخلل من
-                // الخادم → أعد الاتصال، لا تطرد.
-                console.info(
-                  `[WS] 4401 treated as transient (probe=${result}) — token NOT dead, reconnecting.`
-                );
-                retryTransientAuth(result);
-              })
-              .catch(() => {
-                clearTimeout(timeoutId);
-                if (!mountedRef.current) return;
-                // probe أُلغي أو فشل → unknown → أعد الاتصال (لا طرد).
-                console.info("[WS] Token probe aborted/failed — treating as transient (no logout).");
-                retryTransientAuth("unknown");
-              });
-
-            // مُهم: نُرجع هنا لأن probe + reconnect سيتمان async.
-            return;
-          }
-
-          // D-WS-AUTH-001: لو وصلنا هنا، الـ close ليس auth-related.
-          // أعد ضبط fatalRetries (نجاح اتصال غير-auth).
-          fatalRetries.current = 0;
-
-          // D-WS-FLAP-003: close codes "صامتة" لا تستحق إعلان reconnecting.
-          // 1000/1001 من cleanup/navigation. نُعيد المحاولة لكن لا نُحدِّث الـ UI.
-          const silentClose = SILENT_CLOSE_CODES.has(e.code);
-
-          retries.current += 1;
-
-          // D-WS-002: لا يُعلَن عن Offline إلا بعد استنفاد جميع المحاولات
-          if (retries.current >= MAX_RETRIES) {
-            console.error(
-              `[WS] Exhausted ${MAX_RETRIES} reconnect attempts — declaring offline. ` +
-                `last_close_code=${e.code} auth_mode=${token ? "query_param" : "none"}`
-            );
-            setState("offline");
-            return; // لا إعادة اتصال تلقائية — المستخدم يحتاج reload
-          }
-
-          // D-WS-FLAP-003: لو الاتصال كان مستقراً (>3s) أو close صامت،
-          // أبقِ الـ UI على "متصل" حتى آخر لحظة. الـ debounce يمنع flicker:
-          // لو نجحنا في الاتصال خلال 500ms، المستخدم لن يرى "إعادة الاتصال".
-          const showReconnectingState = () => {
-            if (mountedRef.current) setState("reconnecting");
-          };
-
-          if (silentClose || wasStable) {
-            // أجِّل إعلان "reconnecting" لـ 500ms — لو نجح الـ retry قبلها لا flicker.
+      ws.onopen = () => {
+        if (mountedRef.current) {
+          // D-WS-FLAP-003: ألغِ أي debounce timer من المحاولة السابقة —
+          // إن كنّا في نافذة "reconnecting" قصيرة ولم نُظهر الحالة بعد،
+          // الآن نُلغي ذلك ونبقى على "connected".
+          if (stateDebounceRef.current) {
             clearTimeout(stateDebounceRef.current);
-            stateDebounceRef.current = setTimeout(showReconnectingState, 500);
-          } else {
-            // اتصال فشل سريعاً (<3s) ولم يكن silent — أعلِنها فوراً.
-            setState("reconnecting");
+            stateDebounceRef.current = null;
           }
 
-          // Exponential backoff مع jitter
-          const delay = Math.min(Math.pow(2, retries.current - 1) * 500, MAX_BACKOFF);
-          const jitter = Math.floor(Math.random() * 500);
+          // D-WS-FLAP-003: سجّل وقت الفتح الناجح — يُستخدم في onclose للتمييز.
+          openedAtRef.current = Date.now();
+          // D-WS-FLAP-004: علِّم أنّ الاتصال نجح مرة على الأقل — UI sync useEffect
+          // سيرى هذا ويُحدِّث uiState إلى "connected" فوراً.
+          everConnectedRef.current = true;
+          lastConnectedAtRef.current = Date.now();
+          // D-WS-FLAP-004 (REGRESSION FIX 2026-05-26): ألغِ UI promotion timer
+          // المجدوَل — تعافينا، لا حاجة لإظهار "reconnecting".
+          // كان هذا السطر يشير إلى `offlineGraceTimerRef` المحذوف بعد refactor،
+          // ما يُسبب ReferenceError ويُحطِّم الـ onopen handler — وبالتالي
+          // "متصل" لم تظهر أبداً للمستخدم.
+          if (uiPromotionTimerRef.current) {
+            clearTimeout(uiPromotionTimerRef.current);
+            uiPromotionTimerRef.current = null;
+          }
 
-          console.info(
-            `[WS] Reconnecting in ${delay + jitter}ms (attempt ${retries.current}/${MAX_RETRIES})`
-          );
-          clearTimeout(reconnectTimeoutRef.current);
-          reconnectTimeoutRef.current = setTimeout(connect, delay + jitter);
+          const wasReconnect = retries.current > 0;
+          retries.current = 0;
+          // D-WS-AUTH-001: reset عداد 4401 — اتصال ناجح يُلغي أي شك في الـ token.
+          fatalRetries.current = 0;
+          // ألغِ أي probe HTTP جاري (مش محتاج لو الاتصال نجح)
+          if (revalidateAbortRef.current) {
+            revalidateAbortRef.current.abort();
+            revalidateAbortRef.current = null;
+          }
+          setState(wasReconnect ? "recovered" : "connected");
+          // ISS-101 (D-WS-KICK-DIAG): breadcrumb — اتصال ناجح (مع/بدون reconnect).
+          clientLog("ws_open", { was_reconnect: wasReconnect });
+
+          // بعد recovery → انتقل إلى connected بعد لحظة قصيرة للـ UI feedback
+          if (wasReconnect) {
+            setTimeout(() => {
+              if (mountedRef.current) setState("connected");
+            }, 500);
+          }
+
+          // بدء heartbeat للكشف عن stale connections
+          startHeartbeat(ws);
+
+          // Flush pending messages
+          if (pendingQueue.current.length > 0) {
+            while (pendingQueue.current.length > 0) {
+              const msg = pendingQueue.current.shift();
+              try {
+                ws.send(JSON.stringify(msg));
+              } catch {
+                /* ignore */
+              }
+            }
+          }
+        }
+      };
+
+      // ISS-STREAM-004: Delta batching via requestAnimationFrame
+      // Problem: 400+ delta chunks arrive in <4s → 400+ dispatchEvent calls →
+      //          400+ React setState calls → machine-gun re-renders that freeze UI.
+      // Fix: buffer delta chunks and flush them in a single batch per animation frame.
+      //      Non-delta events (conversation_init, persisted, error, etc.) are dispatched
+      //      immediately to preserve correct lifecycle ordering.
+      const deltaBuffer = [];
+      let rafPending = false;
+
+      const flushDeltaBuffer = () => {
+        rafPending = false;
+        if (!mountedRef.current || deltaBuffer.length === 0) return;
+
+        // ISS-DELTA-BUG-001 (2026-05-28): حفظ baseEvent قبل splice —
+        // deltaBuffer.splice(0) يُفرغ المصفوفة فوراً، فـ deltaBuffer[0] بعدها = undefined.
+        // النتيجة القديمة: baseEvent={} → mergedEvent بدون _connection_id/_event_namespace
+        // → useAgentSocket يستقبل event بدون metadata → قد يُرفض أو يُعالَج بشكل خاطئ.
+        const baseEvent = deltaBuffer[deltaBuffer.length - 1] || {};
+
+        // Merge all buffered delta content into a single chunk
+        const merged = deltaBuffer.splice(0).reduce((acc, ev) => {
+          const content = ev.payload?.content;
+          if (typeof content === "string") acc += content;
+          return acc;
+        }, "");
+
+        if (!merged) return;
+
+        // Use the last buffered event as the envelope, replace content with merged
+        const mergedEvent = {
+          ...baseEvent,
+          type: "assistant_delta",
+          payload: { ...(baseEvent.payload || {}), content: merged },
         };
-    } catch (err) {
-        console.warn("[WS] Connection failed:", err);
-        retries.current += 1;
 
+        window.dispatchEvent(
+          new CustomEvent("agent:event", { detail: mergedEvent }),
+        );
+        window.dispatchEvent(
+          new CustomEvent(`agent:event:${eventNamespaceRef.current}`, {
+            detail: mergedEvent,
+          }),
+        );
+      };
+
+      const scheduleDeltaFlush = () => {
+        if (!rafPending) {
+          rafPending = true;
+          requestAnimationFrame(flushDeltaBuffer);
+        }
+      };
+
+      ws.onmessage = (event) => {
         if (!mountedRef.current) return;
 
-        // D-WS-002: لا offline إلا بعد exhaustion
-        if (retries.current >= MAX_RETRIES) {
-            setState("offline");
-            return;
+        // ISS-098 (D-WS-FLAP-005 — 2026-05-29): أي رسالة واردة تُثبت أن
+        // الاتصال حيّ، فتُلغي timeout الـ heartbeat — ليس pong فقط.
+        //
+        // الجذر: الـ backend receive loop محجوب أثناء `await stream_task`
+        // طوال بثّ الإجابة، فلا يستطيع قراءة ping العميل والردّ بـ pong.
+        // مع زمن Supabase + إجابة طويلة، يتجاوز الدور الواحد
+        // HEARTBEAT_TIMEOUT (90s) → close(1001) كاذب → reconnect →
+        // الإجابة الجارية تضيع ("لا يرد عن الأسئلة" للأسئلة الطويلة).
+        // تدفّق الـ deltas نفسه دليل قاطع على أن الاتصال حيّ، لذا نُلغي
+        // الـ timeout عند أي رسالة. (الاتصال الميت فعلاً لا يُرسل شيئاً
+        // فيبقى الـ timeout يعمل ويُطلق reconnect بشكل صحيح.)
+        if (heartbeatTimeoutRef.current) {
+          clearTimeout(heartbeatTimeoutRef.current);
+          heartbeatTimeoutRef.current = null;
         }
 
-        setState("reconnecting");
-        const delay = Math.min(Math.pow(2, retries.current - 1) * 500, MAX_BACKOFF);
+        // معالجة pong من heartbeat — لا نُعالجه كبيانات
+        if (
+          typeof event.data === "string" &&
+          event.data.includes('"type":"pong"')
+        ) {
+          return;
+        }
+
+        // Bug A fix: detect HTML error pages (Next.js DevTools 500 bleed).
+        // When the backend crashes, Next.js dev server may intercept the 500
+        // and stream back a raw HTML page containing <nextjs-portal> or
+        // <!DOCTYPE html>. Guard here before JSON.parse so the HTML never
+        // reaches the chat renderer as text content.
+        if (typeof event.data === "string") {
+          const trimmed = event.data.trimStart();
+          if (trimmed.startsWith("<") || trimmed.startsWith("<!DOCTYPE")) {
+            console.error(
+              "[WS] Received HTML instead of JSON — backend 500 error page intercepted by Next.js DevTools. Suppressing HTML bleed.",
+              event.data.slice(0, 200),
+            );
+            window.dispatchEvent(
+              new CustomEvent("agent:notification", {
+                detail: {
+                  level: "error",
+                  message: "حدث خطأ في الخادم. يرجى المحاولة مرة أخرى.",
+                },
+              }),
+            );
+            window.dispatchEvent(
+              new CustomEvent("agent:event", {
+                detail: {
+                  type: "assistant_final",
+                  payload: { content: "" },
+                  _connection_id: connectionIdRef.current,
+                  _event_namespace: eventNamespaceRef.current,
+                },
+              }),
+            );
+            return;
+          }
+        }
+
+        const directAssistantError = parseAssistantErrorEnvelope(event.data);
+        if (directAssistantError) {
+          window.dispatchEvent(
+            new CustomEvent("agent:notification", {
+              detail: { level: "error", message: String(directAssistantError) },
+            }),
+          );
+          return;
+        }
+
+        try {
+          const data = JSON.parse(event.data);
+          const enrichedData = {
+            ...data,
+            _connection_id: connectionIdRef.current,
+            _event_namespace: eventNamespaceRef.current,
+          };
+
+          const eventType = data?.type;
+          const isDelta =
+            eventType === "delta" || eventType === "assistant_delta";
+
+          if (isDelta) {
+            // Buffer delta events — flush once per animation frame (~16ms)
+            deltaBuffer.push(enrichedData);
+            scheduleDeltaFlush();
+          } else {
+            // Flush any pending deltas before dispatching lifecycle events
+            // to preserve correct ordering (e.g. deltas before assistant_final)
+            if (deltaBuffer.length > 0) flushDeltaBuffer();
+
+            window.dispatchEvent(
+              new CustomEvent("agent:event", {
+                detail: enrichedData,
+              }),
+            );
+            window.dispatchEvent(
+              new CustomEvent(`agent:event:${eventNamespaceRef.current}`, {
+                detail: enrichedData,
+              }),
+            );
+          }
+        } catch (e) {
+          console.warn("Failed to parse WebSocket message:", e);
+        }
+      };
+
+      ws.onerror = (err) => {
+        if (mountedRef.current) {
+          // degraded وليس offline — onclose سيُقرِّر ما إذا كان يجب إعادة الاتصال
+          setState("degraded");
+        }
+        console.warn("[WS] error", {
+          url: ws.url,
+          readyState: ws.readyState,
+          error: err?.message || "unknown",
+        });
+      };
+
+      ws.onclose = (e) => {
+        if (!mountedRef.current) {
+          // الـ component unmounted أو الـ effect cleanup قيد التنفيذ — تجاهل تماماً.
+          return;
+        }
+
+        // D-WS-FLAP-003: لو الـ ws الذي أُغلق ليس wsRef.current الحالي،
+        // فهذا close لاتصال قديم (race condition من إعادة render). تجاهل.
+        if (wsRef.current && wsRef.current !== ws) {
+          console.info(
+            "[WS] ignoring close of stale ws (replaced by newer connection)",
+            { code: e.code, reason: e.reason },
+          );
+          return;
+        }
+
+        wsRef.current = null;
+        stopHeartbeat();
+
+        // D-WS-FLAP-003: قياس مدة الاتصال — يفرّق بين close فوري وعابر.
+        const sessionMs = openedAtRef.current
+          ? Date.now() - openedAtRef.current
+          : 0;
+        const wasStable = sessionMs >= STABLE_THRESHOLD_MS;
+
+        console.warn("[WS] closed", {
+          url: ws.url,
+          code: e.code,
+          reason: e.reason,
+          wasClean: e.wasClean,
+          session_ms: sessionMs,
+          was_stable: wasStable,
+        });
+        // ISS-101 (D-WS-KICK-DIAG): breadcrumb — يُسجِّل كل إغلاق (كوده + المدة)
+        // ليُظهر السجل التسلسل الكامل (connect → close → reconnect) المؤدّي للطرد،
+        // لا الحدث الأخير فقط. حاسم لتشخيص الطرد على الجوال بلا devtools.
+        clientLog("ws_close", {
+          code: e.code,
+          reason: String(e.reason || "").slice(0, 60),
+          session_ms: sessionMs,
+          attempt: retries.current,
+        });
+
+        // D-WS-AUTH-001 (2026-05-26) → D-WS-KICK-001 (ISS-097): 4401/4403
+        // ─────────────────────────────────────────────────────────────────
+        // 4401 قد يكون transient في بيئات mobile/Codespaces:
+        //   - DB lag → db.get(User) returns None / يرمي استثناء
+        //   - clock skew بين client و server
+        //   - Codespaces proxy / carrier-NAT حذف auth header
+        //   - خلل WS من جهة الخادم (race، إغلاق مفاجئ)
+        //
+        // الـ flow (D-WS-KICK-001 — لا حدّ يُترجَم إلى طرد):
+        //   1. probe HTTP /me لتأكيد صلاحية الـ token:
+        //      - 401/403 → الـ token ميت حقاً → fire auth_error (المسار الوحيد)
+        //      - 200 (valid) أو network/unknown → الـ token سليم → أعد الاتصال
+        //   2. لا تسجيل خروج أبداً ما دام /me لا يُؤكِّد البطلان.
+        if (FATAL_CODES.has(e.code)) {
+          fatalRetries.current += 1;
+
+          console.warn("[WS] Auth-related close — investigating", {
+            code: e.code,
+            reason: e.reason,
+            attempt: fatalRetries.current,
+          });
+
+          // ─────────────────────────────────────────────────────────────────
+          // D-WS-KICK-001 (ISS-097 — 2026-05-29): WS 4401 لا يُسجِّل الخروج وحده.
+          // ─────────────────────────────────────────────────────────────────
+          // الكارثة المُشخَّصة: الكود القديم كان يُطلق `agent:auth_error`
+          // (→ logout → "محادثة جديدة") بعد MAX_FATAL_RETRIES إغلاقات 4401
+          // *بدون* تأكيد أن الـ token فعلاً منتهٍ. مع FATAL_RETRY_DELAY_MS=2s،
+          // كان ذلك طرداً خلال ~6-8 ثوانٍ — حتى عندما يكون الـ token صالحاً
+          // تماماً. أي خلل WS من جهة الخادم (db.get transient، blip شبكي،
+          // race) كان يُترجَم إلى تسجيل خروج كارثي.
+          //
+          // القاعدة الجديدة (لا تُكسر بدون ADR): المسار **الوحيد** إلى
+          // `agent:auth_error` هو probe HTTP `/me` يُرجع 401/403 صراحةً
+          // (= الـ token ميت حقاً). أي نتيجة أخرى (200 = صالح، أو
+          // network/unknown = الخادم غير قابل للوصول) → نُبقي الجلسة
+          // ونُعيد الاتصال بـ exponential backoff. لا طرد أبداً ما دام
+          // الـ token صالحاً.
+          //
+          // إذا انتهى الـ token حقاً (بعد 8 ساعات) → /me يُرجع 401 → طرد
+          // نظيف (سلوك صحيح). وحتى حينها، FIX-B يستعيد آخر محادثة بعد
+          // إعادة الدخول فلا يفقد المستخدم سياقه.
+          if (revalidateAbortRef.current) {
+            revalidateAbortRef.current.abort();
+          }
+          const abortCtl =
+            typeof AbortController !== "undefined"
+              ? new AbortController()
+              : null;
+          revalidateAbortRef.current = abortCtl;
+          const timeoutId = setTimeout(() => {
+            if (abortCtl) abortCtl.abort();
+          }, REVALIDATION_TIMEOUT_MS);
+
+          // إعادة محاولة transient موحَّدة: backoff تصاعدي عبر عدّاد retries
+          // العام (لا عدّاد fatal منفصل) — فإن ظل الخادم 4401 إلى ما لا نهاية
+          // مع token صالح، نصل أخيراً إلى "offline" (الخادم معطّل) لا
+          // "auth_error" (الجلسة منتهية). هذان حدثان مختلفان تماماً.
+          const retryTransientAuth = (probe) => {
+            if (!mountedRef.current) return;
+            retries.current += 1;
+            if (retries.current >= MAX_RETRIES) {
+              console.error(
+                `[WS] 4401 persisted ${MAX_RETRIES}× with valid/unknown token — ` +
+                  `server unreachable, declaring offline (NOT auth_error).`,
+              );
+              setState("offline");
+              return;
+            }
+            setState(retries.current <= 1 ? "degraded" : "reconnecting");
+            if (typeof window !== "undefined") {
+              window.dispatchEvent(
+                new CustomEvent("agent:transient_auth_warning", {
+                  detail: { code: e.code, attempt: retries.current, probe },
+                }),
+              );
+            }
+            const delay = Math.min(
+              Math.pow(2, retries.current - 1) * 500,
+              MAX_BACKOFF,
+            );
+            const jitter = Math.floor(Math.random() * 500);
+            clearTimeout(reconnectTimeoutRef.current);
+            reconnectTimeoutRef.current = setTimeout(connect, delay + jitter);
+          };
+
+          clientLog("ws_fatal_close", {
+            code: e.code,
+            reason: String(e.reason || "").slice(0, 80),
+          });
+          revalidateTokenViaHttp(wsUrl, token, abortCtl?.signal)
+            .then((result) => {
+              clearTimeout(timeoutId);
+              if (!mountedRef.current) return;
+              console.info("[WS] Token revalidation result:", result);
+              clientLog("ws_revalidate_result", { code: e.code, result });
+
+              if (result === "invalid") {
+                // المسار الوحيد للطرد: /me أكّد أن الـ token ميت حقاً.
+                console.error(
+                  "[WS] Token confirmed invalid via /me — escalating to auth_error.",
+                );
+                setState("auth_error");
+                if (typeof window !== "undefined") {
+                  window.dispatchEvent(
+                    new CustomEvent("agent:auth_error", {
+                      detail: {
+                        code: e.code,
+                        reason: "token_invalid_confirmed_via_http",
+                      },
+                    }),
+                  );
+                }
+                return;
+              }
+
+              // result === "valid" أو "unknown" → الـ token سليم، الخلل من
+              // الخادم → أعد الاتصال، لا تطرد.
+              console.info(
+                `[WS] 4401 treated as transient (probe=${result}) — token NOT dead, reconnecting.`,
+              );
+              retryTransientAuth(result);
+            })
+            .catch(() => {
+              clearTimeout(timeoutId);
+              if (!mountedRef.current) return;
+              // probe أُلغي أو فشل → unknown → أعد الاتصال (لا طرد).
+              console.info(
+                "[WS] Token probe aborted/failed — treating as transient (no logout).",
+              );
+              retryTransientAuth("unknown");
+            });
+
+          // مُهم: نُرجع هنا لأن probe + reconnect سيتمان async.
+          return;
+        }
+
+        // D-WS-AUTH-001: لو وصلنا هنا، الـ close ليس auth-related.
+        // أعد ضبط fatalRetries (نجاح اتصال غير-auth).
+        fatalRetries.current = 0;
+
+        // D-WS-FLAP-003: close codes "صامتة" لا تستحق إعلان reconnecting.
+        // 1000/1001 من cleanup/navigation. نُعيد المحاولة لكن لا نُحدِّث الـ UI.
+        const silentClose = SILENT_CLOSE_CODES.has(e.code);
+
+        retries.current += 1;
+
+        // D-WS-002: لا يُعلَن عن Offline إلا بعد استنفاد جميع المحاولات
+        if (retries.current >= MAX_RETRIES) {
+          console.error(
+            `[WS] Exhausted ${MAX_RETRIES} reconnect attempts — declaring offline. ` +
+              `last_close_code=${e.code} auth_mode=${token ? "query_param" : "none"}`,
+          );
+          setState("offline");
+          return; // لا إعادة اتصال تلقائية — المستخدم يحتاج reload
+        }
+
+        // D-WS-FLAP-003: لو الاتصال كان مستقراً (>3s) أو close صامت،
+        // أبقِ الـ UI على "متصل" حتى آخر لحظة. الـ debounce يمنع flicker:
+        // لو نجحنا في الاتصال خلال 500ms، المستخدم لن يرى "إعادة الاتصال".
+        const showReconnectingState = () => {
+          if (mountedRef.current) setState("reconnecting");
+        };
+
+        if (silentClose || wasStable) {
+          // أجِّل إعلان "reconnecting" لـ 500ms — لو نجح الـ retry قبلها لا flicker.
+          clearTimeout(stateDebounceRef.current);
+          stateDebounceRef.current = setTimeout(showReconnectingState, 500);
+        } else {
+          // اتصال فشل سريعاً (<3s) ولم يكن silent — أعلِنها فوراً.
+          setState("reconnecting");
+        }
+
+        // Exponential backoff مع jitter
+        const delay = Math.min(
+          Math.pow(2, retries.current - 1) * 500,
+          MAX_BACKOFF,
+        );
         const jitter = Math.floor(Math.random() * 500);
+
+        console.info(
+          `[WS] Reconnecting in ${delay + jitter}ms (attempt ${retries.current}/${MAX_RETRIES})`,
+        );
         clearTimeout(reconnectTimeoutRef.current);
         reconnectTimeoutRef.current = setTimeout(connect, delay + jitter);
+      };
+    } catch (err) {
+      console.warn("[WS] Connection failed:", err);
+      retries.current += 1;
+
+      if (!mountedRef.current) return;
+
+      // D-WS-002: لا offline إلا بعد exhaustion
+      if (retries.current >= MAX_RETRIES) {
+        setState("offline");
+        return;
+      }
+
+      setState("reconnecting");
+      const delay = Math.min(
+        Math.pow(2, retries.current - 1) * 500,
+        MAX_BACKOFF,
+      );
+      const jitter = Math.floor(Math.random() * 500);
+      clearTimeout(reconnectTimeoutRef.current);
+      reconnectTimeoutRef.current = setTimeout(connect, delay + jitter);
     }
-  // ISS-096: wsUrl/token/eventNamespace مُزالة من dependencies — تُقرأ من refs.
-  // هذا يمنع إعادة إنشاء connect عند كل تغيير في wsUrl/token → لا cleanup → لا قطع.
+    // ISS-096: wsUrl/token/eventNamespace مُزالة من dependencies — تُقرأ من refs.
+    // هذا يمنع إعادة إنشاء connect عند كل تغيير في wsUrl/token → لا cleanup → لا قطع.
   }, [startHeartbeat, stopHeartbeat]);
 
   const sendMessage = useCallback((data) => {
@@ -846,9 +906,11 @@ export function useRealtimeConnection(wsUrl, token, eventNamespace = "default") 
   // هذا يُعوِّض عن إزالة wsUrl/token من dependencies connect.
   useEffect(() => {
     if (wsUrl && token && mountedRef.current) {
-      if (!wsRef.current ||
-          (wsRef.current.readyState !== WebSocket.OPEN &&
-           wsRef.current.readyState !== WebSocket.CONNECTING)) {
+      if (
+        !wsRef.current ||
+        (wsRef.current.readyState !== WebSocket.OPEN &&
+          wsRef.current.readyState !== WebSocket.CONNECTING)
+      ) {
         connect();
       }
     }
