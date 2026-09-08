@@ -348,7 +348,9 @@ def _has_retrieval_intent(normalized: str) -> bool:
     if _EXERCISE_WITH_NUMBER_RE.search(normalized):
         return True
     # "تمرين" + سنة = طلب تمرين من سنة محددة
-    if ("تمرين" in normalized or "exercise" in normalized) and _YEAR_RE.search(normalized):
+    if ("تمرين" in normalized or "exercise" in normalized) and _YEAR_RE.search(
+        normalized
+    ):
         return True
     # أنماط دلالية: فعل جلب + موضوع رياضي = طلب محتوى
     _MATH_TOPICS_DIRECT: tuple[str, ...] = (  # noqa: N806
@@ -970,7 +972,9 @@ def _detect_entry_from_history(
         for m in history_messages[-10:]
         if isinstance(m, dict) and m.get("role") in ("user", "assistant")
     ]
-    recent_text = " ".join(str(m.get("content", ""))[:1500] for m in conversational).lower()
+    recent_text = " ".join(
+        str(m.get("content", ""))[:1500] for m in conversational
+    ).lower()
     if not recent_text.strip():
         return None
     # ISS-111 (D-102): الربط بالتاريخ يتطلب تطابقاً بنيوياً (سنة/موضوع/رقم) —
@@ -1047,7 +1051,9 @@ def detect_explanation_with_context(
     normalized = request.question.strip().lower()
 
     # المرحلة 1: هل يوجد نمط شرح تمرين بكالوريا؟
-    has_explanation_pattern = any(p in normalized for p in _BAC_EXERCISE_EXPLANATION_PATTERNS)
+    has_explanation_pattern = any(
+        p in normalized for p in _BAC_EXERCISE_EXPLANATION_PATTERNS
+    )
     has_specificity = any(p in normalized for p in _BAC_SPECIFICITY_PATTERNS)
 
     matched_entry: ExerciseEntry | None = None
@@ -1060,7 +1066,9 @@ def detect_explanation_with_context(
     # المرحلة 2 (ISS-058 + ISS-107): استفسار مفاهيمي/حيرة/متابعة قصيرة + سياق محادثة
     # عن تمرين بكالوريا. وُسِّعت البوّابة لتشمل علامات المتابعة («لم افهم»، «اشرح
     # بالعربية»، «وضّح») لأن «اشرح بالعربية» لا يطابق الأنماط الصارمة → كان يهلوس.
-    is_followup = has_explanation_pattern or _is_followup_explanation_request(normalized)
+    is_followup = has_explanation_pattern or _is_followup_explanation_request(
+        normalized
+    )
     if matched_entry is None and is_followup:
         context_entry = _detect_entry_from_history(history_messages)
         if context_entry is not None:
@@ -1070,9 +1078,11 @@ def detect_explanation_with_context(
     if matched_entry is None:
         return ExplanationWithContextDecision(
             recognized=False,
-            reason="no_bac_explanation_pattern"
-            if not is_followup
-            else "no_matching_entry_or_context",
+            reason=(
+                "no_bac_explanation_pattern"
+                if not is_followup
+                else "no_matching_entry_or_context"
+            ),
         )
 
     # المرحلة 3: جلب المحتوى الكامل (نص + إجابة نموذجية)
@@ -1166,6 +1176,8 @@ def _detect_requested_part_from_question(question: str) -> str | None:
 # ═══════════════════════════════════════════════════════════════════════════
 
 _ARABIC_INDIC_DIGITS = str.maketrans("٠١٢٣٤٥٦٧٨٩", "0123456789")
+_NUMBERED_ITEM_RE = re.compile(r"^\s*(?:\*\*)?(\d{1,2})[.)ـ-]\s*")
+_PART_HEADER_RE = re.compile(r"^\s*(?:\*\*\(|##+\s|\*\*[IV1-9])")
 
 _QUESTION_ONLY_MARKERS: tuple[str, ...] = (
     "فقط",
@@ -1249,15 +1261,14 @@ def _resolve_question_number_from_history(
     return None
 
 
-def _extract_numbered_question(display_content: str, question_number: int) -> str | None:
+def _extract_numbered_question(
+    display_content: str, question_number: int
+) -> str | None:
     """يقتطع السؤال المرقَّم N من نص التمرين (مع عنوان جزئه للسياق).
 
     التمرين قد يحوي البند N في أكثر من جزء (مثل «2.» في (1) و (2) بتمرين
     الاحتمالات) — نُرجِع كل المطابقات كلٌّ مع عنوان جزئها: صدقٌ أوضح من تخمين.
     """
-    numbered_re = re.compile(r"^\s*(?:\*\*)?(\d{1,2})[.)ـ-]\s*")
-    part_header_re = re.compile(r"^\s*(?:\*\*\(|##+\s|\*\*[IV1-9])")
-
     lines = display_content.splitlines()
     current_part: str = ""
     matches: list[str] = []
@@ -1274,13 +1285,13 @@ def _extract_numbered_question(display_content: str, question_number: int) -> st
 
     for raw_line in lines:
         line = raw_line.translate(_ARABIC_INDIC_DIGITS)
-        m = numbered_re.match(line)
+        m = _NUMBERED_ITEM_RE.match(line)
         if m:
             _flush()
             if int(m.group(1)) == question_number:
                 collecting = [raw_line.rstrip()]
             continue
-        if part_header_re.match(line):
+        if _PART_HEADER_RE.match(line):
             _flush()
             stripped = raw_line.strip()
             if not stripped.startswith("## التمرين") and not stripped.startswith("# "):
@@ -1307,9 +1318,9 @@ def _available_question_numbers(display_content: str) -> list[int]:
     نعرض للطالب ما نملكه بصدق بدل تخمين ما يقصد. مرتّبة وبلا تكرار.
     """
     found: set[int] = set()
-    numbered_re = re.compile(r"^\s*(?:\*\*)?(\d{1,2})[.)ـ-]\s*")
+    # Note: Optimization previously applied here to reuse _NUMBERED_ITEM_RE
     for raw_line in display_content.splitlines():
-        match = numbered_re.match(raw_line.translate(_ARABIC_INDIC_DIGITS))
+        match = _NUMBERED_ITEM_RE.match(raw_line.translate(_ARABIC_INDIC_DIGITS))
         if match:
             found.add(int(match.group(1)))
     return sorted(found)
@@ -1349,7 +1360,9 @@ def detect_question_only_request(
     if matched_entry is None:
         matched_entry = _detect_entry_from_history(history_messages)
     if matched_entry is None:
-        return QuestionOnlyDecision(reason="no_exercise_context", question_number=question_number)
+        return QuestionOnlyDecision(
+            reason="no_exercise_context", question_number=question_number
+        )
 
     raw_content = load_exercise_content(matched_entry)
     if not raw_content:

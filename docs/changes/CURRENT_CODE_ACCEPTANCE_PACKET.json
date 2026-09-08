@@ -1,155 +1,36 @@
 {
-  "$schema_version": "1",
-  "packet_id": "CAP-2026-09-01-fx-discovery-protocol",
-  "status": "READY_FOR_GATE",
-  "decision": "D-277",
-  "changed_paths": [
-    "docs/changes/CURRENT_CODE_ACCEPTANCE_PACKET.json",
-    "app/services/billing/vouchers.py",
-    "tests/services/test_voucher_redemption.py"
-  ],
-  "standards": [
-    "system-design-primer"
-  ],
-  "evidence": [
-    "nist-agent-standards-initiative",
-    "owasp-agent-security",
-    "oauth-security-bcp-rfc9700",
-    "mcp-security-best-practices-2025-06-18",
-    "agentdojo-2024",
-    "injecagent-acl-2024"
-  ],
-  "local_application": [
-    {
-      "standard": "system-design-primer",
-      "paths": [
-        "docs/commercial/FX_OPPORTUNITY_PORTFOLIO.json",
-        "docs/commercial/FX_OPPORTUNITY_PORTFOLIO.md",
-        "scripts/fitness/check_fx_opportunity_portfolio.py",
-        "tests/fitness/test_fx_opportunity_portfolio_gate.py"
-      ],
-      "gate": "python3 scripts/fitness/check_fx_opportunity_portfolio.py && python3 -m pytest -q tests/fitness/test_fx_opportunity_portfolio_gate.py",
-      "application_ar": "تطبيق بحث الإيراد كعقد بيانات للفرص القريبة: تعريف مشترٍ مؤهل، موافقة اتصال، أسئلة كشف الألم، سجل دليل منزوع الهوية، حدود تجربة مدفوعة، وقاعدة قرار/قتل؛ وتمنع البوابة إضافة العقد للفرص غير NOW أو ترقية الإيراد."
-    }
-  ],
-  "production": {
-    "owner": "naas-commercial-research",
-    "status": "RESEARCH_ONLY",
-    "interfaces": [
-      "docs/commercial/FX_OPPORTUNITY_PORTFOLIO.json: مصدر بروتوكول الاكتشاف المقيد للفرص NOW",
-      "docs/commercial/FX_OPPORTUNITY_PORTFOLIO.md: حدود التشغيل وعدم ادعاء الإيراد",
-      "scripts/fitness/check_fx_opportunity_portfolio.py: فرض بنية البروتوكول والأدلة والترتيب وعدم الترقية"
+    "$schema_version": "1",
+    "packet_id": "CAP-2026-09-01-fx-discovery-protocol",
+    "status": "READY_FOR_GATE",
+    "decision": "D-277",
+    "changed_paths": [
+        "app/services/capabilities/exercise_retrieval.py",
+        "microservices/api_gateway/websockets.py",
+        "tests/unit/infrastructure/clients/orchestrator/test_local_fallback.py"
     ],
-    "failure_behavior_ar": "تفشل البوابة عند مصدر مجهول أو عرض غير مصرح أو ترقية تجارية أو ترتيب منجرف أو غياب بروتوكول قرار للفرص NOW أو تطبيقه على فرصة ليست NOW.",
-    "observability_ar": "مصدر JSON يكشف الأسئلة والحدود وحقول السجل وقاعدة القرار؛ وتغطي الاختبارات السلبية غياب قاعدة القرار واستعمال البروتوكول خارج NOW.",
-    "security_boundary_ar": "لا اتصال بعميل ولا اختبار خارجي أو معالجة بيانات؛ أي تواصل يتطلب إذناً صريحاً، والسجل المقرر يمنع الأسماء والأسرار والرموز وبيانات العملاء.",
-    "rollback_ar": "التغيير إضافي ويمكن عكسه، لكن ذلك يزيل عقداً قابلاً للتدقيق يمنع تحويل مقابلات عامة إلى ادعاء طلب أو إيراد.",
-    "runtime_evidence_paths": [
-      "docs/commercial/FX_OPPORTUNITY_PORTFOLIO.json",
-      "docs/commercial/FX_OPPORTUNITY_PORTFOLIO.md",
-      "tests/fitness/test_fx_opportunity_portfolio_gate.py",
-      "scripts/fitness/check_fx_opportunity_portfolio.py"
-    ]
-  },
-  "commercial_trace": {
-    "offer_ids": [
-      "ai-red-teaming-multilingual"
+    "standards": [
+        "system-design-primer"
     ],
-    "customer_problem_ar": "فرق الوكلاء العربية التي تنفذ أفعالاً ذات أثر لا تملك دائماً دليلاً متكرراً على التفويض والسياسة وانتقال الحالة، لكن شدة الألم والميزانية لم تثبتا لـNAAS.",
-    "value_hypothesis_ar": "بروتوكول اكتشاف مقيد يمنع بناء منصة قبل توثيق بديل العميل والألم ومالك الميزانية ومسار الشراء وبوابة تجربة مدفوعة محددة.",
-    "foreign_currency_path_ar": "مقابلات مصرح بها مع مشترين مؤهلين ثم Sprint B2B محدد ومدفوع بالدولار أو اليورو فقط عند تحقق بوابة القبول؛ لا اشتراك أو توسع قبل دليل تجديد وهامش.",
-    "foundation_exception_ar": "هذه حزمة بحث وحوكمة اكتشاف فقط؛ لا توجد مقابلات أو عميل أو عقد أو دفعة أو إيراد مثبت، ويبقى العرض الأب PROPOSED."
-  },
-  "deletions": {
-    "count": 0,
-    "paths": [],
-    "policy_ar": "الحذف غير مسموح في هذه الحزمة."
-  },
-  "verification": {
-    "result": "PASS",
-    "commands": [
-      "python3 scripts/fitness/check_fx_opportunity_portfolio.py",
-      "python3 -m pytest -q tests/fitness/test_fx_opportunity_portfolio_gate.py",
-      "ruff check scripts/fitness/check_fx_opportunity_portfolio.py tests/fitness/test_fx_opportunity_portfolio_gate.py",
-      "ruff format --check scripts/fitness/check_fx_opportunity_portfolio.py tests/fitness/test_fx_opportunity_portfolio_gate.py",
-      "python3 scripts/fitness/check_documentation_contract.py",
-      "git diff --check"
+    "evidence": [
+        "nist-agent-standards-initiative",
+        "owasp-agent-security",
+        "oauth-security-bcp-rfc9700",
+        "mcp-security-best-practices-2025-06-18",
+        "agentdojo-2024",
+        "injecagent-acl-2024"
     ],
-    "measured_ar": "نجحت بوابة المحفظة واختباراتها الإيجابية والسلبية (6 اختبارات)، ونجح Ruff وفحص التنسيق؛ لا يمثل ذلك دليلاً على مقابلات أو إيراد."
-  },
-  "curriculum": {
-    "catalog_path": "docs/research/UNIVERSITY_CURRICULUM_CATALOG.json",
-    "application_matrix_path": "docs/research/CURRICULUM_APPLICATION_MATRIX.json",
-    "all_catalog_courses_loaded": true,
-    "catalog_course_count": 59,
-    "considered_course_ids": [
-      "COMPSCI 20",
-      "COMPSCI 32",
-      "COMPSCI 50",
-      "COMPSCI 51",
-      "COMPSCI 61",
-      "COMPSCI 79",
-      "COMPSCI 85",
-      "COMPSCI 91R",
-      "COMPSCI 1050",
-      "COMPSCI 1066",
-      "COMPSCI 1090A",
-      "COMPSCI 1090B",
-      "COMPSCI 1200",
-      "COMPSCI 1210",
-      "COMPSCI 1240",
-      "COMPSCI 1251",
-      "COMPSCI 1261",
-      "COMPSCI 1280",
-      "COMPSCI 1410",
-      "COMPSCI 1411",
-      "COMPSCI 1440R",
-      "COMPSCI 1450",
-      "COMPSCI 1520",
-      "COMPSCI 1530",
-      "COMPSCI 1710",
-      "COMPSCI 1750",
-      "COMPSCI 1810",
-      "COMPSCI 1820",
-      "COMPSCI 1840",
-      "COMPSCI 1960",
-      "COMPSCI 2050",
-      "COMPSCI 2211",
-      "COMPSCI 2242",
-      "COMPSCI 2243",
-      "COMPSCI 2280",
-      "COMPSCI 2360R",
-      "COMPSCI 2370",
-      "COMPSCI 2380",
-      "COMPSCI 2411",
-      "COMPSCI 2420",
-      "COMPSCI 2430",
-      "COMPSCI 2440R",
-      "COMPSCI 2470R",
-      "COMPSCI 2520R",
-      "COMPSCI 2630",
-      "COMPSCI 2680",
-      "COMPSCI 2710",
-      "COMPSCI 2760",
-      "COMPSCI 2822R",
-      "COMPSCI 2823R",
-      "COMPSCI 2824",
-      "COMPSCI 2831",
-      "COMPSCI 2860",
-      "COMPSCI 2880",
-      "COMPSCI 2881R",
-      "COMPSCI 2883R",
-      "COMPSCI 2901",
-      "COMPSCI 2902",
-      "COMPSCI 2990R"
-    ],
-    "baseline_evidence_ids": [
-      "harvard-cs50x-foundations",
-      "harvard-cs-concentration-domains"
-    ],
-    "task_specific_evidence_ids": [
-      "harvard-cs50x-foundations",
-      "harvard-cs-concentration-domains"
+    "local_application": [
+        {
+            "standard": "system-design-primer",
+            "paths": [
+                "docs/commercial/FX_OPPORTUNITY_PORTFOLIO.json",
+                "docs/commercial/FX_OPPORTUNITY_PORTFOLIO.md",
+                "scripts/fitness/check_fx_opportunity_portfolio.py",
+                "tests/fitness/test_fx_opportunity_portfolio_gate.py"
+            ],
+            "gate": "python3 scripts/fitness/check_fx_opportunity_portfolio.py && python3 -m pytest -q tests/fitness/test_fx_opportunity_portfolio_gate.py",
+            "application_ar": "\u062a\u0637\u0628\u064a\u0642 \u0628\u062d\u062b \u0627\u0644\u0625\u064a\u0631\u0627\u062f \u0643\u0639\u0642\u062f \u0628\u064a\u0627\u0646\u0627\u062a \u0644\u0644\u0641\u0631\u0635 \u0627\u0644\u0642\u0631\u064a\u0628\u0629: \u062a\u0639\u0631\u064a\u0641 \u0645\u0634\u062a\u0631\u064d \u0645\u0624\u0647\u0644\u060c \u0645\u0648\u0627\u0641\u0642\u0629 \u0627\u062a\u0635\u0627\u0644\u060c \u0623\u0633\u0626\u0644\u0629 \u0643\u0634\u0641 \u0627\u0644\u0623\u0644\u0645\u060c \u0633\u062c\u0644 \u062f\u0644\u064a\u0644 \u0645\u0646\u0632\u0648\u0639 \u0627\u0644\u0647\u0648\u064a\u0629\u060c \u062d\u062f\u0648\u062f \u062a\u062c\u0631\u0628\u0629 \u0645\u062f\u0641\u0648\u0639\u0629\u060c \u0648\u0642\u0627\u0639\u062f\u0629 \u0642\u0631\u0627\u0631/\u0642\u062a\u0644\u061b \u0648\u062a\u0645\u0646\u0639 \u0627\u0644\u0628\u0648\u0627\u0628\u0629 \u0625\u0636\u0627\u0641\u0629 \u0627\u0644\u0639\u0642\u062f \u0644\u0644\u0641\u0631\u0635 \u063a\u064a\u0631 NOW \u0623\u0648 \u062a\u0631\u0642\u064a\u0629 \u0627\u0644\u0625\u064a\u0631\u0627\u062f."
+        }
     ],
     "unapplied_course_policy_ar": "كل المقررات قُرئت على مستوى الكتالوج والمصفوفة؛ ما لا ينطبق مباشرة على حزمة الحوكمة يُسجل كغير منطبق مع سبب، ولا يتحول إلى ادعاء تطبيق أو حذف من الكتالوج.",
     "applicability_result": "ALL_CATALOG_COURSES_CONSIDERED",
