@@ -1,9 +1,11 @@
 import asyncio
+import json
 import logging
 
 import websockets
 from fastapi import WebSocket, WebSocketDisconnect
 from starlette.websockets import WebSocketState
+from websockets.exceptions import InvalidStatus
 
 logger = logging.getLogger("api_gateway")
 
@@ -17,7 +19,9 @@ async def websocket_proxy(client_ws: WebSocket, target_url: str):
     requested_protocols = client_ws.headers.get("sec-websocket-protocol", "").split(",")
     parsed_protocols = [p.strip() for p in requested_protocols if p.strip()]
     selected_protocol = (
-        "jwt" if "jwt" in parsed_protocols else (parsed_protocols[0] if parsed_protocols else None)
+        "jwt"
+        if "jwt" in parsed_protocols
+        else (parsed_protocols[0] if parsed_protocols else None)
     )
 
     await client_ws.accept(subprotocol=selected_protocol)
@@ -93,12 +97,41 @@ async def websocket_proxy(client_ws: WebSocket, target_url: str):
             # Run both tasks concurrently
             # If either task finishes (e.g. disconnect), we cancel the other and exit
             _done, pending = await asyncio.wait(
-                [asyncio.create_task(client_to_target()), asyncio.create_task(target_to_client())],
+                [
+                    asyncio.create_task(client_to_target()),
+                    asyncio.create_task(target_to_client()),
+                ],
                 return_when=asyncio.FIRST_COMPLETED,
             )
 
             for task in pending:
                 task.cancel()
+
+    except InvalidStatus as e:
+        logger.error(
+            f"WebSocket proxy failed to connect to {target_url} with HTTP {e.response.status_code}"
+        )
+        body = getattr(e.response, "body", b"")
+        if body and (b"<html" in body.lower() or b"<!doctype" in body.lower()):
+            logger.error(
+                "API_GATEWAY HTML bleed prevented: Blocked HTML response from upstream."
+            )
+        if client_ws.client_state == WebSocketState.CONNECTED:
+            try:
+                await client_ws.send_text(
+                    json.dumps(
+                        {
+                            "type": "error",
+                            "payload": {
+                                "details": "Upstream service error",
+                                "code": "WS_UPSTREAM_ERROR",
+                            },
+                        }
+                    )
+                )
+            except Exception:
+                pass
+            await client_ws.close(code=1011, reason="Upstream connection failed")
 
     except Exception as e:
         logger.error(f"WebSocket proxy failed to connect to {target_url}: {e}")
