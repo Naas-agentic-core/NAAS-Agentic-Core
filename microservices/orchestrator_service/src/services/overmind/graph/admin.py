@@ -8,7 +8,9 @@ from langgraph.graph import END, StateGraph
 from microservices.orchestrator_service.src.contracts.admin_tools import (
     validate_tool_name,
 )
-from microservices.orchestrator_service.src.services.overmind.graph.main import AgentState
+from microservices.orchestrator_service.src.services.overmind.graph.main import (
+    AgentState,
+)
 from microservices.orchestrator_service.src.services.tools.registry import get_registry
 
 
@@ -86,7 +88,9 @@ class DetectIntentNode:
 
 
 class ValidateAccessNode:
-    async def __call__(self, state: AdminExecutionState) -> AdminExecutionState | dict[str, str]:
+    async def __call__(
+        self, state: AdminExecutionState
+    ) -> AdminExecutionState | dict[str, str]:
         if not _is_admin_state(state):
             return {"error": "ADMIN_ACCESS_DENIED", "access": "denied"}
         return {**state, "access": "granted"}
@@ -98,9 +102,15 @@ def resolve_tool_deterministic(query: str) -> str:
 
     wants_python = bool(re.search(r"python|بايثون|\.py", query_lower))
     wants_tables = bool(re.search(r"جدول|جداول|table|tables|database|db", query_lower))
-    wants_users = bool(re.search(r"مستخدم|مستخدمين|user|users|أعضاء|member", query_lower))
-    wants_services = bool(re.search(r"خدمة|خدمات|service|services|container", query_lower))
-    wants_full_stats = bool(re.search(r"إحصائيات|stats|metrics|ملخص|overview|كل", query_lower))
+    wants_users = bool(
+        re.search(r"مستخدم|مستخدمين|user|users|أعضاء|member", query_lower)
+    )
+    wants_services = bool(
+        re.search(r"خدمة|خدمات|service|services|container", query_lower)
+    )
+    wants_full_stats = bool(
+        re.search(r"إحصائيات|stats|metrics|ملخص|overview|كل", query_lower)
+    )
 
     if wants_python:
         validate_tool_name("admin.count_python_files")
@@ -130,9 +140,6 @@ class ResolveToolNode:
 
 
 class ExecuteToolNode:
-    def __init__(self):
-        pass
-
     async def __call__(self, state):
         import time
 
@@ -144,7 +151,9 @@ class ExecuteToolNode:
         import logging
 
         logger = logging.getLogger("admin_graph")
-        logger.info(f"TOOL_REGISTRY.get('{tool_name}') → {'found' if tool_fn else 'None'}")
+        logger.info(
+            f"TOOL_REGISTRY.get('{tool_name}') → {'found' if tool_fn else 'None'}"
+        )
 
         if not tool_fn:
             emit_telemetry(
@@ -172,7 +181,10 @@ class ExecuteToolNode:
         except Exception as e:
             logger.error("Exception in tool execution", exc_info=True)
             emit_telemetry(
-                node_name="ExecuteToolNode", start_time=start_time, state=state, error=str(e)
+                node_name="ExecuteToolNode",
+                start_time=start_time,
+                state=state,
+                error=str(e),
             )
             return {
                 "error": "ADMIN_TOOL_EXECUTION_FAILED",
