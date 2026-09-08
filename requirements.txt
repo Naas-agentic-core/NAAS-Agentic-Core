@@ -190,3 +190,4 @@ tenacity==8.2.3
 uvicorn==0.52.3
 prometheus-client>=0.26.0
 sympy
+sqlglot

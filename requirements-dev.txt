@@ -46,3 +46,4 @@ uc-micro-py==1.0.3
 dparse==0.6.4
 packaging==25.0
 hypothesis==6.126.0
+sqlglot

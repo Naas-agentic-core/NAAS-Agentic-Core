@@ -85,3 +85,4 @@ argon2_cffi
 docker
 langgraph-checkpoint-postgres
 psycopg-binary
+sqlglot

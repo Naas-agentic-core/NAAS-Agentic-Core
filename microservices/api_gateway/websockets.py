@@ -1,14 +1,26 @@
 import asyncio
+import json
 import logging
+import re
 
 import websockets
 from fastapi import WebSocket, WebSocketDisconnect
 from starlette.websockets import WebSocketState
 
+try:
+    from websockets.exceptions import InvalidStatus
+except ImportError:
+    InvalidStatus = None
+
+try:
+    from websockets.legacy.exceptions import InvalidStatusCode
+except ImportError:
+    InvalidStatusCode = None
+
 logger = logging.getLogger("api_gateway")
 
 
-async def websocket_proxy(client_ws: WebSocket, target_url: str):
+async def websocket_proxy(client_ws: WebSocket, target_url: str):  # noqa: PLR0912
     """
     Proxies a WebSocket connection from the client to the target URL.
     Handles bi-directional communication and connection lifecycle.
@@ -17,7 +29,9 @@ async def websocket_proxy(client_ws: WebSocket, target_url: str):
     requested_protocols = client_ws.headers.get("sec-websocket-protocol", "").split(",")
     parsed_protocols = [p.strip() for p in requested_protocols if p.strip()]
     selected_protocol = (
-        "jwt" if "jwt" in parsed_protocols else (parsed_protocols[0] if parsed_protocols else None)
+        "jwt"
+        if "jwt" in parsed_protocols
+        else (parsed_protocols[0] if parsed_protocols else None)
     )
 
     await client_ws.accept(subprotocol=selected_protocol)
@@ -84,6 +98,13 @@ async def websocket_proxy(client_ws: WebSocket, target_url: str):
                     async for message in target_ws:
                         # Forward to client
                         if client_ws.client_state == WebSocketState.CONNECTED:
+                            if isinstance(message, str):
+                                msg_lower = message.strip().lower()
+                                if msg_lower.startswith(
+                                    "<!doctype"
+                                ) or msg_lower.startswith("<html"):
+                                    await _handle_html_bleed(client_ws, message, logger, "api_gateway.html_bleed_intercepted")
+                                    break
                             await client_ws.send_text(message)
                 except websockets.exceptions.ConnectionClosed:
                     logger.info("Target closed WebSocket connection")
@@ -93,7 +114,10 @@ async def websocket_proxy(client_ws: WebSocket, target_url: str):
             # Run both tasks concurrently
             # If either task finishes (e.g. disconnect), we cancel the other and exit
             _done, pending = await asyncio.wait(
-                [asyncio.create_task(client_to_target()), asyncio.create_task(target_to_client())],
+                [
+                    asyncio.create_task(client_to_target()),
+                    asyncio.create_task(target_to_client()),
+                ],
                 return_when=asyncio.FIRST_COMPLETED,
             )
 
@@ -101,7 +125,45 @@ async def websocket_proxy(client_ws: WebSocket, target_url: str):
                 task.cancel()
 
     except Exception as e:
+        is_invalid_status = InvalidStatus and isinstance(e, InvalidStatus)
+        is_invalid_status_code = InvalidStatusCode and isinstance(e, InvalidStatusCode)
+
+        if is_invalid_status or is_invalid_status_code:
+            status_code = getattr(e, "status_code", None)
+            if hasattr(e, "response") and e.response:
+                status_code = getattr(e.response, "status_code", status_code)
+                body = getattr(e.response, "body", b"")
+            else:
+                body = b""
+
+            body_str = body.decode("utf-8", errors="ignore").strip().lower()
+            if body_str.startswith("<!doctype") or body_str.startswith("<html"):
+                body_orig = body.decode("utf-8", errors="ignore")
+                if client_ws.client_state == WebSocketState.CONNECTED:
+                    import contextlib
+                    with contextlib.suppress(Exception):
+                        await _handle_html_bleed(client_ws, body_orig, logger, f"api_gateway.upstream_invalid_status_html_bleed status={status_code}")
+                return
+
         logger.error(f"WebSocket proxy failed to connect to {target_url}: {e}")
         # Close client connection if it's still open
         if client_ws.client_state == WebSocketState.CONNECTED:
             await client_ws.close(code=1011, reason="Upstream connection failed")
+
+async def _handle_html_bleed(client_ws: WebSocket, message: str, logger: logging.Logger, log_msg: str) -> None:
+    title_match = re.search(r"<title>(.*?)</title>", message, re.IGNORECASE)
+    snippet = (
+        f"title={title_match.group(1)[:100]!r}"
+        if title_match
+        else f"snippet={message[:200]!r}"
+    )
+    logger.error(f"{log_msg} snippet=%s", snippet)
+    await client_ws.send_text(
+        json.dumps(
+            {
+                "type": "error",
+                "payload": {"code": "WS_HTML_BLEED", "details": "Upstream returned HTML instead of JSON"}
+            }
+        )
+    )
+    await client_ws.close(code=1011)

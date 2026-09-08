@@ -8,7 +8,9 @@ from langgraph.graph import END, StateGraph
 from microservices.orchestrator_service.src.contracts.admin_tools import (
     validate_tool_name,
 )
-from microservices.orchestrator_service.src.services.overmind.graph.main import AgentState
+from microservices.orchestrator_service.src.services.overmind.graph.main import (
+    AgentState,
+)
 from microservices.orchestrator_service.src.services.tools.registry import get_registry
 
 
@@ -130,9 +132,6 @@ class ResolveToolNode:
 
 
 class ExecuteToolNode:
-    def __init__(self):
-        pass
-
     async def __call__(self, state):
         import time
 
@@ -172,7 +171,10 @@ class ExecuteToolNode:
         except Exception as e:
             logger.error("Exception in tool execution", exc_info=True)
             emit_telemetry(
-                node_name="ExecuteToolNode", start_time=start_time, state=state, error=str(e)
+                node_name="ExecuteToolNode",
+                start_time=start_time,
+                state=state,
+                error=str(e),
             )
             return {
                 "error": "ADMIN_TOOL_EXECUTION_FAILED",
