@@ -152,35 +152,46 @@ async def _proxy_websocket(
                 try:
                     async for message in upstream_ws:
                         if isinstance(message, str):
-                            msg_lower = message.strip().lower()
-                            if msg_lower.startswith(
-                                "<!doctype"
-                            ) or msg_lower.startswith("<html"):
-                                title_match = re.search(
-                                    r"<title>(.*?)</title>", message, re.IGNORECASE
-                                )
-                                snippet = (
-                                    f"title={title_match.group(1)[:100]!r}"
-                                    if title_match
-                                    else f"snippet={message[:200]!r}"
-                                )
-                                logger.error(
-                                    "ws_proxy.html_bleed_intercepted snippet=%s",
-                                    snippet,
-                                )
-                                await client_ws.send_text(
-                                    json.dumps(
-                                        {
-                                            "type": "error",
-                                            "payload": {
-                                                "code": "WS_HTML_BLEED",
-                                                "details": "Upstream returned HTML instead of JSON",
-                                            },
-                                        }
+                            is_valid_json = False
+                            try:
+                                json.loads(message)
+                                is_valid_json = True
+                            except json.JSONDecodeError:
+                                pass
+
+                            if not is_valid_json:
+                                msg_lower = message.strip().lower()
+                                if (
+                                    "<html" in msg_lower
+                                    or "<!doctype" in msg_lower
+                                    or "<body" in msg_lower
+                                    or "<head" in msg_lower
+                                ):
+                                    title_match = re.search(
+                                        r"<title>(.*?)</title>", message, re.IGNORECASE
                                     )
-                                )
-                                await client_ws.close(code=1011)
-                                break
+                                    snippet = (
+                                        f"title={title_match.group(1)[:100]!r}"
+                                        if title_match
+                                        else f"snippet={message[:200]!r}"
+                                    )
+                                    logger.error(
+                                        "ws_proxy.html_bleed_intercepted snippet=%s",
+                                        snippet,
+                                    )
+                                    await client_ws.send_text(
+                                        json.dumps(
+                                            {
+                                                "type": "error",
+                                                "payload": {
+                                                    "code": "WS_HTML_BLEED",
+                                                    "details": "Upstream returned HTML instead of JSON",
+                                                },
+                                            }
+                                        )
+                                    )
+                                    await client_ws.close(code=1011)
+                                    break
                             await client_ws.send_text(message)
                         else:
                             await client_ws.send_bytes(message)
@@ -242,7 +253,12 @@ async def _proxy_websocket(
                 body = b""
 
             body_str = body.decode("utf-8", errors="ignore").strip().lower()
-            if body_str.startswith("<!doctype") or body_str.startswith("<html"):
+            if (
+                "<html" in body_str
+                or "<!doctype" in body_str
+                or "<body" in body_str
+                or "<head" in body_str
+            ):
                 import json
                 import re
 
