@@ -156,12 +156,12 @@
     "owner": "curriculum-governance"
   },
   "git_change_snapshot": {
-    "base_ref": "200cef507bb03d8c9120847e58819cac028393ec",
+    "base_ref": "ffbb80d05bb5f3694b3688fd0b090ded0cf29230",
     "changed_paths_excluding_packet": [
-      ".runtime/truth_table.lock.json",
-      "app/static/js/legacy-app.jsx"
+      "app/api/routers/ws_proxy.py",
+      "tests/services/test_ws_proxy_html_bleed.py"
     ],
-    "content_sha256_excluding_packet": "b12dc1ae4f0e9a87bfee4c4e1930ad070daa3db16590837b90e0409003a64187",
+    "content_sha256_excluding_packet": "ead9c7a0f3c39444fd3fa145fd99a1e35bdc4551c5bd00bcb559b17378e5625a",
     "refreshed_on": "2026-08-21",
     "refresh_command": "python3 scripts/research/refresh_acceptance_diff_snapshot.py"
   }
