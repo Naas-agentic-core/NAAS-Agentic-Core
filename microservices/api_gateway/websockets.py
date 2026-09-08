@@ -20,7 +20,7 @@ except ImportError:
 logger = logging.getLogger("api_gateway")
 
 
-async def websocket_proxy(client_ws: WebSocket, target_url: str):
+async def websocket_proxy(client_ws: WebSocket, target_url: str):  # noqa: PLR0912
     """
     Proxies a WebSocket connection from the client to the target URL.
     Handles bi-directional communication and connection lifecycle.
@@ -103,30 +103,7 @@ async def websocket_proxy(client_ws: WebSocket, target_url: str):
                                 if msg_lower.startswith(
                                     "<!doctype"
                                 ) or msg_lower.startswith("<html"):
-                                    title_match = re.search(
-                                        r"<title>(.*?)</title>", message, re.IGNORECASE
-                                    )
-                                    snippet = (
-                                        f"title={title_match.group(1)[:100]!r}"
-                                        if title_match
-                                        else f"snippet={message[:200]!r}"
-                                    )
-                                    logger.error(
-                                        "api_gateway.html_bleed_intercepted snippet=%s",
-                                        snippet,
-                                    )
-                                    await client_ws.send_text(
-                                        json.dumps(
-                                            {
-                                                "type": "error",
-                                                "payload": {
-                                                    "code": "WS_HTML_BLEED",
-                                                    "details": "Upstream returned HTML instead of JSON",
-                                                },
-                                            }
-                                        )
-                                    )
-                                    await client_ws.close(code=1011)
+                                    await _handle_html_bleed(client_ws, message, logger, "api_gateway.html_bleed_intercepted")
                                     break
                             await client_ws.send_text(message)
                 except websockets.exceptions.ConnectionClosed:
@@ -162,38 +139,31 @@ async def websocket_proxy(client_ws: WebSocket, target_url: str):
             body_str = body.decode("utf-8", errors="ignore").strip().lower()
             if body_str.startswith("<!doctype") or body_str.startswith("<html"):
                 body_orig = body.decode("utf-8", errors="ignore")
-                title_match = re.search(
-                    r"<title>(.*?)</title>", body_orig, re.IGNORECASE
-                )
-                snippet = (
-                    f"title={title_match.group(1)[:100]!r}"
-                    if title_match
-                    else f"snippet={body_orig[:200]!r}"
-                )
-                logger.error(
-                    "api_gateway.upstream_invalid_status_html_bleed status=%s snippet=%s",
-                    status_code,
-                    snippet,
-                )
                 if client_ws.client_state == WebSocketState.CONNECTED:
-                    try:
-                        await client_ws.send_text(
-                            json.dumps(
-                                {
-                                    "type": "error",
-                                    "payload": {
-                                        "code": "WS_HTML_BLEED",
-                                        "details": "Upstream returned HTML instead of JSON",
-                                    },
-                                }
-                            )
-                        )
-                        await client_ws.close(code=1011)
-                    except Exception:
-                        pass
+                    import contextlib
+                    with contextlib.suppress(Exception):
+                        await _handle_html_bleed(client_ws, body_orig, logger, f"api_gateway.upstream_invalid_status_html_bleed status={status_code}")
                 return
 
         logger.error(f"WebSocket proxy failed to connect to {target_url}: {e}")
         # Close client connection if it's still open
         if client_ws.client_state == WebSocketState.CONNECTED:
             await client_ws.close(code=1011, reason="Upstream connection failed")
+
+async def _handle_html_bleed(client_ws: WebSocket, message: str, logger: logging.Logger, log_msg: str) -> None:
+    title_match = re.search(r"<title>(.*?)</title>", message, re.IGNORECASE)
+    snippet = (
+        f"title={title_match.group(1)[:100]!r}"
+        if title_match
+        else f"snippet={message[:200]!r}"
+    )
+    logger.error(f"{log_msg} snippet=%s", snippet)
+    await client_ws.send_text(
+        json.dumps(
+            {
+                "type": "error",
+                "payload": {"code": "WS_HTML_BLEED", "details": "Upstream returned HTML instead of JSON"}
+            }
+        )
+    )
+    await client_ws.close(code=1011)

@@ -1318,6 +1318,7 @@ def _available_question_numbers(display_content: str) -> list[int]:
     نعرض للطالب ما نملكه بصدق بدل تخمين ما يقصد. مرتّبة وبلا تكرار.
     """
     found: set[int] = set()
+    # Note: Optimization previously applied here to reuse _NUMBERED_ITEM_RE
     for raw_line in display_content.splitlines():
         match = _NUMBERED_ITEM_RE.match(raw_line.translate(_ARABIC_INDIC_DIGITS))
         if match:
