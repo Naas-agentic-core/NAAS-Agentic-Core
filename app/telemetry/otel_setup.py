@@ -29,17 +29,21 @@ from __future__ import annotations
 import contextlib
 import logging
 import os
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from opentelemetry.metrics import Counter, Histogram, Meter
+    from opentelemetry.trace import Tracer
 
 logger = logging.getLogger("cogniforge.otel_setup")
 
 # Module-level state — single setup per process.
 _INITIALIZED: bool = False
-_OTEL_TRACER: Any = None
-_OTEL_METER: Any = None
-_OTEL_HISTOGRAM_TURN: Any = None
-_OTEL_COUNTER_TERMINAL: Any = None
-_OTEL_COUNTER_FALLBACK: Any = None
+_OTEL_TRACER: Tracer | None = None
+_OTEL_METER: Meter | None = None
+_OTEL_HISTOGRAM_TURN: Histogram | None = None
+_OTEL_COUNTER_TERMINAL: Counter | None = None
+_OTEL_COUNTER_FALLBACK: Counter | None = None
 
 
 def is_enabled() -> bool:
@@ -52,17 +56,17 @@ def is_initialized() -> bool:
     return _INITIALIZED
 
 
-def get_tracer() -> Any | None:
+def get_tracer() -> Tracer | None:
     """Return the cached OTel tracer (or None if disabled / not initialized)."""
     return _OTEL_TRACER
 
 
-def get_meter() -> Any | None:
+def get_meter() -> Meter | None:
     """Return the cached OTel meter (or None if disabled / not initialized)."""
     return _OTEL_METER
 
 
-def get_metrics() -> dict[str, Any]:
+def get_metrics() -> dict[str, Histogram | Counter | None]:
     """Return the pre-created instruments. Empty dict when disabled."""
     if not _INITIALIZED:
         return {}
@@ -140,7 +144,9 @@ def setup_otel(service_name: str = "cogniforge-monolith") -> bool:
         metric_reader = PeriodicExportingMetricReader(
             metric_exporter, export_interval_millis=10_000
         )
-        meter_provider = MeterProvider(resource=resource, metric_readers=[metric_reader])
+        meter_provider = MeterProvider(
+            resource=resource, metric_readers=[metric_reader]
+        )
         metrics.set_meter_provider(meter_provider)
         _OTEL_METER = metrics.get_meter("cogniforge.path_observer")
         _OTEL_HISTOGRAM_TURN = _OTEL_METER.create_histogram(
