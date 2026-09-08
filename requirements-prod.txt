@@ -59,7 +59,7 @@ Jinja2==3.1.6
 typer==0.20.0
 tenacity==8.2.3
 langgraph>=1.2.11,<2.0.0
-langchain-core>=0.3.0
+langchain-core>=1.6.1
 redis>=5.0.0
 # D-205: `app.main` imports prometheus_client at runtime (app/telemetry) and NOTHING
 # else in the tree pulls it transitively — so a production image built from this file
@@ -107,8 +107,8 @@ openai
 
 # LlamaIndex Stack
 # llama-index meta-package removed to reduce bloat/conflicts
-llama-index-core==0.14.23
-llama-index-instrumentation==0.5.0
+llama-index-core==0.14.24
+llama-index-instrumentation==0.6.0
 llama-index-workflows
 llama-index-readers-file
 llama-index-vector-stores-supabase
@@ -119,5 +119,5 @@ llama-index-vector-stores-supabase
 # re-drags sentence-transformers → torch transitively, which would have made the
 # line above a comment that changed nothing. app/services/chat/memory_engine.py
 # uses llama_index.core without ever setting Settings.embed_model.
-langgraph-sdk==0.3.15
+langgraph-sdk==0.4.4
 dspy
