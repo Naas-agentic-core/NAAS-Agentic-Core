@@ -108,9 +108,15 @@ class SuperSearchOrchestrator:
             self.llm = llm
         else:
             api_key = os.environ.get("OPENROUTER_API_KEY")
-            base_url = "https://openrouter.ai/api/v1"
-            # ISS-068: nemotron-super-120b — أفضل نموذج مجاني للبحث والتلخيص
-            model_name = os.environ.get("PRIMARY_MODEL", "nvidia/nemotron-3-super-120b-a12b:free")
+            # D-288: نفس بوابة التجاوز في بقية العملاء — بلاها لا يُختبر المسار بدُّون شبكة.
+            base_url = (
+                os.environ.get("OPENROUTER_BASE_URL", "").strip() or "https://openrouter.ai/api/v1"
+            )
+            # ISS-068 كان يختار nemotron-3-super-120b «أفضل نموذج مجاني للتلخيص» — وهو
+            # النموذج الذي **حظرتْه** ISS-107/D-067 لاحقاً لأنه يسرّب التفكير الإنجليزي
+            # داخل `content`. D-288 (2026-09-09): الافتراضي الآن نموذج بـ endpoint حيّ
+            # ومُتحقَّق منه عربياً؛ و`PRIMARY_MODEL` يبقى تجاوز المُشغِّل.
+            model_name = os.environ.get("PRIMARY_MODEL", "google/gemma-4-31b-it:free")
             self.llm = ChatOpenAI(
                 model=model_name,
                 openai_api_key=api_key,

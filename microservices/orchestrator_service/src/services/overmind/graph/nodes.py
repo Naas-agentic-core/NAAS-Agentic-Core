@@ -45,10 +45,12 @@ def _configure_dspy() -> None:
         return
 
     try:
-        # ISS-068: nemotron-reasoning — أسرع نموذج مجاني مع reasoning tokens
-        dspy_model = os.getenv(
-            "OPENROUTER_DSPY_MODEL", "nvidia/nemotron-3-nano-30b-a3b:free"
-        ).strip()
+        # ISS-068 اختار nemotron-3-nano-30b «لأسرع reasoning». D-067/ISS-069 نقضاه
+        # **حيّاً**: مع system prompt طويل يرجع content=None (كل التفكير في reasoning
+        # فقط). تصنيف النية على DSPy بهذا النموذج كان يسقط إلى الـ heuristic الحتمي
+        # ⇒ توجيه خاطئ (شرح فيزياء يُعامَل كـ«معرفة عامة» بلا بحث) = «لا يُجيب صحيحاً».
+        # D-288 (2026-09-09): الافتراضي الآن نموذج له endpoint حيّ ويدعم response_format.
+        dspy_model = os.getenv("OPENROUTER_DSPY_MODEL", "google/gemma-4-31b-it:free").strip()
         if not dspy_model.startswith("openai/"):
             dspy_model = f"openai/{dspy_model}"
         # DEADLOCK FIX: bound the structured-output call. Without an explicit
@@ -58,7 +60,7 @@ def _configure_dspy() -> None:
         # letting the deterministic heuristic fallback engage.
         lm = dspy.LM(
             model=dspy_model,
-            api_base="https://openrouter.ai/api/v1",
+            api_base=os.getenv("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1").strip(),
             api_key=openrouter_key,
             timeout=25,
             num_retries=0,

@@ -1,5 +1,5 @@
 {
-  "branch": "claude/check-dependabot-branch-xhssli",
+  "branch": "arena/01a084b4-naas-agentic-core",
   "components": [
     {
       "agreed": false,
@@ -350,6 +350,6 @@
       "on_live_chain": true
     }
   ],
-  "generated_at_utc": "2026-08-28T20:13:03.758011+00:00",
+  "generated_at_utc": "2026-09-09T06:27:57.471498+00:00",
   "schema_version": 1
 }

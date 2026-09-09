@@ -25,9 +25,15 @@ def _load_gate():
 
 
 def test_canonical_chain_is_the_verified_primary_first():
-    # D-167: PRIMARY must be the verified gpt-oss-20b; 120b stays as tail recovery slot.
-    assert MODEL_CHAIN[0] == "openai/gpt-oss-20b:free"
+    # D-288 (2026-09-09): PRIMARY هو النموذج ذو الـ endpoint الحيّ والمُتحقَّق منه
+    # عربياً (gemma-4-31b-it:free). فتحات التعافي الميتة (gpt-oss-20b/120b) تبقى
+    # **خلف** الأحياء لا أمامها — هذا الترتيب هو الفرق بين «إجابة» و«عطل صامت».
+    assert MODEL_CHAIN[0] == "google/gemma-4-31b-it:free"
     assert "openai/gpt-oss-120b:free" in MODEL_CHAIN[1:]
+    assert "openai/gpt-oss-20b:free" in MODEL_CHAIN[1:]
+    assert not any(m in MODEL_CHAIN[0] for m in ("nemotron-3-nano", "nemotron-3-super")), (
+        "D-067/ISS-107: reasoning-only أو مسرِّب الإنجليزية ممنوع أن يكون PRIMARY"
+    )
     # No reasoning-only / dead models proven catastrophic live (D-067/ISS-107).
     joined = " ".join(MODEL_CHAIN)
     assert "reasoning:free" not in joined

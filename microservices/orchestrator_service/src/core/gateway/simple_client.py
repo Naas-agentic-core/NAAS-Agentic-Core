@@ -7,6 +7,7 @@
 import hashlib
 import json
 import logging
+import os
 from collections.abc import AsyncGenerator
 from dataclasses import dataclass
 
@@ -56,7 +57,11 @@ class OpenRouterClient(LLMClient):
         self.cognitive_engine = cognitive_engine
         self.safety_net = safety_net
 
-        self.base_url = "https://openrouter.ai/api/v1"
+        # ISS-200/D-288: base URL قابل للتجاوز (بوابة/وكيل/ازدواج اختبار) —
+        # نفس عقدة OPENROUTER_PRIMARY_MODEL: لا يُختبر المسار بلا هذا المقبض.
+        self.base_url = (
+            os.getenv("OPENROUTER_BASE_URL", "").strip() or "https://openrouter.ai/api/v1"
+        )
         self.headers = {
             "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json",

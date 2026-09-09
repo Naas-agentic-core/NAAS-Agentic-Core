@@ -35,6 +35,10 @@ class AgentState(TypedDict):
     is_admin: bool
     user_role: str
     scope: str
+    # ISS-200 (D-288): الدور لم يُجب لأن سلسلة النماذج سقطت كلها — لا لأن المعلومة
+    # غير موجودة. مُصرَّح هنا كي لا يُسقطه LangGraph، فتراه المراقبة والاختبارات
+    # الحيّة (و`/health`) بدل أن يضيع خلف نصٍّ جاهز يبدو كإجابة.
+    provider_error: bool
 
 
 ADMIN_METRIC_TRIGGERS = {

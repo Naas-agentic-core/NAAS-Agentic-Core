@@ -136,12 +136,112 @@ _TECH_ALLOWLIST: frozenset[str] = frozenset(
         "demonstration",
         "equation",
         "matrice",
+        # D-289 (ISS-201): مفردات SI/الفيزياء/الكيمياء التي يكتبها النموذج باللاتينية
+        # داخل نصٍّ عربي سليم — حذفُها كان يُسلِّم إجابة مبتورة («الوحدة (N)» بعد
+        # حذف Newton). مقيَّدة بمصطلحات علمية/ملفية، لا كلمات إنجليزية عامة (تلك
+        # بقايا reasoning وتُحذف عمداً).
+        "newton",
+        "newtons",
+        "joule",
+        "joules",
+        "watt",
+        "watts",
+        "pascal",
+        "ampere",
+        "volt",
+        "volts",
+        "ohm",
+        "ohms",
+        "hertz",
+        "coulomb",
+        "kelvin",
+        "celsius",
+        "mole",
+        "molecules",
+        "molecule",
+        "atom",
+        "atoms",
+        "electron",
+        "electrons",
+        "proton",
+        "neutron",
+        "photon",
+        "ion",
+        "ions",
+        "energy",
+        "power",
+        "force",
+        "mass",
+        "velocity",
+        "acceleration",
+        "momentum",
+        "friction",
+        "tension",
+        "pressure",
+        "density",
+        "volume",
+        "temperature",
+        "frequency",
+        "wavelength",
+        "current",
+        "voltage",
+        "resistance",
+        "capacity",
+        "inductance",
+        "magnetic",
+        "electric",
+        "gravity",
+        "inertia",
+        "torque",
+        "kinetic",
+        "potential",
+        "equilibrium",
+        "oxidation",
+        "reduction",
+        "catalyst",
+        "acid",
+        "alkane",
+        "alcohol",
+        "ester",
+        "ether",
+        "polymer",
+        "monomer",
+        "ph",
+        "python",
+        "java",
+        "javascript",
+        "algorithm",
+        "api",
+        "pdf",
+        "csv",
+        "xlsx",
+        "docx",
+        "http",
+        "https",
+        "ftp",
+        "smtp",
+        "tcp",
+        "udp",
+        "utf8",
+        "ascii",
+        "sql",
     }
 )
 
 # ── أنماط (مُجمَّعة مرة واحدة) ───────────────────────────────────────────────────
 # رمز لاتيني (ASCII + Latin-1/Extended المُشكَّل) مع روابط snake/apostrophe.
 _LATIN_TOKEN = re.compile(r"[A-Za-zÀ-ɏ]+(?:[_'][A-Za-zÀ-ɏ]+)*")
+
+# D-289 (ISS-201): بنيةُ نصية مشروعة — لا غارباج نموذج. الغارباج المرصود في
+# ISS-114 كلماتٌ عارية («experiences_random»، «exitos»، «Eingaben»)؛ أما اللاتيني
+# الذي يحمل رقماً أو punctuation مساري (`/`، `.`، `:`، `-`) أو يقع داخل شيفرة
+# مُضمَّنة فهو عنوان/ملفُ/مُعرِّفٌ **مقصود** كتبه النموذج عن قصد: `https://…`،
+# `gpt-oss-20b:free`، `python3.12`، `max_retry`. حذفُها كان يُسلِّم الطالب نصّاً
+# مبتوراً («راجع https://foo.bar» → «راجع ://.») أي إجابةً خاطئة بعد إصلاح
+# السلسلة نفسها — ولهذا تُحمى هيكلياً بدل توسيع الـ allowlist كلمةً كلمةً.
+_STRUCTURAL_NEIGHBOURS = "/.:-_="
+_STRUCTURAL_BEFORE = re.compile(r"(?:https?://|www\.)[A-Za-z0-9./:_\-]*$")
+
 # محددات الرياضيات (opener/closer).
 _MATH_DELIM = re.compile(r"\$\$|\$|\\\(|\\\)|\\\[|\\\]")
 # وسوم HTML (فتح/إغلاق/مغلق ذاتياً).
@@ -189,6 +289,26 @@ def _strip_garbage_markers(text: str) -> str:
         return _INSTRUCTION_LEAK_RE.sub("", out)
     except Exception:  # pragma: no cover — fail-open
         return text
+
+
+def _is_structural_token(tok: str, text: str, pos: int) -> bool:
+    """هل هذا اللاتيني جزءٌ من بنية نصية مشروعة (URL/مسار/مُعرِّف/شيفرة)؟
+
+    D-289 — لا يمسّ قرار الـ allowlist ولا وضع الرياضيات: يضيف فقط استثناءً
+    بنيوياً لا يمكن أن يكون غارباجَ نموذج.
+    """
+    # داخل شيفرة مُضمَّنة `...` أو ```...```
+    if text.count("`", 0, pos) % 2 == 1:
+        return True
+    if _STRUCTURAL_BEFORE.match(text[max(0, pos - 12) : pos]):
+        return True  # امتداد عنوان بعد // أو www.
+    end = pos + len(tok)
+    before = text[pos - 1] if pos > 0 else ""
+    after = text[end] if end < len(text) else ""
+    if before in _STRUCTURAL_NEIGHBOURS or after in _STRUCTURAL_NEIGHBOURS:
+        return True  # ملتحم بمسار/وسم (example.com، gpt-oss، F=ma)
+    # مُعرِّف مرقَّم (python3، utf8)
+    return before.isdigit() or after.isdigit()
 
 
 def _strip_accents(token: str) -> str:
@@ -397,6 +517,8 @@ class StreamIntegrityFilter:
             return tok.isascii()
         if pos > 0 and text[pos - 1] == "\\":
             return True  # أمر LaTeX شارد خارج الرياضيات
+        if _is_structural_token(tok, text, pos):
+            return True  # D-289: عنوان/مسار/مُعرِّف/شيفرة مُضمَّنة — ليست غارباجاً
         return _strip_accents(tok) in _TECH_ALLOWLIST
 
 

@@ -33,15 +33,19 @@ _NODE_TIMEOUT = 40.0
 # على OpenRouter. gpt-oss-120b من نفس العائلة، نفس quality contract،
 # rate limit pool مختلف. مُرقّى لـ default للـ math pipeline.
 # ISS-130 (D-167 — 2026-07-14): gpt-oss-120b:free أُزيل من OpenRouter (404) — العودة للـ 20b المُتحقَّق.
-_DEFAULT_MODEL = "openai/gpt-oss-20b:free"
+# ISS-200 (D-288 — 2026-09-09): gpt-oss-20b:free بلا endpoint الآن (`"endpoints": []`).
+_DEFAULT_MODEL = "google/gemma-4-31b-it:free"
 # ISS-074 (2026-05-15): fallback chain مُحدَّث بعد بنشمارك حي
 # - google/gemma-4-26b-a4b-it:free → rate-limited 429 (مُزال)
 # - qwen/qwen3-coder:free          → rate-limited 429 (مُزال)
 # - الترتيب: الأسرع → الأقوى → الأكبر
+# D-288: أُزيل منها ما يُنتج garbage بدل إجابة:
+# - nemotron-3-super-120b (nvidia) → **محظور** في كل طبقة: تسرّب إنجليزي في content (ISS-107)
+# - `z-ai/glm-4.5-air:free` → reasoning-only ⇒ content=None (D-067)
 _FALLBACK_MODELS = [
-    "openai/gpt-oss-20b:free",  # demoted from default 2026-05-27 (ISS-082)
-    "nvidia/nemotron-3-super-120b-a12b:free",  # 14s، 120B params، شرح عبقري
-    "z-ai/glm-4.5-air:free",  # reasoning mode — ISS-069 fix
+    "google/gemma-4-26b-a4b-it:free",  # ✅ endpoint حيّ (2026-09-09) — عربي + LaTeX
+    "nvidia/nemotron-3.5-lightning:free",  # ✅ endpoint حيّ — 1M ctx (فتحة D-280 المُجرَّبة في CI)
+    "openai/gpt-oss-20b:free",  # 🕳 0 endpoints حالياً — فتحة تعافٍ آلي (demoted 2026-09-09)
 ]
 
 # ISS-074: ترتيب الأنواع حسب التخصيص (أكثر تحديداً → أقل تحديداً)
@@ -454,11 +458,15 @@ async def solve_node(state: MathPipelineState) -> MathPipelineState:
                     )
                     solution = stripped
                 else:
-                    # ISS-074: retry على نموذج أقوى (nemotron-super-120B) عند echo/meta
-                    # يتجنب nemotron-nano-30B الذي يميل لإعادة echo system prompt
+                    # ISS-074: retry على نموذج آخر عند echo/meta — كان nemotron-super-120B،
+                    # وهو **محظور** منذ ISS-107 لأنه يسرّب التفكير الإنجليزي داخل `content`
+                    # (أي أن محاولة «الإصلاح» كانت تُنتج النص الخاطئ الذي تراه الطالب).
+                    # D-288: النموذج البديل هو أول سلسلة احتياط حيّة (gemma-4-26b) —
+                    # مختلفٌ عمّا فشل، ومُتحقَّق منه عربياً+LaTeX وبنقطة خدمةٍ حيّة.
                     logger.warning(
-                        "math_pipeline: meta-text/echo detected (%r), retrying on super-120B",
+                        "math_pipeline: meta-text/echo detected (%r), retrying on %s",
                         meta_hit,
+                        _FALLBACK_MODELS[0],
                     )
                     retry = await asyncio.wait_for(
                         _call_openrouter(
@@ -469,7 +477,7 @@ async def solve_node(state: MathPipelineState) -> MathPipelineState:
                             ),
                             question,
                             max_tokens=1500,
-                            model="nvidia/nemotron-3-super-120b-a12b:free",
+                            model=_FALLBACK_MODELS[0],
                         ),
                         timeout=_NODE_TIMEOUT,
                     )

@@ -48,6 +48,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed - 2026-09-09 - D-288/D-289 · ISS-200/ISS-201: كل أسئلة الطالب كانت تعود برسالة اعتذار واحدة — وما عاد منها كان مبتورًا
+- **ISS-200 (D-288) — سلسلة نماذج ميتة الصدارة، وسقوطٌ بلا دوران.** `openai/gpt-oss-20b:free` لم يعد له
+  endpoint على الطبقة المجانية (`GET /api/v1/models/<id>/endpoints` → `"endpoints": []`)، وكان عميلُ
+  الـ orchestrator يرسل كل طلب إلى PRIMARY وحده: خطأُ المزوّد كان قاتلاً ⇒ `deltas=0` و`PROVIDER_UNAVAILABLE_MESSAGE`
+  في أقل من ثانية. السلسلة أُعيد بناؤها من الكتالوج الحيّ (PRIMARY = `google/gemma-4-31b-it:free`)، وصار
+  العميل **يدور** على السلسلة عند 402/404/406/408/409/413/425/429/5xx ويفشل فورًا على 401/403، بـ
+  `max_retries=0` ومهلة أول رمز، ويُسجِّل النموذج الذي خدم فعلاً (`last_model` + `health_snapshot()["chain"]`).
+  كما يُلغي المسارُ الطالبي إعادةَ محاولة DSPy على مزوّد ميت، ويبلّغ `provider_down` بدل تلفيق «لا يوجد سياق».
+- **بوّاباتٌ جديدة لا تعليق:** `scripts/verify_model_registry_live.py` (`make model-check`) يسأل الكتالوجَ
+  الحيّ عن السلسلة كما يقرؤها الدماغان — تجاوزُ المشغِّل ثم الذيل ثم `OPENROUTER_EXTRA_MODELS` — ويفشل
+  fail-closed عند تعذّر الشبكة (لا أخضر كاذب)؛ أُدرج في `live-e2e.yml` قبل إقلاع الخادم. وأُكمِلت سجلّاتُ
+  `shared/ai_models/registry.py` (إدخالٌ لـ `nvidia/nemotron-3.5-lightning:free` بقدراتٍ لم تُبنشَر = فارغة،
+  وتحديثُ دليل كلِّ نموذج بتاريخ 2026-09-09) لأنّ بوّابة D-202 حمراء عمداً على أيّ نموذجٍ في السلسلة بلا إدخال.
+- **القنوات كلها على بوابة واحدة:** `OPENROUTER_BASE_URL` صار يقرأه عميلُ الـ orchestrator ووكيلا
+  `simple_client` و`super_search`، والافتراضياتُ الميتة أُزيلت من `math_pipeline`/`conversation_graph`/`nodes.py`
+  (تثبيتات `check_legacy_invariants.py` حُدِّثت مرآةً لذلك).
+- **ISS-201 (D-289) — حارسُ النزاهة كان يمزّق الإجابة الصحيحة.** `StreamIntegrityFilter._strip_latin_garbage`
+  يعامل كل لاتيني طويلٍ كغارباج: `https://example.com/physics` → `://./`، و`python3.12`، و`F = m \cdot a`.
+  أُضيف استثناءٌ بنيوي (`_is_structural_token`) + توسعةُ `_TECH_ALLOWLIST` بمفردات SI/الفيزياء/الكيمياء/الملفات،
+  وبندٌ في دستور الطبقة مع إصدارٍ مرقَّم (`CONTENT_INTEGRITY_DOCTRINE_VERSION` 1.0.0 → 1.1.0). تسريبُ
+  التفكير اللاتيني يبقى محذوفاً — البرهان: `experiences_random Eingaben Sweg exitos` لا يزال يُشطَب.
+- **البرهان (حيٌّ، لا ساخر):** `scripts/e2e_orchestrator_live.py` على ثلاث ساقين (مباشر :8006 · مونوليث WS
+  :8000 · وكيلُ الواجهة :5000) — `ok=True deltas=10 chars=245 ttft=0.04 terminal=assistant_final`، والجسم
+  مطابقٌ بلا بتر. وبتثبيت PRIMARY ميتاً في البيئة: `... failed (NotFoundError(404) 'No endpoints found') — rotating`
+  ثم `AI stream served by model=google/gemma-4-26b-a4b-it:free chunks=9` — والدوران مُثبَتٌ لا موصوف.
+- **الاختبارات:** 61 اختباراً أخضر (parity السلسلة · مسبار السجلّ · عميل الدوران · حارس النزاهة) بلا تراجعٍ
+  في `tests/services/test_iss079_catastrophic_fixes.py`؛ `ruff check`/`format` (0.14.0) نظيف؛ البوّابات
+  `check_model_registry` / `check_model_chain_parity` / `check_legacy_invariants` / `check_model_client_literals` خضراء.
+
 ### Added - 2026-08-20 - D-240: Transition Service (multi-agent AI work-transition layer)
 - `microservices/transition_service/` — 13 specialized agents (early warning, occupation
   exposure, skills gap, career transition, education/curriculum, job creation, social

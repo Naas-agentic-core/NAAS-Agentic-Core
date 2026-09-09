@@ -170,10 +170,16 @@ class TestPrimaryModelConfig:
 
     def test_app_core_ai_config_primary(self):
         source = self._read("app/core/ai_config.py")
-        # D-167: PRIMARY عاد إلى gpt-oss-20b (120b المجاني أُزيل نهائياً — 404)
-        assert 'PRIMARY = _resolve_primary_model("openai/gpt-oss-20b:free")' in source, (
-            "app/core/ai_config.py PRIMARY must be openai/gpt-oss-20b:free (D-167). "
-            "gpt-oss-120b:free أُزيل نهائياً من OpenRouter (ISS-130)."
+        # D-288 (2026-09-09): PRIMARY هو gemma-4-31b-it:free. الـ PRIMARY القديم
+        # (gpt-oss-20b:free) لم يعد له endpoint (`\"endpoints\": []`)، وإبقاؤه حرفيةً
+        # «مؤمَّنة» كان يعني أن الحراسة تُثبّت العطل نفسه. الحظر القديم يبقى قائماً:
+        # لا nemotron-3-nano ولا nemotron-3-super في PRIMARY (D-067 / ISS-107).
+        assert 'PRIMARY = _resolve_primary_model("google/gemma-4-31b-it:free")' in source, (
+            "app/core/ai_config.py PRIMARY must be google/gemma-4-31b-it:free (D-288): "
+            "عربي+LaTeX مُتحقَّق منه، وله endpoint حيّ. gpt-oss-20b:free بلا endpoint (ISS-200)."
+        )
+        assert 'PRIMARY = _resolve_primary_model("nvidia/nemotron' not in source, (
+            "D-067: nemotron-3-nano ممنوع أن يكون PRIMARY (content=None ⇒ كارثة «pepepe»)."
         )
 
     def test_app_core_ai_config_has_recovery_slot(self):
@@ -188,23 +194,32 @@ class TestPrimaryModelConfig:
         assert "GPT_OSS_20B_FREE" in source, (
             "orchestrator ai_config must have GPT_OSS_20B_FREE constant"
         )
-        # D-167: PRIMARY يستخدم GPT_OSS_20B_FREE (mirror لسلسلة المونوليث)
-        assert "PRIMARY = _resolve_primary_model(AvailableModels.GPT_OSS_20B_FREE)" in source, (
-            "orchestrator ai_config PRIMARY must use GPT_OSS_20B_FREE (D-167)"
+        # D-288: PRIMARY يستخدم GEMMA_4_31B_IT_FREE (mirror لسلسلة المونوليث — D-013).
+        # هذا هو الدماغ الذي يقرأه مسار الدردشة الحيّ فعلياً، فأي انحرافٍ هنا = صمت.
+        assert "PRIMARY = _resolve_primary_model(AvailableModels.GEMMA_4_31B_IT_FREE)" in source, (
+            "orchestrator ai_config PRIMARY must use GEMMA_4_31B_IT_FREE (D-288)"
         )
 
     def test_conversation_math_pipeline_default(self):
         source = self._read("microservices/conversation_service/src/math_pipeline.py")
-        # D-167: _DEFAULT_MODEL عاد إلى gpt-oss-20b (120b المجاني أُزيل — 404)
-        assert '_DEFAULT_MODEL = "openai/gpt-oss-20b:free"' in source, (
-            "math_pipeline default model must be gpt-oss-20b:free (D-167/ISS-130)."
+        # D-288: نفس الحرفية الميتة كانت مكرّرة هنا أيضاً.
+        assert '_DEFAULT_MODEL = "google/gemma-4-31b-it:free"' in source, (
+            "math_pipeline default model must be google/gemma-4-31b-it:free (D-288/ISS-200)."
+        )
+        # ISS-107: نموذج «تسرّب الإنجليزية» محظور في كل طبقة — بما فيها retry الـ meta.
+        assert '"nvidia/nemotron-3-super-120b-a12b:free"' not in source, (
+            "math_pipeline must not call the ISS-107 banned model (English-in-content leak)."
         )
 
     def test_conversation_graph_default(self):
         source = self._read("microservices/conversation_service/src/conversation_graph.py")
-        # D-167: _DEFAULT_MODEL عاد إلى gpt-oss-20b (120b المجاني أُزيل — 404)
-        assert '_DEFAULT_MODEL = "openai/gpt-oss-20b:free"' in source, (
-            "conversation_graph default model must be gpt-oss-20b:free (D-167/ISS-130)."
+        # D-288: conversation-service خارج مسار الطالب اليوم (rollout 0%)، لكن أي
+        # حرفية ميتة فيه تصبح عطلاً فور ترقية التوجيه — فلنُبقِ صورته مطابقة.
+        assert '_DEFAULT_MODEL = "google/gemma-4-31b-it:free"' in source, (
+            "conversation_graph default model must be google/gemma-4-31b-it:free (D-288)."
+        )
+        assert '"nvidia/nemotron-3-super-120b-a12b:free"' not in source, (
+            "conversation_graph fallback must not include the ISS-107 banned model"
         )
 
 

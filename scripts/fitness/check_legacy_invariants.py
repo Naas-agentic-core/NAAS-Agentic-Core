@@ -113,7 +113,11 @@ REQUIRED: dict[str, list[str]] = {
         "ISS-052",  # iss-052-bac-display-streaming.yml
     ],
     "app/core/ai_config.py": [
-        'PRIMARY = _resolve_primary_model("openai/gpt-oss-20b:free")',  # iss-079-catastrophic-trio-gate.yml
+        # D-288 (2026-09-09): PRIMARY هو gemma-4-31b-it:free — النموذج الذي تخدمه
+        # OpenRouter فعلاً (منتهى `/api/v1/models/<id>/endpoints` غير فارغ). الحرفية
+        # الميتة (gpt-oss-20b:free) لا تصلح أن تكون «قيمة الحراسة»: حارسٌ يُثبّت
+        # عطلاً معروفاً يحوّل الاختبار إلى ختمٍ على الموت.
+        'PRIMARY = _resolve_primary_model("google/gemma-4-31b-it:free")',  # iss-079-catastrophic-trio-gate.yml
     ],
     "app/services/capabilities/exercise_retrieval.py": [
         '"أريد شرح"',  # iss-075-greeting-explanation-gate.yml
@@ -201,7 +205,7 @@ REQUIRED: dict[str, list[str]] = {
         "StateGraph",  # microservices-step12-conversation-service.yml
         "TimeoutError",  # microservices-step12-conversation-service.yml
         "_CYRILLIC_REPLACEMENTS",  # iss-074-latex-stream-normalizer-gate.yml
-        '_DEFAULT_MODEL = "openai/gpt-oss-20b:free"',  # iss-079-catastrophic-trio-gate.yml
+        '_DEFAULT_MODEL = "google/gemma-4-31b-it:free"',  # iss-079-catastrophic-trio-gate.yml (D-288: gpt-oss-20b:free بلا endpoint)
         "_build_fallback_response",  # microservices-step12-conversation-service.yml
         "_normalize_latex_response",  # iss-071-latex-normalize-gate.yml
         "_strip_chat_meta_narration",  # iss-074-latex-stream-normalizer-gate.yml
@@ -221,7 +225,7 @@ REQUIRED: dict[str, list[str]] = {
         "async def enrich_node",  # D-080 topology (replaces misattributed rows)
         "MathPipelineState",  # iss-070-math-pipeline-gate.yml
         "StateGraph",  # iss-070-math-pipeline-gate.yml
-        '_DEFAULT_MODEL = "openai/gpt-oss-20b:free"',  # iss-079-catastrophic-trio-gate.yml
+        '_DEFAULT_MODEL = "google/gemma-4-31b-it:free"',  # iss-079-catastrophic-trio-gate.yml (D-288: gpt-oss-20b:free بلا endpoint)
         "_SYSTEM_PROMPT_ECHO_MARKERS",  # iss-074-latex-stream-normalizer-gate.yml
         "_build_fallback_solution",  # iss-070-math-pipeline-gate.yml
         "_clean_foreign_scripts",  # iss-074-latex-stream-normalizer-gate.yml
@@ -256,7 +260,7 @@ REQUIRED: dict[str, list[str]] = {
         "/compose",  # microservices-step10-postgres-checkpointer.yml
     ],
     "microservices/orchestrator_service/src/core/ai_config.py": [
-        "PRIMARY = _resolve_primary_model(AvailableModels.GPT_OSS_20B_FREE)",  # iss-079-catastrophic-trio-gate.yml
+        "PRIMARY = _resolve_primary_model(AvailableModels.GEMMA_4_31B_IT_FREE)",  # iss-079-catastrophic-trio-gate.yml
     ],
     "microservices/orchestrator_service/src/core/config.py": [
         '"8002"',  # microservices-step9-skills-pipeline.yml

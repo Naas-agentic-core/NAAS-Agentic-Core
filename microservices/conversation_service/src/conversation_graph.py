@@ -121,16 +121,22 @@ _NODE_TIMEOUT_SECONDS = 45.0
 # على OpenRouter ("Provider returned error 429"). gpt-oss-120b من نفس العائلة،
 # نفس quality contract، rate limit pool مختلف. مُرقّى لـ default.
 # ISS-130 (D-167 — 2026-07-14): gpt-oss-120b:free أُزيل من OpenRouter (404) — العودة للـ 20b المُتحقَّق.
-_DEFAULT_MODEL = "openai/gpt-oss-20b:free"
+# ISS-200 (D-288 — 2026-09-09): مسبار الكتالوج الحيّ (`/api/v1/models/<id>/endpoints`)
+# يُظهر `"endpoints": []` لـ gpt-oss-20b:free — الحرفية الميتة نفسها كانت هنا أيضاً.
+# الحُرّاس: لا يُصلَّب النموذج في `shared/ai_models/model_chain.py` وحده؛ هذه الصورة
+# تُحدَّث معه (sister copy — لا استيراد: صورة هذا الخدمة لا تحمل `shared/`).
+_DEFAULT_MODEL = "google/gemma-4-31b-it:free"
 
-# سلسلة fallback — تُجرَّب بالترتيب عند 429 أو فشل النموذج الأساسي (D-067)
+# سلسلة fallback — تُجرَّب بالترتيب عند 404/429 أو فشل النموذج الأساسي (D-067).
+# أُزيل منها ما يضرّ ولا يفي: nemotron-3-super-120b (nvidia — محظور
+# تسرّب إنجليزي في content، ISS-107)، وglm-4.5-air (reasoning-only ⇒
+# content=None، D-067)، و`mistralai/mistral-7b-instruct:free` (بلا endpoint حيّ).
 _FALLBACK_CHAIN: list[str] = [
-    "openai/gpt-oss-20b:free",  # demoted from PRIMARY 2026-05-27 (ISS-082)
-    "nvidia/nemotron-3-super-120b-a12b:free",  # verified live 2026-05-27
-    "z-ai/glm-4.5-air:free",  # verified live 2026-05-27
-    "google/gemma-3-27b-it:free",
+    "google/gemma-4-26b-a4b-it:free",  # ✅ endpoint حيّ (2026-09-09)
+    "nvidia/nemotron-3.5-lightning:free",  # ✅ endpoint حيّ — 1M ctx (D-280)
+    "openai/gpt-oss-20b:free",  # 🕳 0 endpoints حالياً — فتحة تعافٍ آلي (demoted 2026-09-09)
     "meta-llama/llama-3.3-70b-instruct:free",
-    "mistralai/mistral-7b-instruct:free",
+    "google/gemma-3-27b-it:free",
 ]
 
 _INTENT_PATTERNS: dict[str, list[str]] = {

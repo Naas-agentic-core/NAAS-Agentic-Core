@@ -86,6 +86,11 @@ class AvailableModels:
     # ISS-079 (D-067 — 2026-05-17): نماذج عاملة موثَّقة بـ tests/integration/live
     GPT_OSS_20B_FREE = "openai/gpt-oss-20b:free"
     GPT_OSS_120B_FREE = "openai/gpt-oss-120b:free"
+    # D-288 (2026-09-09): عائلة gpt-oss المجانية بلا endpoint حالياً، والنموذان
+    # الحيّان المُتحقَّق منها بمسبار الكتالوج المباشر (`.../endpoints`).
+    GEMMA_4_31B_IT_FREE = "google/gemma-4-31b-it:free"  # ✅ endpoint حيّ — PRIMARY
+    GEMMA_4_26B_A4B_IT_FREE = "google/gemma-4-26b-a4b-it:free"  # ✅ endpoint حيّ
+    NEMOTRON_3_5_LIGHTNING_FREE = "nvidia/nemotron-3.5-lightning:free"  # ✅ endpoint حيّ (1M ctx)
 
 
 class ActiveModels:
@@ -121,16 +126,28 @@ class ActiveModels:
     # gpt-oss-120b نهائياً (404) ⇒ إعادة ترقية gpt-oss-20b (تعافى من 429 —
     # مُتحقَّق حياً عربي+LaTeX finish=stop). gemma-4 بإصداريه بعده (GOOD حياً)؛
     # gpt-oss-120b في الذيل كفتحة تعافٍ آلي (mirror لسلسلة المونوليث — D-013).
-    PRIMARY = _resolve_primary_model(AvailableModels.GPT_OSS_20B_FREE)
+    # PRIMARY = gpt-oss-20b منذ D-167. ISS-200 (D-288 — 2026-09-09): مسبار الكتالوج
+    # الحيّ (`GET /api/v1/models/<id>/endpoints`) يُظهر أن OpenRouter لم يعد يخدم
+    # أياً من `openai/gpt-oss-20b:free` ولا `openai/gpt-oss-120b:free` ولا
+    # `nvidia/nemotron-nano-9b-v2:free` (`"endpoints": []`). وبما أن عميل
+    # `services/llm/client.py` يقرأ PRIMARY وحده بلا سلسلة سقوط، كانت **كل** دورة
+    # دردشة تُنهي نفسها بسطر جاهز بدل إجابة (رُصد حياً: 0 delta / 2.07s).
+    # PRIMARY اليوم: gemma-4-31b-it:free — endpoint حيّ + الجودة العربية/LaTeX التي
+    # تُثبتها رحلة live-e2e الخضراء منذ D-280؛ والنماذج الميتة فتحات تعافٍ آلي.
+    PRIMARY = _resolve_primary_model(AvailableModels.GEMMA_4_31B_IT_FREE)
     LOW_COST = PRIMARY
     GATEWAY_PRIMARY = PRIMARY
     GATEWAY_FALLBACK_1 = (
-        AvailableModels.GEMINI_2_FLASH_EXP_FREE
-    )  # gemma-4-26b — GOOD حياً 2026-07-14
-    GATEWAY_FALLBACK_2 = "google/gemma-4-31b-it:free"  # GOOD حياً 2026-07-14 — عربي+LaTeX
-    GATEWAY_FALLBACK_3 = AvailableModels.NEMOTRON_3_NANO  # works on short prompts (guarded)
-    GATEWAY_FALLBACK_4 = AvailableModels.GPT_OSS_120B_FREE  # ميت 404 — فتحة تعافٍ آلي
-    GATEWAY_FALLBACK_5 = "nvidia/nemotron-nano-9b-v2:free"  # ملاذ أخير؛ محميّ بالحُرّاس (D-177: FIRST_TOKEN_TIMEOUT يحدّ تعليقه 62s؛ nemotron-3-super-120b يبقى محظوراً ISS-107)
+        AvailableModels.GEMMA_4_26B_A4B_IT_FREE
+    )  # ✅ endpoint حيّ 2026-09-09 (كان GEMINI_2_FLASH_EXP_FREE — نفس الحرفية)
+    GATEWAY_FALLBACK_2 = (
+        AvailableModels.NEMOTRON_3_5_LIGHTNING_FREE
+    )  # ✅ حيّ — 1M ctx، فتحة D-280 المُجرَّبة في CI
+    GATEWAY_FALLBACK_3 = (
+        AvailableModels.GPT_OSS_20B_FREE
+    )  # 🕳 0 endpoints 2026-09-09 — فتحة تعافٍ آلي (PRIMARY التاريخي D-067)
+    GATEWAY_FALLBACK_4 = AvailableModels.GPT_OSS_120B_FREE  # 🕳 0 endpoints — فتحة تعافٍ آلي
+    GATEWAY_FALLBACK_5 = AvailableModels.NEMOTRON_3_NANO  # ملاذ أخير سريع؛ محميّ بالحُرّاس (D-177: FIRST_TOKEN_TIMEOUT؛ ممنوع كـ PRIMARY — D-067). خلفه nemotron-nano-9b-v2:free أُزيل (0 endpoints)
     TIER_NANO = PRIMARY
     TIER_FAST = PRIMARY
     TIER_SMART = PRIMARY

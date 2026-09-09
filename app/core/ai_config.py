@@ -135,7 +135,13 @@ class ActiveModels:
     # ISS-130 (D-167 — 2026-07-14): gpt-oss-120b:free أُزيل نهائياً من OpenRouter
     # (404) ⇒ إعادة ترقية gpt-oss-20b (الـ PRIMARY المُتحقَّق تاريخياً — D-067،
     # وتعافى من 429 — مُتحقَّق حياً 10.2s عربي+LaTeX finish=stop).
-    PRIMARY = _resolve_primary_model("openai/gpt-oss-20b:free")
+    # ISS-200 (D-288 — 2026-09-09): `openai/gpt-oss-20b:free` صار **بلا endpoint**
+    # (`"endpoints": []` في `GET /api/v1/models/openai/gpt-oss-20b:free/endpoints`)، وهو
+    # الـ PRIMARY الذي كان كل طالبٍ يعتمد عليه ⇒ فشل صامت لكل دورة دردشة. PRIMARY اليوم
+    # هو النموذج الذي تُثبِت به رحلة live-e2e الخضراء جودتها (D-280) وهو الوحيد الذي يجمع الجودة العربية مع endpoint حيّ.
+    # يبقى gpt-oss-20b في السلسلة كفتحة تعافٍ آلي (FALLBACK_3) — إن أعاد OpenRouter
+    # خدمته المجانية يعود تلقائياً. الحُرّاس: ممنوع reasoning-only (D-067) وcontent==0.
+    PRIMARY = _resolve_primary_model("google/gemma-4-31b-it:free")
     LOW_COST = PRIMARY
     GATEWAY_PRIMARY = PRIMARY
     # ISS-107 (2026-06-02): بنشمارك حي بالمفتاح الحقيقي + الـ system prompt الإنتاجي
@@ -163,14 +169,29 @@ class ActiveModels:
     #   ❌ gpt-oss-120b:free     → 404 (أُزيل من الطبقة المجانية)
     #   ❌ qwen3-next / kimi-k2.6 / qwen3-coder / llama-3.3-70b → ميتة/Provider error
     #   ⚠️ nemotron-3-nano       → هلوسة يابانية (يؤكّد حظر D-067 كـ PRIMARY)
-    # القرار: إعادة ترقية gpt-oss-20b إلى PRIMARY (هو الـ PRIMARY المُتحقَّق تاريخياً
+    #   القرار: إعادة ترقية gpt-oss-20b إلى PRIMARY (هو الـ PRIMARY المُتحقَّق تاريخياً
     # D-067)؛ gemma-4 بإصداريه بعده؛ gpt-oss-120b يبقى في ذيل السلسلة كفتحة
     # تعافٍ آلي إن أعاد OpenRouter نسخته المجانية (الحُرّاس يتجاوزون 404 فوراً).
-    GATEWAY_FALLBACK_1 = "google/gemma-4-26b-a4b-it:free"  # ✅ GOOD حياً (2026-07-14) — عربي+LaTeX
-    GATEWAY_FALLBACK_2 = "google/gemma-4-31b-it:free"  # ✅ GOOD حياً (2026-07-14) — عربي+LaTeX
-    GATEWAY_FALLBACK_3 = "nvidia/nemotron-3-nano-30b-a3b:free"  # سريع؛ محميّ بـ content==0 guard
-    GATEWAY_FALLBACK_4 = "openai/gpt-oss-120b:free"  # ميت 404 (2026-07-14) — فتحة تعافٍ آلي
-    GATEWAY_FALLBACK_5 = "nvidia/nemotron-nano-9b-v2:free"  # ملاذ أخير؛ محميّ بالحُرّاس (D-177: FIRST_TOKEN_TIMEOUT يحدّ تعليقه 62s؛ nemotron-3-super-120b يبقى محظوراً ISS-107 — تسرّب إنجليزي)
+    # ISS-200 (D-288 — 2026-09-09): **تجريب حيّ حقيقي** على `.../endpoints` كشف أن
+    # OpenRouter لم يعد يخدم النسخ المجانية من عائلة gpt-oss إطلاقاً:
+    #   🕳 openai/gpt-oss-20b:free      → "endpoints": []   (كان PRIMARY — فالكل ميت)
+    #   🕳 openai/gpt-oss-120b:free     → "endpoints": []
+    #   🕳 nvidia/nemotron-nano-9b-v2:free → "endpoints": []  (الملاذ الأخير كان ميتاً هو الآخر)
+    #   ✅ google/gemma-4-31b-it:free   → Google AI Studio (99.6% uptime/24h)
+    #   ✅ google/gemma-4-26b-a4b-it:free → Google AI Studio (99.5% uptime/24h)
+    #   ✅ nvidia/nemotron-3.5-lightning:free → Nvidia (1M ctx، 97.3% uptime/24h)
+    # المفارقة أن `live-e2e.yml` كان **أخضر** لأنه يتجاوز PRIMARY بـ
+    # `OPENROUTER_PRIMARY_MODEL` (D-280) بينما التشغيل الحقيقي يحتفظ بالحرفية الميتة:
+    # أي أن الاختبار الحيّ كان يُصلح البيئة بدل أن يكشف المنتج. الترقية الآن إلى
+    # gemma-4-31b (نفس النموذج الذي تُثبت به الرحلة الخضراء جودتها العربية)؛ والنموذجان
+    # gpt-oss يبقيان كفتحتي تعافٍ آلي. المُسبار: `scripts/verify_model_registry_live.py`.
+    GATEWAY_FALLBACK_1 = (
+        "google/gemma-4-26b-a4b-it:free"  # ✅ endpoint حيّ (2026-09-09) — عربي+LaTeX
+    )
+    GATEWAY_FALLBACK_2 = "nvidia/nemotron-3.5-lightning:free"  # ✅ endpoint حيّ (2026-09-09) — 1M ctx، فتحة D-280 المُجرَّبة في CI
+    GATEWAY_FALLBACK_3 = "openai/gpt-oss-20b:free"  # 🕳 0 endpoints (2026-09-09) — فتحة تعافٍ آلي (PRIMARY التاريخي D-067)
+    GATEWAY_FALLBACK_4 = "openai/gpt-oss-120b:free"  # 🕳 0 endpoints (2026-09-09) — فتحة تعافٍ آلي
+    GATEWAY_FALLBACK_5 = "nvidia/nemotron-3-nano-30b-a3b:free"  # سريع؛ محميّ بـ content==0 + حرّاس Arabic/D-177؛ ممنوع كـ PRIMARY (D-067). خلفه: nemotron-nano-9b-v2:free أُزيل (0 endpoints)
     TIER_NANO = PRIMARY
     TIER_FAST = PRIMARY
     TIER_SMART = PRIMARY

@@ -110,21 +110,38 @@ MODEL_REGISTRY: Final[dict[str, ModelRecord]] = {
         ModelRecord(
             model_id="openai/gpt-oss-20b:free",
             capabilities=_ALL,
-            verified_on=date(2026, 7, 14),
-            evidence="D-167 live benchmark: 2102 chunks, 4762 chars Arabic + LaTeX, finish=stop.",
-            notes="الصدارة المُتحقَّقة (D-067/D-167).",
+            verified_on=date(2026, 9, 9),
+            evidence=(
+                "D-167 live benchmark: 2102 chunks, 4762 chars Arabic + LaTeX, finish=stop. "
+                "2026-09-09 (D-288): public /endpoints probe returns an EMPTY list — the free "
+                "tier serves no endpoint for it anymore, so it is no longer PRIMARY."
+            ),
+            notes=(
+                "القدرة مُتحقَّقة، والقدرةَ لا تُطعِم طالباً بلا endpoint: مُنحىً عن الصدارة إلى "
+                "الذيل حتى يعود حيّاً (D-288). التحقّق من الخدمة حيّاً مسؤوليّة "
+                "scripts/verify_model_registry_live.py، لا هذا الإدخال."
+            ),
         ),
         ModelRecord(
             model_id="google/gemma-4-26b-a4b-it:free",
             capabilities=_ALL,
-            verified_on=date(2026, 7, 22),
-            evidence="D-177 live E2E: answered in Arabic + LaTeX after PRIMARY returned reasoning-only.",
+            verified_on=date(2026, 9, 9),
+            evidence=(
+                "D-177 live E2E: answered in Arabic + LaTeX after PRIMARY returned reasoning-only. "
+                "2026-09-09 /endpoints probe: free endpoint alive (Google AI Studio, 262144 ctx, "
+                "uptime 99.53%) — and served a live Arabic+LaTeX turn end to end under D-288."
+            ),
         ),
         ModelRecord(
             model_id="google/gemma-4-31b-it:free",
             capabilities=_ALL,
-            verified_on=date(2026, 7, 14),
-            evidence="D-167 live benchmark: Arabic + LaTeX, clean finish.",
+            verified_on=date(2026, 9, 9),
+            evidence=(
+                "D-167 live benchmark: Arabic + LaTeX, clean finish. D-280 (2026-08-22): passed the "
+                "full live matrix as CI PRIMARY. 2026-09-09 /endpoints probe: free endpoint alive "
+                "(262144 ctx / 32768 max completion, uptime 99.61%). PRIMARY since D-288."
+            ),
+            notes="الصدارة المُتحقَّقة (D-067/D-167) والمُعلَنة في السلسلة (D-288).",
         ),
         ModelRecord(
             model_id="nvidia/nemotron-3-nano-30b-a3b:free",
@@ -140,9 +157,27 @@ MODEL_REGISTRY: Final[dict[str, ModelRecord]] = {
         ModelRecord(
             model_id="openai/gpt-oss-120b:free",
             capabilities=frozenset({Capability.ARABIC, Capability.LATEX}),
-            verified_on=date(2026, 7, 14),
-            evidence="D-167: removed from the OpenRouter free tier (404); kept as an auto-recovery slot.",
+            verified_on=date(2026, 9, 9),
+            evidence=(
+                "D-167: removed from the OpenRouter free tier (404); 2026-09-09 /endpoints probe "
+                "still empty. Kept as an auto-recovery slot."
+            ),
             notes="نموذجٌ ميّت تُخطّيه الحُرّاس فوراً — بقاؤه مجّاني وتعافيه آلي.",
+        ),
+        # أُدرِج في السلسلة (D-288) لأنه حيٌّ على الكتالوج المجاني، لا لأن قدرته النصية
+        # مُتحقَّقة. قدراتٌ لم تُبنشَر = إدخالٌ بقدرات فارغة، لا ادّعاءٌ يسبق الدليل.
+        ModelRecord(
+            model_id="nvidia/nemotron-3.5-lightning:free",
+            capabilities=frozenset(),
+            verified_on=date(2026, 9, 9),
+            evidence=(
+                "2026-09-09 public /endpoints probe: free endpoint alive (NVIDIA, 1000000 ctx, "
+                "65536 max completion, uptime 99.77% last 30m). D-280 wired it as the free-tier "
+                "recovery slot, but ISS-199 recorded `first_token_timeout` on it in a live CI pass "
+                "(2026-08-30) — so no content capability is claimed here at all. Not PRIMARY-eligible "
+                "by data, not by taste."
+            ),
+            notes="ملاذُ تعافٍ في الذيل. يُرقّى بعد قياسٍ حيٍّ لا بتحرير سطر.",
         ),
         ModelRecord(
             model_id="nvidia/nemotron-nano-9b-v2:free",

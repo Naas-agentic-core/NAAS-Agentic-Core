@@ -47,6 +47,10 @@ from microservices.orchestrator_service.src.core.logging import get_logger
 from microservices.orchestrator_service.src.infrastructure.clients.research_client import (
     research_client,
 )
+from microservices.orchestrator_service.src.services.llm.client import (
+    PROVIDER_UNAVAILABLE_MESSAGE,
+    AllModelsFailedError,
+)
 from microservices.orchestrator_service.src.services.overmind.latex_normalizer import (
     LatexStreamNormalizer,
     normalize_latex,
@@ -626,6 +630,9 @@ class SynthesizerNode:
         # fail-open: "" عند أي تعذّر، والتوليف يتابع كالمعتاد.
         reasoning_hint = await _consult_reasoning_agent(query)
 
+        # ISS-200 (D-288): تمييز «سلسلة النماذج سقطت كلها» عن «لا يوجد سياق».
+        provider_down = False
+
         if not reranked:
             # ISS-STREAM-002: عند عدم وجود نتائج بحث → استخدم LLM مباشرة مع streaming
             writer = self._get_writer()
@@ -681,9 +688,20 @@ class SynthesizerNode:
                             }
                         )
                     text_val = "".join(parts).strip()
+                except AllModelsFailedError as e:
+                    logger.error(
+                        "Synthesizer no-docs streaming: model chain exhausted — %s (chain=%s)",
+                        e,
+                        llm_client.model_chain(),
+                    )
+                    provider_down = True
                 except Exception as e:
                     logger.error(f"Synthesizer no-docs streaming failed: {e}")
-            if not text_val:
+            if provider_down:
+                # انقطاع المُزوّد حالةُ تشغيلٍ لا جهلٌ بالموضوع: النصُّ الجاهز القديم
+                # («لا توجد تفاصيل متاحة») كان يُقرأ كإجابة ويُطفئ أي إنذار.
+                text_val = PROVIDER_UNAVAILABLE_MESSAGE
+            elif not text_val:
                 text_val = "لا توجد تفاصيل متاحة."
         else:
             raw_doc_text = reranked[0].text
@@ -760,11 +778,26 @@ class SynthesizerNode:
                             }
                         )
                     text_val = "".join(parts).strip()
+                except AllModelsFailedError as e:
+                    logger.error(
+                        "Synthesizer streaming: model chain exhausted — %s (chain=%s)",
+                        e,
+                        llm_client.model_chain(),
+                    )
+                    text_val = ""
+                    provider_down = True
                 except Exception as e:
                     logger.error(f"Synthesizer streaming failed: {e}")
                     text_val = ""
 
-            if not text_val:
+            if provider_down:
+                # ISS-200: DSPy يستدعي نفس المزوّد الميت — إعادة المحاولة به تُضيف
+                # تعليقاً فقط؛ والرجوع إلى `raw_doc_text` كان يُلقي وثيقة الاسترجاع
+                # الخام للطالب كأنها شرح، وهو ما ينقضّ عليه عقد D-115 صراحةً
+                # («المصدر سياق مساعد لا يُنسخ ولا يُكشف منه نتيجة»).
+                text_val = PROVIDER_UNAVAILABLE_MESSAGE
+
+            if not text_val and not provider_down:
                 # Fallback إلى DSPy (batch mode أو فشل streaming)
                 try:
                     # D-103: حقن hint الاستدلال في مسار DSPy batch أيضاً
@@ -816,5 +849,11 @@ class SynthesizerNode:
         # they get the answer, never a JSON dump.
         return {
             "final_response": response_json,
-            "messages": [AIMessage(content=text_val or "لا توجد تفاصيل متاحة.")],
+            "provider_error": provider_down,
+            "messages": [
+                AIMessage(
+                    content=text_val
+                    or (PROVIDER_UNAVAILABLE_MESSAGE if provider_down else "لا توجد تفاصيل متاحة.")
+                )
+            ],
         }

@@ -3,6 +3,10 @@ import logging
 from langchain_core.messages import AIMessage
 
 from microservices.orchestrator_service.src.services.llm.client import (
+    PROVIDER_UNAVAILABLE_MESSAGE,
+    AllModelsFailedError,
+)
+from microservices.orchestrator_service.src.services.llm.client import (
     get_ai_client as get_llm_client,
 )
 from microservices.orchestrator_service.src.services.overmind.latex_normalizer import (
@@ -141,6 +145,24 @@ class GeneralKnowledgeNode:
                 "messages": [AIMessage(content=response_content.strip())],
             }
 
+        except AllModelsFailedError as error:
+            # ISS-200 (D-288): انقطاع المُزوّد حالةُ تشغيلٍ، لا جهلٌ بالمعلومة. السطر
+            # الجاهز القديم («لم أتمكن من استرجاع هذه المعلومة») كان يجعل العطلَ يبدو
+            # إجابةً صحيحة الشكل: الطالب لا يعرف أنه يعيد المحاولة، والإنذار لا يشتعل.
+            # هنا تُنسخ تفاصيل السلسلة إلى السجلّ فقط، ويُعلَّم الدور كـ provider_error.
+            logger.error(
+                "GeneralKnowledgeNode: model chain exhausted — %s (chain=%s)",
+                error,
+                llm_client.model_chain(),
+            )
+            emit_telemetry(
+                node_name="GeneralKnowledgeNode", start_time=start_time, state=state, error=error
+            )
+            return {
+                "final_response": PROVIDER_UNAVAILABLE_MESSAGE,
+                "messages": [AIMessage(content=PROVIDER_UNAVAILABLE_MESSAGE)],
+                "provider_error": True,
+            }
         except Exception as error:
             logger.error(f"GeneralKnowledgeNode failed: {error}", exc_info=True)
             fallback_response = "عذراً، لم أتمكن من استرجاع هذه المعلومة الآن."

@@ -142,6 +142,14 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements-ci.txt
 
+      # D-288: اسأل الكتالوج الحيّ قبل أن تُقلع الرحلة. خطأ المزوّد (404/402) كان يهبط
+      # بكل ردود الطالب إلى رسالة اعتذار واحدة في أقل من ثانية، والحارس الأخضر
+      # (test_ai_config) لا يراه لأنه يفرض PRIMARY بالقوة. المسبار يقرأ السلسلة كما يقرأها
+      # الدماغان — تجاوز المشغِّل ثم الذيل ثم OPENROUTER_EXTRA_MODELS — فيسلّك ادّعاء D-280
+      # («ذيل التعافي مثبَّت») أخيراً، ويبلّغ سبب كل ميت صراحةً لا صمتاً.
+      - name: "Live model registry probe (D-288)"
+        run: python scripts/verify_model_registry_live.py --check-key
+
       - name: Boot the monolith against production Supabase
         shell: bash
         run: |

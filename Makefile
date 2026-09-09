@@ -20,7 +20,7 @@
 .PHONY: help install quality test format lint security docs clean run dev deploy \
         microservices-build microservices-up microservices-down microservices-logs \
         microservices-test microservices-health gateway-test event-bus-test \
-        circuit-breaker-test integration-test fmt guardrails ci compose-isolation
+        circuit-breaker-test integration-test fmt guardrails ci compose-isolation gates model-check
 
 # Colors for output
 BLUE := \033[0;34m
@@ -78,6 +78,8 @@ help:
 	@echo "  make docker-down      - Stop Docker containers"
 	@echo "  make docker-logs      - View Docker logs"
 	@echo "  make compose-isolation - Validate compose isolation rules"
+	@echo "  make gates            - Run every CI fitness gate locally"
+	@echo "  make model-check      - Ask the live provider if the whole model chain is servable (D-288)"
 	@echo ""
 	@echo "$(GREEN)🗄️ Database:$(NC)"
 	@echo "  make db-migrate       - Create new migration"
@@ -157,6 +159,15 @@ compose-isolation:
 	@echo "$(BLUE)🧩 Validating compose isolation rules...$(NC)"
 	python scripts/validate_compose_isolation.py
 	@echo "$(GREEN)✅ Compose isolation validation complete!$(NC)"
+
+# D-288: CI الأخضر لا يعني أن الكتالوج الحيّ يخدم نماذجنا — المطاردة الكاملة كانت هنا.
+# المسبار يسأل مزوّد النماذج عن كل سلسلة MODEL_CHAIN (وعميلِ الـ override نفسه) ويُسقِط
+# الرحلة الحيّة برسائل صريحة إن مات نموذج. يحتاج OPENROUTER_API_KEY فقط؛ لا يُقلِع
+# خادماً ولا يلمس قاعدة بيانات، فيُشغَّل قبل الإقلاع الحيّ وبعده على السواء.
+model-check:
+	@echo "$(BLUE)🛰️ Probing the live model registry for the whole chain...$(NC)"
+	python scripts/verify_model_registry_live.py --check-key
+	@echo "$(GREEN)✅ Model chain is servable on the live registry.$(NC)"
 
 ci: check lint guardrails compose-isolation test
 	@echo "$(GREEN)✅ CI checks complete!$(NC)"

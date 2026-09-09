@@ -181,3 +181,50 @@ class TestBranchCoverage:
         out += flt.feed("us نهاية") + flt.flush()
         # «sinus» ليست في allowlist (sin نعم، sinus لا) ⇒ تُحذف ككلمة كاملة.
         assert "نهاية" in out and "sinus" not in out
+
+
+class TestD289StructuralProtection:
+    r"""ISS-201 (D-289): الحماية البنيوية — اللاتيني الذي هو **بنية** ليس غارباجاً.
+
+    العطل المرصود حيّاً: بعد إصلاح سلسلة النماذج وصلت إجابات مبتورة للطالب —
+    `https://example.com/physics` صارت `://./`، و`Newton` حُذف كلياً. الحارس صُمِّم
+    ليقتل «experiences_random»، لا ليمزّق الروابط والمُعرِّفات والمصطلحات العلمية.
+    """
+
+    _PAD = "شرح مفصّل لقانون نيوتن الثاني في الفيزياء: القوة محصلة تساوي الكتلة في " "التسارع، " * 3
+
+    def test_url_survives(self) -> None:
+        src = self._PAD + "راجع https://example.com/physics للمزيد."
+        out, stripped, _ = _run([src])
+        assert "https://example.com/physics" in out
+        assert stripped == 0
+
+    def test_dotted_and_numbered_identifiers_survive(self) -> None:
+        src = self._PAD + "شغّل python3.12 ثم اكتب الملف main.py وreadme.txt هنا."
+        out, _, _ = _run([src])
+        assert "python3.12" in out and "main.py" in out and "readme.txt" in out
+
+    def test_inline_code_span_survives(self) -> None:
+        src = self._PAD + "نفّذ الأمر `run_live_e2e` ثم راجع النتيجة."
+        out, _, _ = _run([src])
+        assert "run_live_e2e" in out
+
+    def test_si_unit_vocabulary_survives(self) -> None:
+        """المفردات العلمية المكتوبة لاتينياً في نصٍّ عربي سليم (توسيع allowlist)."""
+        src = self._PAD + "الوحدة Newton والجهد بالفولت volt والطاقة joule والمقاومة ohm."
+        out, _, _ = _run([src])
+        for word in ("Newton", "volt", "joule", "ohm"):
+            assert word in out, f"مصطلح علمي حُذف: {word}"
+
+    def test_real_garbage_is_still_stripped(self) -> None:
+        """الغارباج العاري (بلا بنية، خارج allowlist) يبقى محذوفاً — لا ارتخاء في الحراسة."""
+        src = self._PAD + "كلمات Eingaben exitos Sweg دخيلة تماماً."
+        out, stripped, _ = _run([src])
+        assert stripped >= 2 and "Eingaben" not in out and "exitos" not in out
+
+    def test_model_id_leak_in_prose_is_not_math(self) -> None:
+        """مُعرِّف نموذج ملتحم بنقاط/شرطات يبقى (يُعالَج في طبقة الـ meta لاحقاً)،
+        لكن لا يُترك كـ«جملة إنجليزية»: الكلمة العامة حوله تُحذف."""
+        src = self._PAD + "من google/gemma-4-31b-it:free انتهى الشرح"
+        out, _, _ = _run([src])
+        assert "gemma-4-31b-it" in out

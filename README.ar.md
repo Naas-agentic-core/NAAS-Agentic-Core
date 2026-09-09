@@ -327,7 +327,7 @@ make microservices-health
 ├── observability/          Prometheus · لوحات Grafana · توصيل التتبّع
 ├── infra/                  Kubernetes · Terraform · ArgoCD
 ├── .memory/                الذاكرة المؤسسية — الحقيقة التشغيلية · القرارات · البلاغات
-└── CLAUDE.md               الدستور التشغيلي (D-001 → D-287)
+└── CLAUDE.md               الدستور التشغيلي (D-001 → D-289)
 ```
 
 ---
@@ -338,7 +338,7 @@ make microservices-health
 
 **الطموح يُصنَّف ولا يُكتَم**: `PLANNED` و`SEAM` و`ABSENT` إعلانات مُتتبَّعة. والطموح غير المُصنَّف هو الذي يُنسى.
 
-سجلّ البلاغات والقرارات: [`.memory/decisions.md`](.memory/decisions.md) (D-001 → D-287) · [`.memory/issues.md`](.memory/issues.md) (ISS-001 → ISS-199). كلاهما سجلٌّ مُلحَق-فقط يشمل الإخفاقات — وبلاغُ كارثةٍ بلا جذرٍ مكتوب ليس مُغلَقًا.
+سجلّ البلاغات والقرارات: [`.memory/decisions.md`](.memory/decisions.md) (D-001 → D-289) · [`.memory/issues.md`](.memory/issues.md) (ISS-001 → ISS-201). كلاهما سجلٌّ مُلحَق-فقط يشمل الإخفاقات — وبلاغُ كارثةٍ بلا جذرٍ مكتوب ليس مُغلَقًا.
 
 ---
 
@@ -384,7 +384,7 @@ make microservices-health
 
 | المستوى | المصدر | الدور |
 |---|---|---|
-| 🏛️ الدستور | [`CLAUDE.md`](CLAUDE.md) | القانون التشغيلي الدائم (D-001 → D-287). لا يحمل سردًا مؤرَّخًا ولا جداول حالة |
+| 🏛️ الدستور | [`CLAUDE.md`](CLAUDE.md) | القانون التشغيلي الدائم (D-001 → D-289). لا يحمل سردًا مؤرَّخًا ولا جداول حالة |
 | 🧠 الذاكرة | [`.memory/`](.memory/README.md) | `runtime_truth` · `decisions` · `issues` · `roadmap` · `pedagogical_os` |
 | 📐 مواصفة البرنامج | [`spec.md`](spec.md) | هدف التبسيط API-first — **الهدف** لا الحقيقة الجارية |
 | 🎼 العقائد | [`ENGINEERING_DOCTRINE.md`](docs/architecture/ENGINEERING_DOCTRINE.md) · [`CS_KNOWLEDGE_MAP.md`](docs/architecture/CS_KNOWLEDGE_MAP.md) · [`AGENTIC_ORCHESTRATION_DOCTRINE.md`](docs/architecture/AGENTIC_ORCHESTRATION_DOCTRINE.md) · [`COGNITIVE_EXECUTION_ENGINE.md`](docs/architecture/COGNITIVE_EXECUTION_ENGINE.md) · [`COGNITIVE_DIGITAL_TWIN.md`](docs/architecture/COGNITIVE_DIGITAL_TWIN.md) | وثائق قانون، كلٌّ تُسمّي بوّابتها |
