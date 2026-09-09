@@ -17,8 +17,8 @@
 # 0.109.2 the same file is 5 passed. uvicorn, pydantic, websockets, httptools,
 # watchfiles and python-multipart all keep #2290's bumps.
 # Tracked for removal in #2303 (BKT task ownership).
-fastapi==0.109.2
-uvicorn==0.52.3
+fastapi==0.141.1
+uvicorn==0.52.4
 SQLAlchemy==2.0.52
 sqlmodel==0.0.39
 alembic==1.19.1
@@ -36,7 +36,7 @@ asyncpg==0.31.0
 # Tracked for removal in #2303 (engine cached per loop).
 aiosqlite==0.17.0
 psycopg2-binary==2.9.12
-pydantic>=2.13.4,<3.0.0
+pydantic>=2.13.5,<3.0.0
 pydantic-settings>=2.15.0,<3.0.0
 PyJWT==2.13.0
 passlib==1.7.4
@@ -61,7 +61,7 @@ Jinja2==3.1.6
 typer==0.20.0
 tenacity==8.2.3
 redis>=5.0.0
-websockets>=17.0.1
+websockets>=17.1
 beautifulsoup4==4.12.3
 numpy>=1.26.0
 pyyaml==6.0.1
@@ -70,7 +70,7 @@ pyyaml==6.0.1
 # ⛔ The LangGraph/LangChain floors below are held deliberately (see the coupled
 # checkpoint pair near the end of this file). #2294 proposed langgraph>=1.2.11 +
 # langchain-core>=1.5.5 + checkpoint 4.x, which is an engine upgrade needing an
-# ADR — and it is also unsatisfiable next to `websockets>=17.0.1` (#2290):
+# ADR — and it is also unsatisfiable next to `websockets>=17.1` (#2290):
 # langgraph 1.2.11 requires langgraph-sdk>=0.4.2, which caps websockets at <17.
 # Measured with `uv pip compile --python-version 3.12`, which reports
 # "your requirements are unsatisfiable" — i.e. every CI job dies at pip install.
