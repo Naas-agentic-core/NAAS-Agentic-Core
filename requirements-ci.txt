@@ -74,12 +74,12 @@ pyyaml==6.0.1
 # langgraph 1.2.11 requires langgraph-sdk>=0.4.2, which caps websockets at <17.
 # Measured with `uv pip compile --python-version 3.12`, which reports
 # "your requirements are unsatisfiable" — i.e. every CI job dies at pip install.
-langgraph>=0.2.39,<2.0.0
-langchain-core>=0.3.0
-langchain-community>=0.3.0
-langchain-openai>=0.2.0
+langgraph>=1.2.11,<2.0.0
+langchain-core>=1.6.1
+langchain-community>=0.4.2
+langchain-openai>=1.6.0
 llama-index
-llama-index-core>=0.14.23
+llama-index-core>=0.14.24
 llama-index-workflows
 llama-index-embeddings-huggingface
 llama-index-vector-stores-supabase
@@ -149,6 +149,6 @@ attrs==25.4.0
 # LangGraph 1.1.10. Raising them means moving to langgraph 2.x: an engine upgrade with
 # an ADR, not a dependency bump. `microservices/orchestrator_service/requirements.txt`
 # carries the identical coupled pair — change both or neither.
-langgraph-checkpoint>=2.0.0,<3.0.0
-langgraph-checkpoint-postgres>=2.0.0,<3.0.0
+langgraph-checkpoint>=4.2.0,<5.0.0
+langgraph-checkpoint-postgres>=3.1.2,<4.0.0
 psycopg-binary
