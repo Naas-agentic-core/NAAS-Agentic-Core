@@ -6,7 +6,6 @@ import re
 import websockets
 from fastapi import WebSocket, WebSocketDisconnect
 from starlette.websockets import WebSocketState
-from websockets.exceptions import InvalidStatus
 
 try:
     from websockets.exceptions import InvalidStatus
@@ -124,32 +123,6 @@ async def websocket_proxy(client_ws: WebSocket, target_url: str):  # noqa: PLR09
 
             for task in pending:
                 task.cancel()
-
-    except InvalidStatus as e:
-        logger.error(
-            f"WebSocket proxy failed to connect to {target_url} with HTTP {e.response.status_code}"
-        )
-        body = getattr(e.response, "body", b"")
-        if body and (b"<html" in body.lower() or b"<!doctype" in body.lower()):
-            logger.error(
-                "API_GATEWAY HTML bleed prevented: Blocked HTML response from upstream."
-            )
-        if client_ws.client_state == WebSocketState.CONNECTED:
-            try:
-                await client_ws.send_text(
-                    json.dumps(
-                        {
-                            "type": "error",
-                            "payload": {
-                                "details": "Upstream service error",
-                                "code": "WS_UPSTREAM_ERROR",
-                            },
-                        }
-                    )
-                )
-            except Exception:
-                pass
-            await client_ws.close(code=1011, reason="Upstream connection failed")
 
     except Exception as e:
         is_invalid_status = InvalidStatus and isinstance(e, InvalidStatus)

@@ -55,9 +55,7 @@ def _configure_dspy() -> None:
             ActiveModels as _ActiveModels,
         )
 
-        dspy_model = os.getenv(
-            "OPENROUTER_DSPY_MODEL", _ActiveModels.PRIMARY
-        ).strip()
+        dspy_model = os.getenv("OPENROUTER_DSPY_MODEL", _ActiveModels.PRIMARY).strip()
         if not dspy_model.startswith("openai/"):
             dspy_model = f"openai/{dspy_model}"
         # DEADLOCK FIX: bound the structured-output call. Without an explicit

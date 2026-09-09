@@ -59,7 +59,9 @@ PRIMARY_MODEL = "google/gemma-4-26b-a4b-it:free"
 # copies; the parity gate proves equality.
 FALLBACK_1 = "google/gemma-4-31b-it:free"  # ✅ alive 2026-09-08 — Arabic + LaTeX
 FALLBACK_2 = "openai/gpt-oss-20b:free"  # ❌ 0 endpoints today — recovery slot (D-067 quality)
-FALLBACK_3 = "nvidia/nemotron-3-nano-30b-a3b:free"  # ❌ 0 endpoints today; fast; guarded by content==0
+FALLBACK_3 = (
+    "nvidia/nemotron-3-nano-30b-a3b:free"  # ❌ 0 endpoints today; fast; guarded by content==0
+)
 FALLBACK_4 = "openai/gpt-oss-120b:free"  # ❌ 0 endpoints today — auto-recovery slot
 FALLBACK_5 = "nvidia/nemotron-nano-9b-v2:free"  # ❌ 0 endpoints today; last resort (D-177: FIRST_TOKEN_TIMEOUT caps its 62s-empty hang; nemotron-3-super-120b stays BANNED per ISS-107 — English-in-content leak)
 

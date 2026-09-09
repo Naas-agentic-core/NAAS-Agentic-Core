@@ -30,7 +30,7 @@ import os
 
 import websockets
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
-from websockets.exceptions import ConnectionClosed, InvalidStatus
+from websockets.exceptions import ConnectionClosed
 
 try:
     from websockets.exceptions import InvalidStatus
@@ -225,26 +225,6 @@ async def _proxy_websocket(
                 '{"type":"error","payload":{"details":"conversation-service unavailable","code":"WS_UPSTREAM_TIMEOUT"}}'
             )
             await client_ws.close(code=1013)
-        except Exception:
-            pass
-
-    except InvalidStatus as exc:
-        logger.error(
-            "ws_proxy.upstream_invalid_status url=%s status=%s",
-            upstream_url,
-            getattr(exc.response, "status_code", "unknown"),
-        )
-        try:
-            body = getattr(exc.response, "body", b"")
-            if body and (b"<html" in body.lower() or b"<!doctype" in body.lower()):
-                logger.error(
-                    "ws_proxy.html_bleed_prevented: Blocked HTML response from upstream."
-                )
-
-            await client_ws.send_text(
-                '{"type":"error","payload":{"details":"conversation-service returned an error","code":"WS_UPSTREAM_ERROR"}}'
-            )
-            await client_ws.close(code=1011)
         except Exception:
             pass
 

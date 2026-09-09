@@ -134,9 +134,7 @@ class ActiveModels:
     PRIMARY = _resolve_primary_model(AvailableModels.GEMMA_4_26B_A4B_IT_FREE)
     LOW_COST = PRIMARY
     GATEWAY_PRIMARY = PRIMARY
-    GATEWAY_FALLBACK_1 = (
-        AvailableModels.GEMMA_4_31B_IT_FREE
-    )  # ✅ حيّ 2026-09-08 — عربي+LaTeX
+    GATEWAY_FALLBACK_1 = AvailableModels.GEMMA_4_31B_IT_FREE  # ✅ حيّ 2026-09-08 — عربي+LaTeX
     GATEWAY_FALLBACK_2 = AvailableModels.GPT_OSS_20B_FREE  # ❌ 0 endpoints اليوم — فتحة تعافٍ
     GATEWAY_FALLBACK_3 = AvailableModels.NEMOTRON_3_NANO  # ❌ 0 endpoints اليوم (guarded)
     GATEWAY_FALLBACK_4 = AvailableModels.GPT_OSS_120B_FREE  # ميت 404 — فتحة تعافٍ آلي

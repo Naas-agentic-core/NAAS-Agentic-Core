@@ -185,9 +185,7 @@ class AIClient:
                 # للنموذج التالي فقط إن لم نكن قد بثثنا أي محتوى للطالب.
                 last_error = e
                 if emitted_content:
-                    logger.error(
-                        "AI Stream aborted mid-content (model=%s): %s", target_model, e
-                    )
+                    logger.error("AI Stream aborted mid-content (model=%s): %s", target_model, e)
                     return
                 logger.error(
                     "AI Stream failed before any content (model=%s): %s — advancing",

@@ -191,9 +191,9 @@ class TestPrimaryModelConfig:
         )
         # ISS-LLM-CHAIN (2026-09-08): PRIMARY يستخدم GEMMA_4_26B_A4B_IT_FREE
         # (mirror لسلسلة المونوليث — D-013). gpt-oss-20b يبقى فتحة تعافٍ في الذيل.
-        assert "PRIMARY = _resolve_primary_model(AvailableModels.GEMMA_4_26B_A4B_IT_FREE)" in source, (
-            "orchestrator ai_config PRIMARY must use GEMMA_4_26B_A4B_IT_FREE (ISS-LLM-CHAIN)"
-        )
+        assert (
+            "PRIMARY = _resolve_primary_model(AvailableModels.GEMMA_4_26B_A4B_IT_FREE)" in source
+        ), "orchestrator ai_config PRIMARY must use GEMMA_4_26B_A4B_IT_FREE (ISS-LLM-CHAIN)"
 
     def test_conversation_math_pipeline_default(self):
         source = self._read("microservices/conversation_service/src/math_pipeline.py")
