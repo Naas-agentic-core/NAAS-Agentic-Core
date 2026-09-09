@@ -265,7 +265,7 @@
       "tests/services/test_iss079_catastrophic_fixes.py",
       "tests/services/test_iss107_model_chain.py"
     ],
-    "content_sha256_excluding_packet": "341eac8e8da03154e9719c74309838d65855af4b765ca129804cdc7dc06265ba",
+    "content_sha256_excluding_packet": "a8fd39a3d484c6b96a05e2d4d236e2ee2958d0e48ff859937ecdf1c526d595d8",
     "refreshed_on": "2026-09-09",
     "refresh_command": "python scripts/fitness/check_code_acceptance.py  # with CODE_ACCEPTANCE_BASE_SHA=<PR base>"
   }

@@ -196,3 +196,68 @@ class TestChainComposition:
         from shared.ai_models.model_chain import FALLBACK_CHAIN
 
         assert all(m in chain for m in FALLBACK_CHAIN)
+
+
+class TestWhatCountsAsAnAnswer:
+    """اليقينُ بالموت يحتاج **إجابةً مقروءة**، لا رمزَ حالةٍ ارتطم بجدار.
+
+    هذا هو الفرق الذي كان يُفشِل `live-e2e`: المسارُ القديم كان يقرأ 404 (أو 200 بجسدٍ
+    لا `data` فيه) «نموذجاً غير موجود» — حكماً قاطعاً — فيما هو ارتطامٌ ببوابةِ اعتمادٍ
+    أو بجدارٍ أماميّ لا يعرف هذا المسار.
+    """
+
+    @staticmethod
+    def _error(code: int, body: str, ctype: str):
+        import io
+        import urllib.error
+
+        return urllib.error.HTTPError(
+            "https://gateway.invalid/v1/models/x/endpoints",
+            code,
+            "status",
+            {"Content-Type": ctype},
+            io.BytesIO(body.encode("utf-8")),
+        )
+
+    def _probe_with(self, monkeypatch, exc):
+        def _raise(*_args, **_kwargs):
+            raise exc
+
+        monkeypatch.setattr(_probe.urllib.request, "urlopen", _raise)
+        return _probe.probe_model("https://gateway.invalid/v1", "a/one:free", 1.0)
+
+    def test_gateway_json_404_is_a_definitive_absence(self, monkeypatch) -> None:
+        exc = self._error(
+            404, '{"error": {"message": "not a valid model identifier"}}', "application/json"
+        )
+        status = self._probe_with(monkeypatch, exc)
+        assert status.in_catalog is False and status.error is None
+
+    def test_html_404_from_a_proxy_is_blindness_not_death(self, monkeypatch) -> None:
+        exc = self._error(404, "<html><body>Blocked</body></html>", "text/html")
+        status = self._probe_with(monkeypatch, exc)
+        assert status.error is not None
+
+    def test_200_without_labelled_data_is_blindness(self, monkeypatch) -> None:
+        class _Resp:
+            def read(self) -> bytes:
+                return b'{"data": null, "reason": "rate limited"}'
+
+            def __enter__(self) -> _Resp:
+                return self
+
+            def __exit__(self, *_exc: object) -> bool:
+                return False
+
+        monkeypatch.setattr(_probe.urllib.request, "urlopen", lambda *_a, **_k: _Resp())
+        status = _probe.probe_model("https://gateway.invalid/v1", "a/one:free", 1.0)
+        assert status.error is not None and status.in_catalog is True
+
+    def test_blindness_chain_exits_clean_and_loud(self, monkeypatch) -> None:
+        """سلسلةٌ كلها عمًى ⇒ خروجٌ نظيف + «لا حكم» — لا إفشالٌ برمزٍ لا سبب له."""
+        exc = self._error(404, "<html>Blocked</html>", "text/html")
+        results = [self._probe_with(monkeypatch, exc)]
+        errors, warnings, code = _probe.evaluate(
+            results, key_ok=None, key_msg="", allow_dead_primary=False
+        )
+        assert code == 0 and errors == [] and any("لا حكم" in w for w in warnings)

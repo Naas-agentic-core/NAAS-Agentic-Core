@@ -339,7 +339,7 @@ The single live source is [`.memory/roadmap.md`](.memory/roadmap.md) — phases 
 
 Ambition is classified, never concealed: `PLANNED`, `SEAM` and `ABSENT` are tracked declarations. Unclassified ambition is the kind that gets forgotten.
 
-Issue and decision history: [`.memory/decisions.md`](.memory/decisions.md) (D-001 → D-289) · [`.memory/issues.md`](.memory/issues.md) (ISS-001 → ISS-201). Both are append-only records, including the failures — a disaster with no written root cause is not closed.
+Issue and decision history: [`.memory/decisions.md`](.memory/decisions.md) (D-001 → D-289) · [`.memory/issues.md`](.memory/issues.md) (ISS-001 → ISS-202). Both are append-only records, including the failures — a disaster with no written root cause is not closed.
 
 ---
 

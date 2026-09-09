@@ -103,7 +103,10 @@ def probe_model(
         with urllib.request.urlopen(req, timeout=timeout) as resp:
             body = json.loads(resp.read().decode("utf-8"))
     except urllib.error.HTTPError as exc:
-        if exc.code == 404:
+        # 404 وحده حكمٌ على وجود النموذج — ولكن **إن جاء من البوّابة**. جدارٌ أماميّ
+        # أو بوابةُ اعتمادٍ تُرجع 404 بـHTML (أو 200 بجسدٍ لا `data` فيه) لم يُجب عن
+        # شيءٍ سألنا عنه، فهو عمًى لا موتٌ: القاعدة نفسها التي قام عليها هذا الملفّ.
+        if exc.code == 404 and _answered_by_gateway(exc):
             return ModelStatus(model=model, in_catalog=False)
         return ModelStatus(model=model, error=f"HTTP {exc.code}")
     except (urllib.error.URLError, TimeoutError, OSError, ValueError) as exc:
@@ -111,7 +114,8 @@ def probe_model(
 
     data = body.get("data") if isinstance(body, dict) else None
     if not isinstance(data, dict):
-        return ModelStatus(model=model, in_catalog=False)
+        # 200 بشكلٍ لا نعرفه: ليس «نموذجاً غير موجود» — لم نقرأ الكتالوج.
+        return ModelStatus(model=model, error="HTTP 200 بجسدٍ لا `data` موسومًا فيه")
     endpoints = [e for e in (data.get("endpoints") or []) if isinstance(e, dict)]
     live = [e for e in endpoints if int(e.get("status", 0) or 0) == 0]
     best = max(live or endpoints, key=lambda e: int(e.get("context_length", 0) or 0), default=None)
@@ -126,6 +130,23 @@ def probe_model(
         else None,
         raw=data,
     )
+
+
+def _answered_by_gateway(exc: urllib.error.HTTPError) -> bool:
+    """هل هذا الجسدُ جوابٌ من `openrouter.ai` نفسه، أم ارتطامٌ بجدارٍ قبله؟
+
+    اليقينُ بالموت يحتاج **إجابةً مقروءة** لا مجردَ رمز: JSON فيه `error` من البوّابة
+    يكفي؛ HTMLٌّ أو جسدٌ فارغٌ أو نوعُ محتوى غيرِ JSON كلُّه «لم نرَ البوّابة»، فيُقرأ
+    عمًى. (ما أحمرَ `live-e2e` مرّتين كان رمزاً بلا جواب — و«لا حكم على ما لم يُرَ».)
+    """
+    ctype = (exc.headers.get("Content-Type") if exc.headers else None) or ""
+    if "json" not in ctype.lower():
+        return False
+    try:
+        payload = json.loads(exc.read().decode("utf-8", errors="replace"))
+    except (ValueError, OSError, UnicodeDecodeError):
+        return False
+    return isinstance(payload, dict) and bool(payload.get("error"))
 
 
 def check_api_key(base_url: str, api_key: str, timeout: float) -> tuple[bool, str]:

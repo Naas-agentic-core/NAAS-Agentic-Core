@@ -154,9 +154,18 @@ jobs:
       - name: "Live model registry probe (D-288)"
         run: |
           set -euo pipefail
-          python scripts/verify_model_registry_live.py --check-key | tee /tmp/registry-probe.txt
+          rc=0
+          python scripts/verify_model_registry_live.py --check-key 2>&1 \
+            | tee /tmp/registry-probe.txt || rc="${PIPESTATUS[0]}"
           if grep -q "لا حكم" /tmp/registry-probe.txt; then
             echo "::warning::سجلّ النماذج لم يُقرأ من هذا المشغِّل — لا حكم، ولا خُضرةَ تُصدَّق."
+          fi
+          if [ "$rc" -ne 0 ]; then
+            # سِجلّاتُ هذا المشغِّل لا تُقرأ من هنا (الواجهةُ المؤجَّرة تُرجع EOF)، فعلامةُ
+            # الفشل يجب أن تحمل سببَها بنفسها: وإلّا كان «exit code 1» وحده يُخمَّن ساعةً كاملة.
+            reason="$(grep -E '^(❌|⚠️)' /tmp/registry-probe.txt | head -n 3 | tr '\n' ' ')"
+            printf '::error::المسبار خرج %s — %s\n' "$rc" "${reason:0:700}"
+            exit "$rc"
           fi
 
       - name: Boot the monolith against production Supabase

@@ -338,7 +338,7 @@ make microservices-health
 
 **الطموح يُصنَّف ولا يُكتَم**: `PLANNED` و`SEAM` و`ABSENT` إعلانات مُتتبَّعة. والطموح غير المُصنَّف هو الذي يُنسى.
 
-سجلّ البلاغات والقرارات: [`.memory/decisions.md`](.memory/decisions.md) (D-001 → D-289) · [`.memory/issues.md`](.memory/issues.md) (ISS-001 → ISS-201). كلاهما سجلٌّ مُلحَق-فقط يشمل الإخفاقات — وبلاغُ كارثةٍ بلا جذرٍ مكتوب ليس مُغلَقًا.
+سجلّ البلاغات والقرارات: [`.memory/decisions.md`](.memory/decisions.md) (D-001 → D-289) · [`.memory/issues.md`](.memory/issues.md) (ISS-001 → ISS-202). كلاهما سجلٌّ مُلحَق-فقط يشمل الإخفاقات — وبلاغُ كارثةٍ بلا جذرٍ مكتوب ليس مُغلَقًا.
 
 ---
 
