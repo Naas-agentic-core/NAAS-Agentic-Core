@@ -261,3 +261,51 @@ class TestWhatCountsAsAnAnswer:
             results, key_ok=None, key_msg="", allow_dead_primary=False
         )
         assert code == 0 and errors == [] and any("لا حكم" in w for w in warnings)
+
+
+class TestTheQuestionIsWellFormed:
+    """المسارُ نفسُه محلَّ اختبار: 404 من حافّةٍ لا تعرف `models%2F…` ليس حكماً على النموذج."""
+
+    def test_model_id_is_not_percent_encoded(self, monkeypatch) -> None:
+        seen_urls: list[str] = []
+
+        class _Resp:
+            def read(self) -> bytes:
+                return b'{"data": {"endpoints": []}}'
+
+            def __enter__(self) -> _Resp:
+                return self
+
+            def __exit__(self, *_exc: object) -> bool:
+                return False
+
+        def _capture(req, **_kwargs):
+            seen_urls.append(req.full_url)
+            return _Resp()
+
+        monkeypatch.setattr(_probe.urllib.request, "urlopen", _capture)
+        _probe.probe_model("https://openrouter.ai/api/v1", "google/gemma-4-31b-it:free", 1.0)
+        assert seen_urls == [
+            "https://openrouter.ai/api/v1/models/google/gemma-4-31b-it:free/endpoints"
+        ]
+
+    def test_whole_chain_answered_absent_is_declared_blindness(self) -> None:
+        """ستّةُ «غير موجود» بلا إجابةٍ موسومة واحدة = خطأُ مسارٍ عندنا، لا موتُ مزوّد."""
+        results = [_absent(f"a/{i}:free") for i in range(6)]
+        errors, warnings, code = _probe.evaluate(
+            results, key_ok=None, key_msg="", allow_dead_primary=False
+        )
+        assert code == 0 and errors == [] and any("لا حكم" in w for w in warnings)
+
+        _e2, _w2, code2 = _probe.evaluate(
+            results, key_ok=None, key_msg="", allow_dead_primary=False, strict=True
+        )
+        assert code2 == 2
+
+    def test_one_labelled_answer_restores_the_verdict(self) -> None:
+        """ما إن تُجيبَ بوّابةٌ بشكلٍ موسوم حتى يعود الحكمُ القاطعُ إلى كامل قوّته."""
+        results = [_absent("a/dead:free"), _alive("a/live:free")]
+        errors, _warnings, code = _probe.evaluate(
+            results, key_ok=None, key_msg="", allow_dead_primary=False
+        )
+        assert code == 1 and any("PRIMARY" in e for e in errors)

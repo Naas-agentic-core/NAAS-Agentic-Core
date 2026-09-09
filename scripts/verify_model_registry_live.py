@@ -93,8 +93,14 @@ def chain_from_config() -> list[str]:
 def probe_model(
     base_url: str, model: str, timeout: float, api_key: str | None = None
 ) -> ModelStatus:
-    """يقرأ `GET {base}/models/<id>/endpoints` — عامّ، لا يحتاج مفتاحاً."""
-    url = f"{base_url.rstrip('/')}/models/{urllib.parse.quote(model, safe='')}/endpoints"
+    """يقرأ `GET {base}/models/<id>/endpoints` — عامّ، لا يحتاج مفتاحاً.
+
+    **والـ`safe` هنا مُنجِزٌ لا زينة:** معرّفات OpenRouter تحمل `/` و`:`، وترميزُهما
+    (%2F/%3A) يجعل الحافةَ تُرجِع **404 بـJSON من البوّابة نفسها** — أي حكماً قاطعاً
+    زائفاً بـ«النموذج غير موجود». أول تشغيلين CIّين حمُرا على هذا، لا على الكتالوج:
+    الشكْلُ المُستعمَلُ في وثائق المزوّد وفي منتجنا هو المسارُ الخام.
+    """
+    url = f"{base_url.rstrip('/')}/models/{urllib.parse.quote(model, safe='/:')}/endpoints"
     headers = {"User-Agent": "naas-model-registry-probe/1.0", "Accept": "application/json"}
     if api_key:
         headers["Authorization"] = f"Bearer {api_key}"
@@ -242,6 +248,21 @@ def evaluate(
     servable = [r for r in seen if r.servable]
     primary = results[0]
 
+    # إن قال الكتالوجُ «غير موجود» للسلسلة كلّها دون أن يُجيبَ أحدٌ بشكلٍ مُوسوم،
+    # فاحتمالُ أن سؤالنا خاطئ (تغييرُ مسار · ترميزٌ · بوابةٌ تعيد 404 موسوماً) أعلى من
+    # احتمالِ أنّ ستّةَ نماذج ماتت في الدقيقة نفسها — ولا يجوز أن تُبنى خُضرةُ منتجٍ
+    # ولا حمرتُه على قراءةٍ نُخطئ فيها مسارَنا نحن. عمًى مُعلَن، لا حكم.
+    absent = [r for r in seen if not r.in_catalog]
+    if seen and len(absent) == len(seen) and not any(r.raw for r in seen):
+        note = (
+            f"كلُّ {len(seen)} نموذجاً رُدَّ عليها بالغياب، بلا إجابةٍ موسومةٍ واحدة — "
+            "وهو أرجحُ أن يكون خطأً في مسار سؤالنا (مسارٌ غيّرَه المزوّد · ترميزٌ زائدٌ "
+            "في المعرّف) منه أن تموت الستّةُ في الدقيقة نفسها؛ طالع سطرَ السؤال أعلاه."
+        )
+        if strict:
+            return [f"لا حكم على السلسلة: {note} (--strict: رفضٌ صريح)"], [], 2
+        return [], [f"تعذّر الفحص — لا حكم: {note}"], 0
+
     if primary.error is not None:
         warnings.append(
             f"لم يُقرأ وضع PRIMARY «{primary.model}»: {primary.error} — والحكمُ على ما قُرِئ فقط."
@@ -299,6 +320,8 @@ def render_text(
 ) -> None:
     print("=== Live model-registry probe (ISS-200 / D-288) ===")
     print(f"base_url: {base_url}")
+    # ما سُئِل بالضبط: بلا هذا السطر كان 404 من حافةٍ لا تعرف مسارَنا يُقرأ «نموذجٌ مات».
+    print(f"sought:   GET {base_url.rstrip('/')}/models/{results[0].model}/endpoints")
     for idx, r in enumerate(results):
         role = "PRIMARY" if idx == 0 else f"FALLBACK_{idx}"
         if r.error:
