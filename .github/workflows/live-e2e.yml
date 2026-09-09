@@ -146,9 +146,17 @@ jobs:
       # بكل ردود الطالب إلى رسالة اعتذار واحدة في أقل من ثانية، والحارس الأخضر
       # (test_ai_config) لا يراه لأنه يفرض PRIMARY بالقوة. المسبار يقرأ السلسلة كما يقرأها
       # الدماغان — تجاوز المشغِّل ثم الذيل ثم OPENROUTER_EXTRA_MODELS — فيسلّك ادّعاء D-280
-      # («ذيل التعافي مثبَّت») أخيراً، ويبلّغ سبب كل ميت صراحةً لا صمتاً.
+      # («ذيل التعافي مثبَّت») أخيراً.
+      # والفارق المُتعمَّد (دَينُ ISS-199): الموتُ **المقطوعُ به** يُفشِل، والعَمى (شبكة · 429 ·
+      # 5xx) يُبلَّغ ولا يُفشِل — بوّابةٌ تُحمِّر CI لانقطاعٍ لا تراه تُعلِّم الجميع تجاهلها.
+      # من يريد رفض التشغيل بلا رؤية يشغّل --strict. والمفتاح المرفوض 401/403 قطعياً: خطأ.
       - name: "Live model registry probe (D-288)"
-        run: python scripts/verify_model_registry_live.py --check-key
+        run: |
+          set -euo pipefail
+          python scripts/verify_model_registry_live.py --check-key | tee /tmp/registry-probe.txt
+          if grep -q "لا حكم" /tmp/registry-probe.txt; then
+            echo "::warning::سجلّ النماذج لم يُقرأ من هذا المشغِّل — لا حكم، ولا خُضرةَ تُصدَّق."
+          fi
 
       - name: Boot the monolith against production Supabase
         shell: bash

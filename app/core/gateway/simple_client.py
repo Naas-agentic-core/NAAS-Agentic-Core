@@ -8,14 +8,13 @@ import asyncio
 import hashlib
 import json
 import logging
-import os
 import time
 from collections.abc import AsyncGenerator
 from dataclasses import dataclass
 
 import httpx
 
-from app.core.ai_config import get_ai_config, get_openrouter_site_url
+from app.core.ai_config import get_ai_config, get_openrouter_base_url, get_openrouter_site_url
 from app.core.cognitive_cache import CognitiveResonanceEngine, get_cognitive_engine
 from app.core.feature_flags import cognitive_cache_resilience_enabled
 from app.core.gateway.connection import BASE_TIMEOUT, ConnectionManager
@@ -108,11 +107,10 @@ class OpenRouterClient(LLMClient):
         self.cognitive_engine = cognitive_engine
         self.safety_net = safety_net
 
-        # ISS-200/D-288: base URL قابل للتجاوز (بوابة/وكيل/ازدواج اختبار) —
-        # نفس عقدة OPENROUTER_PRIMARY_MODEL: لا يُختبر المسار بلا هذا المقبض.
-        self.base_url = (
-            os.getenv("OPENROUTER_BASE_URL", "").strip() or "https://openrouter.ai/api/v1"
-        )
+        # ISS-200/D-288: base URL قابل للتجاوز (بوابة/وكيل/ازدواج اختبار) — نفس عقدة
+        # OPENROUTER_PRIMARY_MODEL: لا يُختبر المسار بلا هذا المقبض. والاسمُ موطنُه
+        # `Settings` لا هذا الملفّ: لكلِّ نصٍّ يقرؤه البرنامج موطنٌ واحد (D-270 L5).
+        self.base_url = get_openrouter_base_url()
         self.headers = {
             "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json",

@@ -16,7 +16,8 @@ ISS-200 (D-288 — 2026-09-09): this client used to send every request to
    gateway/proxy (or a test double) without editing source.
 
 The client now rotates the same canonical chain the parity gate guards, reads the
-base URL from ``OPENROUTER_BASE_URL``, and raises :class:`AllModelsFailedError`
+base URL from the ``OPENROUTER_BASE_URL`` Settings field, and raises
+:class:`AllModelsFailedError`
 when the whole chain is exhausted — so a caller can report an outage instead of
 answering a student with a canned line. **No model id is spelled out here**: the
 single source of truth stays in ``ai_config``/``shared.ai_models.model_chain``
@@ -37,7 +38,8 @@ from microservices.orchestrator_service.src.core.config import get_settings
 
 logger = logging.getLogger("ai-client")
 
-#: Default OpenRouter surface; override with ``OPENROUTER_BASE_URL`` (gateway/proxy/tests).
+#: Default OpenRouter surface. The *override knob* is a Settings field (D-270 L5: one
+# home per programmatic identifier), so this module never re-declares the env name.
 DEFAULT_BASE_URL = "https://openrouter.ai/api/v1"
 
 #: Bound a model that connects but never produces content (monolith D-177 analogue:
@@ -85,14 +87,15 @@ class AIClient:
 
     def __init__(self) -> None:
         settings = get_settings()
+        # The knob is a Settings field (D-270 L5 — one home per programmatic identifier);
+        # this module only reads it. Empty override keeps the historical behaviour exactly.
+        override = (settings.OPENROUTER_BASE_URL or "").strip()
         if settings.OPENROUTER_API_KEY:
             api_key = settings.OPENROUTER_API_KEY
-            base_url = (
-                os.getenv("OPENROUTER_BASE_URL", DEFAULT_BASE_URL).strip() or DEFAULT_BASE_URL
-            )
+            base_url = override or DEFAULT_BASE_URL
         else:
             api_key = settings.OPENAI_API_KEY
-            base_url = os.getenv("OPENROUTER_BASE_URL", "").strip() or None
+            base_url = override or None
 
         if not api_key:
             logger.warning("No API Key found for AI Client. AI features will fail.")

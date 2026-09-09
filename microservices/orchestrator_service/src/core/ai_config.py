@@ -154,6 +154,10 @@ class ActiveModels:
     TIER_GENIUS = PRIMARY
 
 
+#: القيمةُ الظاهرة عند غياب التجاوز — يستوردها العملاءُ بدل إعادة كتابة الرابط.
+DEFAULT_OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
+
+
 @dataclass(frozen=True)
 class AIConfig:
     """
@@ -180,6 +184,17 @@ class AIConfig:
         يسترجع مفتاح API بأمان من النظام المركزي (Settings).
         """
         return get_settings().OPENROUTER_API_KEY
+
+    @property
+    def openrouter_base_url(self) -> str:
+        """
+        بوابةُ المزوّد كما يقرؤها الضبطُ المركزي (D-288).
+
+        الاسمُ حقلٌ في `Settings` لا `os.getenv` مكرَّرًا في عميلٍ وعميل: لكلِّ نصٍّ يقرؤه
+        البرنامج موطنٌ واحد (D-270 L5). وغيابُ التجاوز يُبقي السلوكَ التاريخيَّ حرفيّاً
+        (السطح العامّ لـ OpenRouter)، فلا مفاجأةَ في الإنتاج عند عدم الضبط.
+        """
+        return (get_settings().OPENROUTER_BASE_URL or "").strip() or DEFAULT_OPENROUTER_BASE_URL
 
     def get_fallback_models(self) -> list[str]:
         """Get list of fallback models."""

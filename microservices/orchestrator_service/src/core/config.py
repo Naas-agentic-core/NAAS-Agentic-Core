@@ -67,6 +67,11 @@ class Settings(BaseSettings):
     # AI Config
     OPENAI_API_KEY: str | None = Field(None, description="OpenAI API Key")
     OPENROUTER_API_KEY: str | None = Field(None, description="OpenRouter API Key")
+    # ISS-200/D-288: تجاوزُ بوابة المزوّد (وكيل/بوابة/ازدواج اختبار). الاسمُ هنا
+    # وحده — تُقلِّبها pydantic-settings من البيئة، فلا حرفيةَ مُكرَّرة في العملاء (D-270 L5).
+    OPENROUTER_BASE_URL: str | None = Field(
+        None, description="Provider base URL override (gateway/proxy/test double)"
+    )
 
     # Microservices URLs (Dynamic Resolution)
     PLANNING_AGENT_URL: str | None = Field(default=None, validate_default=True)

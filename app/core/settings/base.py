@@ -251,6 +251,11 @@ class AppSettings(BaseServiceSettings):
     # AI (Missing fields restored)
     OPENAI_API_KEY: str | None = Field(None, description="OpenAI API Key")
     OPENROUTER_API_KEY: str | None = Field(None, description="OpenRouter API Key")
+    # ISS-200/D-288: بوابةُ المزوّد (وكيل/بوابة/ازدواج اختبار). الاسمُ هنا وحده —
+    # تُقلِّبها pydantic-settings من البيئة، فلا حرفيةَ مُكرَّرة عبر العملاء (D-270 L5).
+    OPENROUTER_BASE_URL: str | None = Field(
+        None, description="Provider base URL override (gateway/proxy/test double)"
+    )
     AI_SERVICE_URL: str | None = Field(None, description="AI Service URL")
 
     # D-268 (ISS-191): `TAVILY_API_KEY` عبر ستّة أبواب ووصل العملية — ثم قرأه

@@ -78,7 +78,23 @@ class TestChainHygiene:
         assert "nemotron-3-super-120b" not in joined  # إنجليزي في content
 
     def test_primary_is_verified_arabic(self):
-        # ISS-130 (D-167 — 2026-07-14): gpt-oss-120b:free أُزيل من OpenRouter (404)
-        # ⇒ إعادة ترقية gpt-oss-20b (تعافى من 429 — مُتحقَّق حياً عربي+LaTeX).
+        """
+        الصدارةُ مُؤَهَّلةٌ بسجلّ القدرات، لا باسمٍ منسوخٍ هنا.
+
+        كان هذا السطر industriاً رابعاً يحمل `openai/gpt-oss-20b:free` حرفيّاً — وهو
+        بعينِه صنفُ ISS-200: الاسمُ الحيُّ في موطنه الواحد، وأيُّ نسخةٍ أخرى تُعلَّق على
+        ماضيه. فالتحقّق الآن: PRIMARY = رأسُ السلسلة القانونية، وله إدخالٌ مؤهَّلٌ في
+        `shared/ai_models/registry.py` (عربي + LaTeX + content + finish نظيف)، ولا نموذج
+        reasoning-only في الصدارة. (التاريخ: ISS-130/D-167 رقّى gpt-oss-20b بعد 404
+        الخاص بـ gpt-oss-120b؛ ثم أزال OpenRouter الطبقةَ المجانية لـ gpt-oss كلها في
+        2026-09-09 ⇒ D-288 نقل الصدارة إلى gemma-4-31b.)
+        """
+        from shared.ai_models.model_chain import MODEL_CHAIN, PRIMARY_MODEL
+        from shared.ai_models.registry import Capability, record_for
+
         cfg = get_ai_config()
-        assert cfg.primary_model == "openai/gpt-oss-20b:free"
+        assert cfg.primary_model == PRIMARY_MODEL == MODEL_CHAIN[0]
+        record = record_for(cfg.primary_model)
+        assert record.eligible_as_primary
+        assert {Capability.ARABIC, Capability.LATEX} <= record.capabilities
+        assert "nemotron-3-nano-30b-a3b" not in cfg.primary_model  # D-067

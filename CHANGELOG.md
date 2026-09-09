@@ -61,9 +61,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   fail-closed عند تعذّر الشبكة (لا أخضر كاذب)؛ أُدرج في `live-e2e.yml` قبل إقلاع الخادم. وأُكمِلت سجلّاتُ
   `shared/ai_models/registry.py` (إدخالٌ لـ `nvidia/nemotron-3.5-lightning:free` بقدراتٍ لم تُبنشَر = فارغة،
   وتحديثُ دليل كلِّ نموذج بتاريخ 2026-09-09) لأنّ بوّابة D-202 حمراء عمداً على أيّ نموذجٍ في السلسلة بلا إدخال.
-- **القنوات كلها على بوابة واحدة:** `OPENROUTER_BASE_URL` صار يقرأه عميلُ الـ orchestrator ووكيلا
-  `simple_client` و`super_search`، والافتراضياتُ الميتة أُزيلت من `math_pipeline`/`conversation_graph`/`nodes.py`
-  (تثبيتات `check_legacy_invariants.py` حُدِّثت مرآةً لذلك).
+- **القنوات كلها على بوابة واحدة — بموطنٍ واحد:** `OPENROUTER_BASE_URL` صار **حقل ضبط** في `Settings`
+  الدماغين (`app/core/settings/base.py` و`microservices/orchestrator_service/src/core/config.py`)، يقرأه
+  عميلُ الـ orchestrator ووكيلا `simple_client` وعقدةُ DSPy عبر ذلك الضبط، لا بـ`os.getenv` مُكرَّرٍ في خمسة
+  ملفات — لأنّ `check_no_magic_strings.py` (D-270 L5) يُحمِّر CI على أيِّ اسمٍ مُعرِّفٍ بلا موطن، وقد حمّرَنا
+  فعلاً في أول تشغيلٍ لهذا الفرع. و`super_search` عاد إلى سطحه الصريح (لا `Settings` خاصّة بتلك الخدمة،
+  ولا معنى لتوسعة الدَين لأجل مزدوجٍ لا يُشغَّل هناك). الافتراضياتُ الميتة أُزيلت من
+  `math_pipeline`/`conversation_graph`/`nodes.py` (تثبيتات `check_legacy_invariants.py` مرآةً لذلك).
+- **العَمى ليس حكماً (دَينُ ISS-199):** المسبار يفرّق بين **ميتٍ قطعيّاً** (200 مع `"endpoints": []`، أو 404 ⇒
+  إفشال الرحلة) و**لم نرَه** (انقطاع · 429 · 5xx ⇒ بلاغةٌ صاخبةٌ برمز خروجٍ نظيف، و`::warning::` في Workflow).
+  من يرفض التشغيل بلا رؤية يشغّل `--strict` (خروج 2). و`/auth/key` بـ401/403 خطأٌ قطعّيّ: مفتاحٌ مرفوضٌ
+  يعني أنّ الرحلة الحيّة كلّها كذبٌ بلا استثناء.
 - **ISS-201 (D-289) — حارسُ النزاهة كان يمزّق الإجابة الصحيحة.** `StreamIntegrityFilter._strip_latin_garbage`
   يعامل كل لاتيني طويلٍ كغارباج: `https://example.com/physics` → `://./`، و`python3.12`، و`F = m \cdot a`.
   أُضيف استثناءٌ بنيوي (`_is_structural_token`) + توسعةُ `_TECH_ALLOWLIST` بمفردات SI/الفيزياء/الكيمياء/الملفات،

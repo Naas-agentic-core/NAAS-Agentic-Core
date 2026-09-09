@@ -7,7 +7,6 @@
 import hashlib
 import json
 import logging
-import os
 from collections.abc import AsyncGenerator
 from dataclasses import dataclass
 
@@ -59,9 +58,8 @@ class OpenRouterClient(LLMClient):
 
         # ISS-200/D-288: base URL قابل للتجاوز (بوابة/وكيل/ازدواج اختبار) —
         # نفس عقدة OPENROUTER_PRIMARY_MODEL: لا يُختبر المسار بلا هذا المقبض.
-        self.base_url = (
-            os.getenv("OPENROUTER_BASE_URL", "").strip() or "https://openrouter.ai/api/v1"
-        )
+        # والاسمُ موطنُه `Settings` لا هذا الملفّ (D-270 L5): يقرأ الضبطَ عبر الدماغ.
+        self.base_url = get_ai_config().openrouter_base_url
         self.headers = {
             "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json",

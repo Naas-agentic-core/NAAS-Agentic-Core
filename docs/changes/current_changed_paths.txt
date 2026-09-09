@@ -12,12 +12,16 @@ M	README.ar.md
 M	README.md
 M	app/core/ai_config.py
 M	app/core/gateway/simple_client.py
+M	app/core/settings/base.py
 M	app/services/skills/content_integrity_skill.py
 M	app/services/skills/doctrine/platform_layer.py
 M	docs/DOCUMENTATION_INDEX.md
+M	docs/changes/CURRENT_CODE_ACCEPTANCE_PACKET.json
+M	docs/changes/current_changed_paths.txt
 M	microservices/conversation_service/src/conversation_graph.py
 M	microservices/conversation_service/src/math_pipeline.py
 M	microservices/orchestrator_service/src/core/ai_config.py
+M	microservices/orchestrator_service/src/core/config.py
 M	microservices/orchestrator_service/src/core/gateway/simple_client.py
 M	microservices/orchestrator_service/src/services/llm/client.py
 M	microservices/orchestrator_service/src/services/overmind/graph/general_knowledge.py
@@ -34,4 +38,4 @@ M	tests/config/test_model_registry_probe.py
 M	tests/microservices/orchestrator_service/test_llm_client_model_chain.py
 M	tests/services/test_content_integrity_skill.py
 M	tests/services/test_iss079_catastrophic_fixes.py
-M	docs/changes/CURRENT_CODE_ACCEPTANCE_PACKET.json
+M	tests/services/test_iss107_model_chain.py

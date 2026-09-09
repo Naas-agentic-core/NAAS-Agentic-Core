@@ -10,6 +10,8 @@ import logging
 import os
 import re
 
+from microservices.orchestrator_service.src.core.ai_config import get_ai_config
+
 from .dspy_compat import dspy
 from .state import (
     ADMIN_PATTERNS,
@@ -60,7 +62,8 @@ def _configure_dspy() -> None:
         # letting the deterministic heuristic fallback engage.
         lm = dspy.LM(
             model=dspy_model,
-            api_base=os.getenv("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1").strip(),
+            # بوابةُ المزوّد تُقرأ من ضبط الخدمة (D-270 L5)، لا من نسخةٍ سادسة من الاسم.
+            api_base=get_ai_config().openrouter_base_url,
             api_key=openrouter_key,
             timeout=25,
             num_retries=0,

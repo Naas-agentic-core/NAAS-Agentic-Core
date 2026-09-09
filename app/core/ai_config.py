@@ -53,6 +53,24 @@ def get_openrouter_site_url() -> str:
     return os.getenv("OPENROUTER_SITE_URL", "https://cogniforge.local").strip()
 
 
+#: القيمةُ الظاهرة عند غياب التجاوز — موطنٌ واحد، يستورده كلُّ عميلٍ بدل أن يعيد كتابته.
+DEFAULT_OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
+
+
+def get_openrouter_base_url() -> str:
+    """
+    بوابةُ المزوّد كما يقرؤها الضبطُ المركزي (D-288).
+
+    تُقرأ من `Settings.openrouter_base_url` لا من `os.getenv` في كلِّ عميل: اسمُ متغيّر
+    البيئة مُعرِّفٌ في مخطط الضبط، وحرفيةٌ مُكرَّرةٌ في خمسة ملفات هي بالضبط دَينُ
+    D-270 L5 (موطنٌ واحد لكلِّ نصٍّ يقرؤه البرنامج). التجاوزُ يُشرَع للاختبار الحيّ
+    وللوكيل المؤسّسي — وبلاهُ يبقى السلوكُ التاريخيَّ حرفيّاً.
+    """
+    # `get_settings` مورَّدٌ من `app.core.config` (= `app.core.settings.base`).
+    override = (get_settings().OPENROUTER_BASE_URL or "").strip()
+    return override or DEFAULT_OPENROUTER_BASE_URL
+
+
 class AvailableModels:
     """
     📚 All Available AI Models | جميع النماذج المتاحة

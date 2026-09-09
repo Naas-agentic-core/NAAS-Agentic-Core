@@ -109,9 +109,9 @@ class SuperSearchOrchestrator:
         else:
             api_key = os.environ.get("OPENROUTER_API_KEY")
             # D-288: نفس بوابة التجاوز في بقية العملاء — بلاها لا يُختبر المسار بدُّون شبكة.
-            base_url = (
-                os.environ.get("OPENROUTER_BASE_URL", "").strip() or "https://openrouter.ai/api/v1"
-            )
+            # بوابةُ المزوّد حقلٌ في `Settings` لدى الدماغين (D-270 L5). لا ضبطَ خاصَّ بهذه
+            # الخدمة، فلا نُعيد كتابة الاسم حرفيةً مُكرَّرة: السطحُ العامُّ صراحةً.
+            base_url = "https://openrouter.ai/api/v1"
             # ISS-068 كان يختار nemotron-3-super-120b «أفضل نموذج مجاني للتلخيص» — وهو
             # النموذج الذي **حظرتْه** ISS-107/D-067 لاحقاً لأنه يسرّب التفكير الإنجليزي
             # داخل `content`. D-288 (2026-09-09): الافتراضي الآن نموذج بـ endpoint حيّ
