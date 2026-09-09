@@ -237,8 +237,11 @@
       "app/services/skills/doctrine/platform_layer.py",
       "docs/DOCUMENTATION_INDEX.md",
       "docs/changes/current_changed_paths.txt",
+      "microservices/auditor_service/requirements.txt",
       "microservices/conversation_service/src/conversation_graph.py",
       "microservices/conversation_service/src/math_pipeline.py",
+      "microservices/memory_agent/requirements.txt",
+      "microservices/observability_service/requirements.txt",
       "microservices/orchestrator_service/src/core/ai_config.py",
       "microservices/orchestrator_service/src/core/config.py",
       "microservices/orchestrator_service/src/core/gateway/simple_client.py",
@@ -247,7 +250,10 @@
       "microservices/orchestrator_service/src/services/overmind/graph/nodes.py",
       "microservices/orchestrator_service/src/services/overmind/graph/search.py",
       "microservices/orchestrator_service/src/services/overmind/graph/state.py",
+      "microservices/planning_agent/requirements.txt",
+      "microservices/reasoning_agent/requirements.txt",
       "microservices/research_agent/src/search_engine/super_search.py",
+      "microservices/user_service/requirements.txt",
       "scripts/fitness/check_legacy_invariants.py",
       "scripts/verify_model_registry_live.py",
       "shared/ai_models/model_chain.py",
@@ -259,7 +265,7 @@
       "tests/services/test_iss079_catastrophic_fixes.py",
       "tests/services/test_iss107_model_chain.py"
     ],
-    "content_sha256_excluding_packet": "a3e686103535bd80fcc30a4de490ce4314e3d1508194dbd76e55bf8869670f16",
+    "content_sha256_excluding_packet": "341eac8e8da03154e9719c74309838d65855af4b765ca129804cdc7dc06265ba",
     "refreshed_on": "2026-09-09",
     "refresh_command": "python scripts/fitness/check_code_acceptance.py  # with CODE_ACCEPTANCE_BASE_SHA=<PR base>"
   }
