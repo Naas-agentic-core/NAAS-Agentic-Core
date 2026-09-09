@@ -191,7 +191,7 @@ class TestD289StructuralProtection:
     ليقتل «experiences_random»، لا ليمزّق الروابط والمُعرِّفات والمصطلحات العلمية.
     """
 
-    _PAD = "شرح مفصّل لقانون نيوتن الثاني في الفيزياء: القوة محصلة تساوي الكتلة في " "التسارع، " * 3
+    _PAD = "شرح مفصّل لقانون نيوتن الثاني في الفيزياء: القوة محصلة تساوي الكتلة في التسارع، " * 3
 
     def test_url_survives(self) -> None:
         src = self._PAD + "راجع https://example.com/physics للمزيد."
