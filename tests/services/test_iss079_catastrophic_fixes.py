@@ -170,10 +170,11 @@ class TestPrimaryModelConfig:
 
     def test_app_core_ai_config_primary(self):
         source = self._read("app/core/ai_config.py")
-        # D-167: PRIMARY عاد إلى gpt-oss-20b (120b المجاني أُزيل نهائياً — 404)
-        assert 'PRIMARY = _resolve_primary_model("openai/gpt-oss-20b:free")' in source, (
-            "app/core/ai_config.py PRIMARY must be openai/gpt-oss-20b:free (D-167). "
-            "gpt-oss-120b:free أُزيل نهائياً من OpenRouter (ISS-130)."
+        # ISS-LLM-CHAIN (2026-09-08): PRIMARY صار gemma-4-26b-a4b-it:free — النموذج
+        # الحيّ الوحيد في السلسلة (gpt-oss-20b/120b وnemotron كلها 0 endpoints).
+        assert 'PRIMARY = _resolve_primary_model("google/gemma-4-26b-a4b-it:free")' in source, (
+            "app/core/ai_config.py PRIMARY must be google/gemma-4-26b-a4b-it:free "
+            "(ISS-LLM-CHAIN — gpt-oss-20b:free صار بلا endpoints على OpenRouter)."
         )
 
     def test_app_core_ai_config_has_recovery_slot(self):
@@ -188,10 +189,11 @@ class TestPrimaryModelConfig:
         assert "GPT_OSS_20B_FREE" in source, (
             "orchestrator ai_config must have GPT_OSS_20B_FREE constant"
         )
-        # D-167: PRIMARY يستخدم GPT_OSS_20B_FREE (mirror لسلسلة المونوليث)
-        assert "PRIMARY = _resolve_primary_model(AvailableModels.GPT_OSS_20B_FREE)" in source, (
-            "orchestrator ai_config PRIMARY must use GPT_OSS_20B_FREE (D-167)"
-        )
+        # ISS-LLM-CHAIN (2026-09-08): PRIMARY يستخدم GEMMA_4_26B_A4B_IT_FREE
+        # (mirror لسلسلة المونوليث — D-013). gpt-oss-20b يبقى فتحة تعافٍ في الذيل.
+        assert (
+            "PRIMARY = _resolve_primary_model(AvailableModels.GEMMA_4_26B_A4B_IT_FREE)" in source
+        ), "orchestrator ai_config PRIMARY must use GEMMA_4_26B_A4B_IT_FREE (ISS-LLM-CHAIN)"
 
     def test_conversation_math_pipeline_default(self):
         source = self._read("microservices/conversation_service/src/math_pipeline.py")

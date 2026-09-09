@@ -15,33 +15,55 @@ and `scripts/fitness/check_model_chain_parity.py` statically proves both brains
 match it. Update the chain here first, then mirror the pinned literals into the
 two `ai_config.py` files; the parity gate fails CI if any of the three drift.
 
-Contract (D-067 → D-167, verified live 2026-07-14)
---------------------------------------------------
+Contract (D-067 → D-167 → ISS-LLM-CHAIN, verified live 2026-09-08)
+------------------------------------------------------------------
 * PRIMARY MUST be a model that returns real `content` (never reasoning-only) with
-  Arabic + LaTeX and `finish=stop`. `openai/gpt-oss-20b:free` is the verified
-  PRIMARY. Reasoning-only models (`content=None` with a system prompt) are banned.
-* `openai/gpt-oss-120b:free` stays in the tail as an auto-recovery slot — it was
-  removed from OpenRouter's free tier (404) but the guards skip a dead model
-  instantly, so keeping it costs nothing and it re-activates automatically if the
-  free version returns.
+  Arabic + LaTeX and `finish=stop`. Reasoning-only models (`content=None` with a
+  system prompt) are banned.
+* Dead models stay in the tail as auto-recovery slots — the guards skip a dead
+  model instantly, so keeping them costs one failed request and they re-activate
+  automatically if OpenRouter restores their endpoints.
+
+### 2026-09-08 — «النظام لا يجيب» (why the chain was re-ordered)
+
+Live probe of OpenRouter's endpoints API (`/api/v1/models/<id>/endpoints`) on
+2026-09-08 — the previous PRIMARY was the reason the system stopped answering:
+
+| model | endpoints | state |
+|---|---|---|
+| `openai/gpt-oss-20b:free` (old PRIMARY) | `[]` | ❌ 404 «No endpoints found» |
+| `openai/gpt-oss-120b:free` | `[]` | ❌ 404 |
+| `nvidia/nemotron-3-nano-30b-a3b:free` | `[]` | ❌ 404 |
+| `nvidia/nemotron-nano-9b-v2:free` | `[]` | ❌ 404 |
+| `google/gemma-4-26b-a4b-it:free` | 1 (Google AI Studio) | ✅ alive |
+| `google/gemma-4-31b-it:free` | 1 (Google AI Studio) | ✅ alive |
+
+The chain is therefore **rotated** — no model is added or removed, only ordered
+so the two live-verified models are tried first. `gpt-oss-20b` drops into the
+tail as the recovery slot it now is (it is still the D-067 quality contract; it
+simply has no endpoints to serve it today).
 """
 
 from __future__ import annotations
 
 import os
 
-# --- The verified PRIMARY (D-067/D-167). ------------------------------------
-PRIMARY_MODEL = "openai/gpt-oss-20b:free"
+# --- The verified PRIMARY (ISS-LLM-CHAIN — live endpoints probe 2026-09-08). --
+# google/gemma-4-26b-a4b-it:free — 1 endpoint (Google AI Studio), uptime_1d
+# 99.49%, and already benchmarked GOOD in D-167 (Arabic + LaTeX, finish=stop).
+PRIMARY_MODEL = "google/gemma-4-26b-a4b-it:free"
 
-# --- Ordered fallback chain (D-167 — live benchmark 2026-07-14). -------------
+# --- Ordered fallback chain (ISS-LLM-CHAIN — live endpoints probe 2026-09-08). -
 # Kept as named constants so both the canonical `FALLBACK_CHAIN` and any future
 # consumer read the same values. The two brains still declare their own pinned
 # copies; the parity gate proves equality.
-FALLBACK_1 = "google/gemma-4-26b-a4b-it:free"  # GOOD live — Arabic + LaTeX
-FALLBACK_2 = "google/gemma-4-31b-it:free"  # GOOD live — Arabic + LaTeX
-FALLBACK_3 = "nvidia/nemotron-3-nano-30b-a3b:free"  # fast; guarded by content==0
-FALLBACK_4 = "openai/gpt-oss-120b:free"  # 404 free tier — auto-recovery slot
-FALLBACK_5 = "nvidia/nemotron-nano-9b-v2:free"  # last resort; guarded (D-177: FIRST_TOKEN_TIMEOUT caps its 62s-empty hang; nemotron-3-super-120b stays BANNED per ISS-107 — English-in-content leak)
+FALLBACK_1 = "google/gemma-4-31b-it:free"  # ✅ alive 2026-09-08 — Arabic + LaTeX
+FALLBACK_2 = "openai/gpt-oss-20b:free"  # ❌ 0 endpoints today — recovery slot (D-067 quality)
+FALLBACK_3 = (
+    "nvidia/nemotron-3-nano-30b-a3b:free"  # ❌ 0 endpoints today; fast; guarded by content==0
+)
+FALLBACK_4 = "openai/gpt-oss-120b:free"  # ❌ 0 endpoints today — auto-recovery slot
+FALLBACK_5 = "nvidia/nemotron-nano-9b-v2:free"  # ❌ 0 endpoints today; last resort (D-177: FIRST_TOKEN_TIMEOUT caps its 62s-empty hang; nemotron-3-super-120b stays BANNED per ISS-107 — English-in-content leak)
 
 FALLBACK_CHAIN: tuple[str, ...] = (
     FALLBACK_1,

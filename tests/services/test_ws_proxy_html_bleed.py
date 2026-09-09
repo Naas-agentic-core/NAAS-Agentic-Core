@@ -4,8 +4,7 @@ import logging
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-from fastapi import WebSocket, WebSocketDisconnect
-from websockets.exceptions import ConnectionClosed
+from fastapi import WebSocket
 
 from app.api.routers.ws_proxy import _proxy_websocket
 
@@ -13,7 +12,7 @@ from app.api.routers.ws_proxy import _proxy_websocket
 try:
     from websockets.exceptions import InvalidStatus
 except ImportError:
-    class InvalidStatus(Exception):
+    class InvalidStatus(Exception):  # noqa: N818 — يُحاكي اسم الصنف في مكتبة websockets
         pass
 
 @pytest.fixture
@@ -49,7 +48,7 @@ async def test_html_bleed_detection_in_message_loop(
     """
     caplog.set_level(logging.ERROR)
 
-    connect_mock, upstream_ws = mock_websockets_connect
+    _, upstream_ws = mock_websockets_connect
 
     # In order to trigger the tasks, we need client_to_upstream to exit cleanly
     # so we don't just hang or cancel upstream_to_client immediately
@@ -100,25 +99,25 @@ async def test_html_bleed_detection_in_invalid_status(
     """
     caplog.set_level(logging.ERROR)
 
-    connect_mock, upstream_ws = mock_websockets_connect
+    connect_mock, _ = mock_websockets_connect
 
     # Create a mock exception with response body
     class MockResponse:
         status_code = 500
         body = b'<!DOCTYPE html>\n<html><body>500 Error</body></html>'
 
-    class MockInvalidStatus(Exception):
+    class MockInvalidStatusError(Exception):
         response = MockResponse()
         status_code = 500
 
     # Ensure the code treats this mock as the imported InvalidStatus
     # Since we are mocking websockets.connect, we just raise the mock exception
-    connect_mock.side_effect = MockInvalidStatus("Invalid status")
+    connect_mock.side_effect = MockInvalidStatusError("Invalid status")
 
-    # We also need to patch InvalidStatus inside ws_proxy to be MockInvalidStatus
+    # We also need to patch InvalidStatus inside ws_proxy to be MockInvalidStatusError
     import app.api.routers.ws_proxy
     original_invalid_status = app.api.routers.ws_proxy.InvalidStatus
-    app.api.routers.ws_proxy.InvalidStatus = MockInvalidStatus
+    app.api.routers.ws_proxy.InvalidStatus = MockInvalidStatusError
 
     try:
         await _proxy_websocket(mock_client_ws, "ws://localhost:8003/chat", ["jwt"])
@@ -149,7 +148,7 @@ async def test_html_bleed_various_payloads(
     """
     Test other payload combinations that should trigger the bleed detection
     """
-    connect_mock, upstream_ws = mock_websockets_connect
+    _, upstream_ws = mock_websockets_connect
 
     payloads = [
         ' {"foo": "bar"} \n <body ... ',
@@ -165,7 +164,7 @@ async def test_html_bleed_various_payloads(
             raise asyncio.CancelledError()
         mock_client_ws.receive_text.side_effect = infinite_receive
 
-        async def message_generator():
+        async def message_generator(payload=payload):
             yield payload
             await asyncio.sleep(1)
 

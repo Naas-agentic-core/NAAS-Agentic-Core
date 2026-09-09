@@ -20,6 +20,10 @@ class _FailingClient:
 async def test_exercise_request_is_visible_on_stream(monkeypatch: pytest.MonkeyPatch) -> None:
     """يتأكد أن طلب تمرين يُرجع نصاً قابلاً للعرض مباشرة على الشاشة عند fallback المحلي."""
     monkeypatch.setenv("ORCHESTRATOR_SERVICE_URL", "http://orchestrator-service:8006")
+    # ISS-LLM-CHAIN (2026-09-08): السلسلة المحلية محجوبة خلف رافعة الرجوع
+    # (D-112: العمود الفقري الإلزامي يُصدر خطأً صريحاً بدل السقوط الصامت).
+    # بدونها لا يصل الاختبار إلى الـ fallback أصلاً فيفرغ من فحصه.
+    monkeypatch.setenv("REQUIRE_ORCHESTRATOR", "0")
     client = OrchestratorClient(base_url="http://orchestrator-service:8006")
 
     async def fake_get_client():
@@ -32,17 +36,23 @@ async def test_exercise_request_is_visible_on_stream(monkeypatch: pytest.MonkeyP
         "تمرين احتمالات: لدينا 3 كرات حمراء و5 زرقاء. احسب احتمال سحب كرة حمراء."
     )
 
-    async def local_retrieval(_question: str):
-        return expected_exercise_text
+    async def local_retrieval(_question: str, _history=None):
+        # الاسم الحالي للمُنتِج (بعد D-166/D-170) مولّدٌ غير متزامن يبثّ مقاطع.
+        yield expected_exercise_text
 
     monkeypatch.setattr(client, "_get_client", fake_get_client)
     monkeypatch.setattr(client, "_build_local_file_count_response", no_file_count)
-    monkeypatch.setattr(client, "_build_local_retrieval_response", local_retrieval)
+    monkeypatch.setattr(client, "_stream_local_retrieval_response", local_retrieval)
 
     rendered_chunks: list[str] = []
     async for item in client.chat_with_agent(question="أعطني تمرين الاحتمالات", user_id=1001):
         if isinstance(item, str):
             rendered_chunks.append(item)
+        elif isinstance(item, dict):
+            # الأحداث المُطبَّعة (assistant_delta) تحمل النص داخل payload.
+            content = (item.get("payload") or {}).get("content")
+            if isinstance(content, str) and content:
+                rendered_chunks.append(content)
 
     assert rendered_chunks
     full_text = "\n".join(rendered_chunks)

@@ -18,6 +18,43 @@ logger = logging.getLogger("orchestrator-client")
 class TurnFallbackMixin:
     """سلسلة الـ fallback المحلية المحروسة — منقولة حرفياً من ذيل chat_with_agent."""
 
+    async def _build_local_file_count_response(self, question: str) -> str | None:
+        """يجيب عن «كم عدد ملفات بايثون في المشروع؟» حتمياً — صفر LLM وصفر shell.
+
+        ## العطل المُصلَح (ISS-LLM-CHAIN — 2026-09-08)
+
+        `_stage_local_fallback` كان يستدعي هذه الدالّة **ولم تكن معرَّفة أصلاً**
+        بعد تفكيك God-file (D-166/D-170) — والنداء بلا `try/except`، فأي
+        ``AttributeError`` يُسقط **سلسلة الـ fallback المحلية بأكملها**. أي أنّ
+        رافعة الطوارئ `REQUIRE_ORCHESTRATOR=0` — المصمَّمة لإبقاء النظام يُجيب
+        حين تسقط خدمة التنسيق — كانت ميتة هي نفسها. لم يظهر الخلل في CI لأنّ
+        الاختبارات تُستبدل فيها هذه الدالّة بـ monkeypatch.
+
+        التنفيذ يفوِّض للقدرة القانونية
+        `app.services.capabilities.file_intelligence` (عدّ بايثون الخالص،
+        بلا عملية فرعية — M0) بدل أي منطقٍ محلي.
+
+        Returns:
+            رسالة العدّ الجاهزة، أو ``None`` إن لم يكن السؤال سؤالَ عدٍّ.
+        """
+        import asyncio
+
+        from app.services.capabilities.file_intelligence import (
+            FileIntelligenceRequest,
+            count_project_files,
+            default_project_root,
+            detect_file_intelligence,
+            render_compatible_message,
+        )
+
+        decision = detect_file_intelligence(FileIntelligenceRequest(question=question))
+        if not decision.recognized:
+            return None
+        count = await asyncio.to_thread(
+            count_project_files, default_project_root(), decision.extension
+        )
+        return render_compatible_message(decision.extension, count)
+
     async def _stage_local_fallback(
         self, ctx: TurnContext
     ) -> AsyncGenerator[dict | str, None]:

@@ -241,6 +241,53 @@ class TurnPreemptsDeterministicMixin:
             ctx.turn_complete = True
             return
 
+    async def _stream_question_only_response(
+        self,
+        question: str,
+        history_messages: list[dict[str, str]] | None = None,
+    ) -> AsyncGenerator[str, None]:
+        """يبثّ الاقتطاع الحتمي لِـ«أعطني السؤال رقم N فقط» — صفر LLM.
+
+        ## العطل المُصلَح (ISS-LLM-CHAIN — 2026-09-08)
+
+        كان `_stage_question_only` يستدعي هذه الدالّة **ولم تكن معرَّفة أصلاً**
+        في شجرة المصدر: كل دور طالب كان يرمي
+        ``AttributeError: 'OrchestratorClient' object has no attribute
+        '_stream_question_only_response'`` فيُسجَّل تحذيراً
+        (``question_only_preempt_failed``) ثم يُتابع الدور — أي أنّ قدرة ISS-112
+        كانت ميتة بالكامل، وطالبٌ يسأل «أعطني السؤال 2 فقط» يتلقّى التمرين كاملاً
+        أو جواباً مُهلوساً من النموذج.
+
+        التنفيذ يفوِّض للسلطة القانونية الوحيدة:
+        ``app.services.capabilities.exercise_retrieval.detect_question_only_request``
+        (نفس القدرة التي تحرسها ``tests/services/test_iss112_question_only.py``)
+        — بلا أي منطق استرجاعٍ هنا.
+
+        Yields:
+            مقاطع نصية جاهزة للبثّ (تأثير كتابة تدريجي)، ولا شيء إن لم تُعرَف النيّة.
+        """
+        import asyncio
+
+        from app.services.capabilities.exercise_retrieval import (
+            ExerciseRetrievalRequest,
+            detect_question_only_request,
+        )
+
+        decision = await asyncio.to_thread(
+            detect_question_only_request,
+            ExerciseRetrievalRequest(question=question),
+            history_messages,
+        )
+        if not decision.recognized or not decision.sliced_content:
+            logger.debug("question_only_preempt_not_applicable reason=%s", decision.reason)
+            return
+
+        # بثّ تدريجي بمقاطع صغيرة (تأثير الكتابة) دون تغيير المحتوى.
+        content = decision.sliced_content
+        step = 160
+        for start in range(0, len(content), step):
+            yield content[start : start + step]
+
     async def _stage_question_only(
         self, ctx: TurnContext
     ) -> AsyncGenerator[dict | str, None]:

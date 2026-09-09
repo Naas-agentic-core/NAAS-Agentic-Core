@@ -80,5 +80,10 @@ class TestChainHygiene:
     def test_primary_is_verified_arabic(self):
         # ISS-130 (D-167 — 2026-07-14): gpt-oss-120b:free أُزيل من OpenRouter (404)
         # ⇒ إعادة ترقية gpt-oss-20b (تعافى من 429 — مُتحقَّق حياً عربي+LaTeX).
+        # ISS-LLM-CHAIN (2026-09-08 — «النظام لا يجيب»): فحص حيّ لـ endpoints
+        # أثبت أن gpt-oss-20b نفسه صار بلا endpoints ⇒ PRIMARY انتقل إلى
+        # gemma-4-26b-a4b-it:free (المُتحقَّق حياً الوحيد في السلسلة).
         cfg = get_ai_config()
-        assert cfg.primary_model == "openai/gpt-oss-20b:free"
+        assert cfg.primary_model == "google/gemma-4-26b-a4b-it:free"
+        # النماذج الميتة تبقى في الذيل كفتحات تعافٍ آلي (لا تُحذف — D-013).
+        assert "openai/gpt-oss-20b:free" in cfg.get_fallback_models()

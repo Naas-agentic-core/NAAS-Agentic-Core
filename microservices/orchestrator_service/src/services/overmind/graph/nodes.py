@@ -45,10 +45,17 @@ def _configure_dspy() -> None:
         return
 
     try:
-        # ISS-068: nemotron-reasoning — أسرع نموذج مجاني مع reasoning tokens
-        dspy_model = os.getenv(
-            "OPENROUTER_DSPY_MODEL", "nvidia/nemotron-3-nano-30b-a3b:free"
-        ).strip()
+        # ISS-LLM-CHAIN (2026-09-08): القيمة المُصلَّبة القديمة
+        # (nvidia/nemotron-3-nano-30b-a3b:free) ميتة على OpenRouter اليوم
+        # (0 endpoints ⇒ 404 «No endpoints found»)، فكان تصنيف النيّة يعطّل
+        # LM بصمت ويُسقط الرسم على حدّ الدلالات الاستدلالية. الافتراضي صار
+        # PRIMARY المعلن في `core/ai_config.py` (مصدر القرار الواحد — D-186)،
+        # و`OPENROUTER_DSPY_MODEL` يبقى تجاوزاً صريحاً للمُشغِّل.
+        from microservices.orchestrator_service.src.core.ai_config import (
+            ActiveModels as _ActiveModels,
+        )
+
+        dspy_model = os.getenv("OPENROUTER_DSPY_MODEL", _ActiveModels.PRIMARY).strip()
         if not dspy_model.startswith("openai/"):
             dspy_model = f"openai/{dspy_model}"
         # DEADLOCK FIX: bound the structured-output call. Without an explicit
