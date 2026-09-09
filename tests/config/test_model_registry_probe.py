@@ -125,6 +125,57 @@ class TestEvaluate:
         )
         assert code == 0 and errors == [] and any("لم يُتحقَّق من المفتاح" in w for w in warnings)
 
+    def test_http_403_from_key_check_is_not_a_verdict(self) -> None:
+        """403 على `/auth/key` يصل من جدارٍ أماميّ لا من OpenRouter — تحذيرٌ لا إفشال.
+
+        العطبُ الأصليّ كان هذا بالضبط: تشخيصٌ يُحمِّر الرحلة على استجابةٍ لم نقرأ
+        معناها. `--strict` وحده يرفعه خطأً (لمن يريد رفض التشغيل بلا رؤية).
+        """
+        results = [_alive("a/one:free")]
+        errors, warnings, code = _probe.evaluate(
+            results, key_ok=False, key_msg="HTTP 403 — البوّابة لم تقرأه", allow_dead_primary=False
+        )
+        assert code == 0 and errors == [] and any("لم يُتحقَّق من المفتاح" in w for w in warnings)
+
+        strict_errors, _w, strict_code = _probe.evaluate(
+            results,
+            key_ok=False,
+            key_msg="HTTP 403 — البوّابة لم تقرأه",
+            allow_dead_primary=False,
+            strict=True,
+        )
+        assert strict_code == 1 and any("لم يُثبت نفسَه" in e for e in strict_errors)
+
+    def test_key_check_never_raises_on_unexpected_shape(self, monkeypatch) -> None:
+        """بوّابةٌ تُعيد JSON غريباً (قائمة/`data: null`) ⇒ «لم نره»، لا traceback يُفشِل CI."""
+
+        class _Resp:
+            def __init__(self, body: str) -> None:
+                self._body = body
+
+            def read(self) -> bytes:
+                return self._body.encode("utf-8")
+
+            def __enter__(self) -> _Resp:
+                return self
+
+            def __exit__(self, *_exc: object) -> bool:
+                return False
+
+        def _serving(payload: str):
+            """مصنعٌ لا حلقةٌ: لا يُغلَق الاستبدال على متغيّرٍ يتحرّك تحته."""
+            return lambda *_a, **_k: _Resp(payload)
+
+        for payload in ('["surprise"]', '{"data": null}', "<html>challenge</html>"):
+            monkeypatch.setattr(_probe.urllib.request, "urlopen", _serving(payload))
+            ok, msg = _probe.check_api_key("https://x.invalid/v1", "sk-fake", 1.0)
+            # لم يُثبت المفتاح نفسَه — ولا استثناءَ يخرج من هنا ليُفشِل CI بصمت
+            assert ok is False and msg, (payload, msg)
+
+        monkeypatch.setattr(_probe.urllib.request, "urlopen", _serving('{"data": {"label": "ci"}}'))
+        ok, msg = _probe.check_api_key("https://x.invalid/v1", "sk-fake", 1.0)
+        assert ok is True and "ci" in msg
+
     def test_dead_lead_of_two_warns_about_latency_tax(self) -> None:
         """كل ميتٍ في الرأس يُدفَع ثمنه في أول ثانية من كل دور — تحذير لا خطأ."""
         results = [_dead("a/one:free"), _absent("a/two:free"), _alive("a/three:free")]

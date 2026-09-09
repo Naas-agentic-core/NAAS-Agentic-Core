@@ -129,17 +129,24 @@ def probe_model(
 
 
 def check_api_key(base_url: str, api_key: str, timeout: float) -> tuple[bool, str]:
-    """`GET {base}/auth/key` — يكشف مفتاحاً ملغى/منفَّذًا قبل أن يُفسَّر كل شيء خطأً."""
+    """`GET {base}/auth/key` — يكشف مفتاحاً ملغى/منفَّذًا قبل أن يُفسَّر كل شيء خطأً.
+
+    هذا **تشخيصٌ لا مُنفِّذ**: أيّ شكلٍ غير متوقّع (بوّابةُ اعتمادٍ تُعيد قائمةً أو
+    `data: null` أو جسداً غير JSON) يجب أن يُقرأ «لم نرَه»، لا استثناءً يُرِمِي الرحلةَ
+    بخروج 1 بلا سبب — وهو العطبُ الذي صنعه هذا الفحصُ نفسه في أول تشغيلٍ CIّ.
+    """
     url = f"{base_url.rstrip('/')}/auth/key"
     req = urllib.request.Request(url, headers={"Authorization": f"Bearer {api_key}"})
     try:
         with urllib.request.urlopen(req, timeout=timeout) as resp:
             payload = json.loads(resp.read().decode("utf-8"))
     except urllib.error.HTTPError as exc:
-        return False, f"HTTP {exc.code} — المفتاح مرفوض أو منتهي"
-    except (urllib.error.URLError, TimeoutError, OSError, ValueError) as exc:
+        return False, f"HTTP {exc.code} — المفتاح مرفوض أو البوّابة لم تقرأه"
+    except Exception as exc:  # تشخيصٌ لا يجوز أن يُفشِّل شيئاً — عريضٌ عن قصد
         return False, f"{type(exc).__name__}: {exc}"
-    data = payload.get("data", payload)
+    data = payload.get("data", payload) if isinstance(payload, dict) else None
+    if not isinstance(data, dict):
+        return False, "قُبِل الطلبُ بلا بنيةٍ تُسنَد (HTTP 200 بشكلٍ غير متوقّع) — لا حكم"
     label = data.get("label") or data.get("user_id") or "ok"
     limit = data.get("limit")
     usage = data.get("usage")
@@ -147,12 +154,23 @@ def check_api_key(base_url: str, api_key: str, timeout: float) -> tuple[bool, st
     return True, f"label={label}{quota}"
 
 
-def _key_verdict(key_ok: bool | None, key_msg: str) -> tuple[list[str], list[str]]:
-    """401/403 رفضٌ **يقيني** ⇒ خطأ؛ غيرُ ذلك (شبكة · 429 · 5xx) لم نرَه ⇒ تحذير."""
+def _key_verdict(
+    key_ok: bool | None, key_msg: str, *, strict: bool = False
+) -> tuple[list[str], list[str]]:
+    """رفضٌ **يقيني** (401) ⇒ خطأ؛ أمّا 403 وشبكةُ وجدرانُ الحماية فلم نقرأه ⇒ تحذير.
+
+    لِمَ 403 ليس خطأً: `GET /auth/key` يصل من مشغّلات CI أحياناً بـ 403 من جدارٍ
+    أماميّ (WAF/Cloudflare) يرفض المتصفّح لا المفتاح — ومنعاً لتكرار عطب «لا يجوز أن
+    يُعاقَب التشغيل على ما لم يستطع رؤيته» يبقى التحذير. الرحلةُ ذاتها تستعمل المفتاح
+    على `POST /chat/completions` (المفتاحُ نفسُه، البوّابةُ نفسُها) فتفشل هناك يقيناً
+    إن كان ميّتاً؛ لهذا يبقى الرفضُ خطأً قاطعاً تحت `--strict`.
+    """
     if key_ok is not False:
         return [], []
-    if re.search(r"HTTP (401|403)\b", key_msg):
+    if re.search(r"HTTP 401\b", key_msg):
         return [f"المفتاح مرفوضٌ يقيناً: {key_msg}"], []
+    if strict:
+        return [f"المفتاح لم يُثبت نفسَه: {key_msg}"], []
     return [], [f"لم يُتحقَّق من المفتاح (لا حكم): {key_msg}"]
 
 
@@ -244,7 +262,7 @@ def evaluate(
             + " — فتحاتُ تعافٍ آليّ، لا أسبابُ إفشال."
         )
 
-    key_errors, key_warnings = _key_verdict(key_ok, key_msg)
+    key_errors, key_warnings = _key_verdict(key_ok, key_msg, strict=strict)
     errors += key_errors
     warnings += key_warnings
     return errors, warnings, (1 if errors else 0)
@@ -273,7 +291,10 @@ def render_text(
             mark, detail = "🕳", "غير موجود في الكتالوج" if not r.in_catalog else "0 endpoint(s)"
         print(f"  {mark} {role:9s} {r.model:44s} {detail}")
     if key_ok is not None:
-        print(f"  {'✅' if key_ok else '❌'} key         {key_msg}")
+        # الرمزُ يُطابق الحكمَ لا محاولةِ الفحص: «❓» لم نرَ، «❌» رُفض يقيناً (401).
+        definitive = bool(re.search(r"HTTP 401\b", key_msg))
+        mark = "✅" if key_ok else ("❌" if definitive else "❓")
+        print(f"  {mark} key         {key_msg}")
     for w in warnings:
         print(f"⚠️  {w}")
     for e in errors:
