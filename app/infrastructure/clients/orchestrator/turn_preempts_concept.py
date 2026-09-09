@@ -21,62 +21,6 @@ logger = logging.getLogger("orchestrator-client")
 class TurnPreemptsConceptMixin:
     """مراحل تعليم المفهوم: التصعيد، التعريف، المثال، الإصغاء النشط، الاسترجاع."""
 
-    async def _stream_local_retrieval_response(
-        self,
-        question: str,
-        history_messages: list[dict[str, str]] | None = None,
-    ) -> AsyncGenerator[str, None]:
-        """يبثّ نصّ التمرين الرسمي من قاعدة المعرفة — صفر LLM، صفر هلوسة.
-
-        ## العطل المُصلَح (ISS-LLM-CHAIN — 2026-09-08)
-
-        هذه الدالّة مستدعاة من ثلاثة مواضع (`_stage_indexed_retrieval` هنا،
-        `_stage_local_fallback` في `turn_fallback.py`، و`BACExerciseSkill._retrieve`)
-        **ولم تكن معرَّفة أصلاً** بعد تفكيك God-file (D-166/D-170) — فكل نداءٍ
-        كان يرمي ``AttributeError`` ويُبتلع في الـ `except` المحيط: مسار
-        الاسترجاع الحتمي (صفر LLM) ميت، وسلسلة الـ fallback المحلية تسقط من
-        سطرها الأول عمليّاً.
-
-        التنفيذ يفوِّض للسلطة القانونية
-        `app.services.capabilities.exercise_retrieval` — نفس القدرة التي تستعملها
-        `detect_question_only_request` — بلا أي منطق استرجاعٍ هنا.
-
-        Yields:
-            مقاطع من نصّ التمرين الرسمي (تأثير كتابة تدريجي)، ولا شيء عند عدم التطابق.
-        """
-        import asyncio
-
-        from app.services.capabilities.exercise_retrieval import (
-            ExerciseRetrievalRequest,
-            _detect_entry_from_history,
-            detect_exercise_retrieval,
-            format_exercise_for_display,
-            load_exercise_content,
-        )
-
-        decision = await asyncio.to_thread(
-            detect_exercise_retrieval,
-            ExerciseRetrievalRequest(question=question),
-            history_messages,
-        )
-        entry = decision.matched_entry
-        if entry is None and history_messages:
-            entry = await asyncio.to_thread(_detect_entry_from_history, history_messages)
-        if entry is None:
-            return
-
-        raw_content = await asyncio.to_thread(load_exercise_content, entry)
-        if not raw_content:
-            return
-        content = format_exercise_for_display(entry, raw_content)
-        if not content:
-            return
-
-        # بثّ تدريجي بمقاطع صغيرة (تأثير الكتابة) دون تغيير المحتوى.
-        step = 160
-        for start in range(0, len(content), step):
-            yield content[start : start + step]
-
     async def _stage_escalation_matrix(self, ctx: TurnContext) -> AsyncGenerator[dict | str, None]:
         """المصفوفة التصعيدية التكيّفية (D-138/D-139/D-147/D-159) — تعليم مفهوم مُسمّى."""
         question = ctx.question

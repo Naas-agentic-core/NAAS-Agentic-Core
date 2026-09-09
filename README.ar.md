@@ -36,9 +36,6 @@
 > الدردشة واجهة تسليم لا أكثر. والقلب هو: واجهة الكائنات التفاعلية · النمذجة المعرفية · ذاكرة الخطأ · التوليد التكيّفي · المحاكاة.
 > — [`CLAUDE.md`](CLAUDE.md) §0، الدستور التشغيلي الذي يرثه كل مساهمٍ وكل وكيل.
 
-> [!NOTE]
-> **ويحمل المستودع مسار تحقق مؤسسيًا مستقلًا.** تقرأ [`NAAS Verification Layer`](docs/architecture/NAAS_VERIFICATION_LAYER.md) مسارات الوكلاء المقدمة إليها عبر خمسة أبعاد وتصدر أحكامًا مرتبطة بدليل. وتصف وثيقة [`NAAS Agent Action Assurance → Agent Trust & Control Plane`](docs/architecture/AGENT_TRUST_CONTROL_PLANE.md) تطورها المقترح. اعتراض الأفعال وقت التشغيل، وهوية الوكلاء، والتفويض، والموافقة البشرية، والمنع والاستعادة **قدرات خارطة طريق لا ادعاءات تنفيذ حالي**. ولا يستعير أي من المنتجين دليل الآخر.
-
 ---
 
 ## الفهرس
@@ -320,7 +317,6 @@ make microservices-health
 │   └── api/routers/        مداخل HTTP + WebSocket (المحادثة WS حصراً)
 ├── shared/                 محرّكات بلا تبعيات: curriculum · scheduling · notation
 │                           illusion · analytics · messaging · retrieval · ai_models
-├── naas_verifier/          قلب مستقل للتحقق من المسار وإنتاج الدليل
 ├── microservices/          جزر الخدمات — لكلٍّ عقدها وDockerfile خاصّ بها
 ├── frontend/               تطبيق Next.js · رموز التصميم · عقود الثيم
 ├── scripts/fitness/        الفوارض — بوّابة لكل قانون
@@ -339,8 +335,6 @@ make microservices-health
 ## ١٢ · خارطة الطريق
 
 المصدر الحيّ الوحيد هو [`.memory/roadmap.md`](.memory/roadmap.md) — المراحل `M0 → M11` للمحرّك التربوي، ومساراتٌ موازية لطبقة المنتج وطبقة القيمة والإيراد ومحرّك التنفيذ المعرفي والتوأم الرقمي المعرفي. وكل وحدةٍ مخطّطة تحمل حالةً من سلّم البرهان ودليلاً ملفّياً وفجوةً مكتوبة وشرط ترقيةٍ صريحاً.
-
-ويتبع مسار التحقق المستقل خارطةً محكومة بالدليل: تحقق المسارات المقدمة اليوم، ثم مهايئ مصرح به لنظام طرف ثالث، ثم `Agent Action Assurance` مدفوع قابل للتكرار، ثم مراقبة `shadow mode` بلا منع، ولا يُسمح بالتحكم inline إلا بعد إثبات الدقة والكمون والفشل الآمن ضمن صنف فعل محدود. المعمارية المستهدفة وحدود الأمان والمنافسة وشروط التوقف في [`docs/architecture/AGENT_TRUST_CONTROL_PLANE.md`](docs/architecture/AGENT_TRUST_CONTROL_PLANE.md)، أما حقيقة التنفيذ فتبقى حصرًا في [`.memory/naas_verification_truth.md`](.memory/naas_verification_truth.md).
 
 **الطموح يُصنَّف ولا يُكتَم**: `PLANNED` و`SEAM` و`ABSENT` إعلانات مُتتبَّعة. والطموح غير المُصنَّف هو الذي يُنسى.
 

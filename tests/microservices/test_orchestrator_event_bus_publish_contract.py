@@ -53,36 +53,3 @@ async def test_event_bus_publish_serializes_dict_payload() -> None:
     channel, raw = capturing.published[0]
     assert channel == "mission:2"
     assert json.loads(raw) == payload
-
-@pytest.mark.asyncio
-async def test_event_bus_publish_serializes_with_event_id() -> None:
-    """يثبت أن الحدث المنشور يتضمن event_id كـ string إذا تم توفيره."""
-
-    bus = EventBus()
-    capturing = _CapturingRedis()
-    bus.redis = capturing  # type: ignore[assignment]
-
-    from datetime import datetime
-
-    from microservices.orchestrator_service.src.models.mission import MissionEventType
-    from microservices.orchestrator_service.src.services.overmind.state import MissionStateManager
-
-    manager = MissionStateManager(session=None, event_bus=bus) # type: ignore
-
-    message = manager._build_event_bus_message(
-        mission_id=3,
-        event_type=MissionEventType.STATUS_CHANGE,
-        payload={"k": "v"},
-        created_at=datetime(2025, 1, 1),
-        event_id=99,
-    )
-
-    await bus.publish("mission:3", message)
-
-    assert capturing.published
-    channel, raw = capturing.published[0]
-    assert channel == "mission:3"
-
-    decoded = json.loads(raw)
-    assert decoded["event_id"] == "99"
-    assert decoded["event_type"] == "status_change"

@@ -46,7 +46,6 @@ from microservices.conversation_service.prom_metrics import (
     record_ws_connection,
     set_startup_info,
 )
-from microservices.conversation_service.routers.import_router import router as import_router
 from microservices.conversation_service.src.conversation_graph import (
     get_conversation_graph,
     invoke_graph,
@@ -153,8 +152,6 @@ app = FastAPI(
     description="Skill مستقلة لإدارة المحادثات التعليمية — الخطوة 12",
     lifespan=lifespan,
 )
-
-app.include_router(import_router)
 
 
 # ── نماذج الـ API ─────────────────────────────────────────────────────────────

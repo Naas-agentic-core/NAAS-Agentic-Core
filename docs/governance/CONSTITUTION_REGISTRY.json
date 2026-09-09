@@ -417,8 +417,7 @@
         ".memory/deep_tech_constitution_truth.md"
       ],
       "enforcers": [
-        "check_deep_tech_constitution.py",
-        "check_agent_assurance_investment_case.py"
+        "check_deep_tech_constitution.py"
       ]
     },
     {

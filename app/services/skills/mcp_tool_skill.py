@@ -50,22 +50,10 @@ try:
             if _INVOCATIONS is not None:
                 _INVOCATIONS.labels(action=action, status=status).inc()
                 _DURATION.labels(action=action).observe(dur)
-        except Exception as exc:  # pragma: no cover
-            logger.debug(
-                "mcp_telemetry_record_failed",
-                extra={
-                    "action": action,
-                    "status": status,
-                    "error_type": type(exc).__name__,
-                    "error": str(exc)[:150],
-                },
-            )
+        except Exception:  # pragma: no cover
+            pass
 
-except Exception as exc:  # pragma: no cover
-    logger.warning(
-        "mcp_telemetry_disabled_prometheus_unavailable",
-        extra={"error_type": type(exc).__name__, "error": str(exc)[:150]},
-    )
+except Exception:  # pragma: no cover
 
     def _rec(action: str, status: str, dur: float) -> None:
         pass

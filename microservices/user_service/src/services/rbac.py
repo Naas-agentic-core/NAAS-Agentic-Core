@@ -9,13 +9,7 @@ from typing import Final
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from microservices.user_service.models import (
-    Permission,
-    Role,
-    RolePermission,
-    User,
-    UserRole,
-)
+from microservices.user_service.models import Permission, Role, RolePermission, User, UserRole
 from microservices.user_service.src.core.common import utc_now
 
 STANDARD_ROLE: Final[str] = "STANDARD_USER"
@@ -150,23 +144,6 @@ class RBACService:
             .where(UserRole.user_id == user_id)
         )
         return [row[0] for row in result.all()]
-
-    async def bulk_user_roles(self, user_ids: list[int]) -> dict[int, list[str]]:
-        if not user_ids:
-            return {}
-
-        result = await self.session.execute(
-            select(UserRole.user_id, Role.name)
-            .select_from(UserRole)
-            .join(Role, Role.id == UserRole.role_id)
-            .where(UserRole.user_id.in_(user_ids))
-        )
-
-        user_roles_map: dict[int, list[str]] = {uid: [] for uid in user_ids}
-        for row in result.all():
-            user_roles_map[row[0]].append(row[1])
-
-        return user_roles_map
 
     async def user_permissions(self, user_id: int) -> set[str]:
         result = await self.session.execute(

@@ -38,8 +38,6 @@ export interface ContentRetrievalSkillValidationError { loc: string | number[]; 
 export interface ConversationServiceChatRequest { question: string; thread_id?: string | null; history?: Record<string, unknown>[]; correlation_id?: string | null }
 export interface ConversationServiceChatResponse { response: string; intent: string; subject?: string; thread_id: string; correlation_id: string; graph_ready: boolean; step?: string; ui_component?: Record<string, unknown> | null }
 export interface ConversationServiceHealthResponse { status: string; service: string; version: string; step: string; graph_ready: boolean; ws_enabled: boolean }
-export interface ConversationServiceImportConversationRequest { conversation_id: number; user_id: number; idempotency_key: string; max_messages?: number; conversation_metadata: Record<string, unknown>; messages: Record<string, unknown>[] }
-export interface ConversationServiceImportConversationResponse { status: string; conversation_id: number; messages_imported: number }
 export interface ConversationServiceValidationError { loc: string | number[]; msg: string; type: string }
 
 // ── foundations_service (foundations-service) ─────────

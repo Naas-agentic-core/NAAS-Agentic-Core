@@ -359,9 +359,9 @@ async def test_create_user(mock_db):
 إذا كان لديك كود يستخدم `setup_static_files` القديم:
 
 ```python
-# القديم (Removed)
-# from app.core.static_handler import setup_static_files
-# setup_static_files(app)
+# القديم (Deprecated)
+from app.core.static_handler import setup_static_files
+setup_static_files(app)
 
 # الجديد
 from app.middleware.static_files_middleware import (

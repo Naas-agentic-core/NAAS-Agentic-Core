@@ -192,11 +192,7 @@ class TestRoutingOrder:
 
     def test_question_only_between_greeting_and_indexed(self):
         greeting_pos = self.CLIENT_SRC.index("_greeting_fastpath_response")
-        # ISS-LLM-CHAIN (2026-09-08): الإبرة كانت تطلب الاستدعاء على سطرٍ واحد
-        # («...(question, history_messages)») لكن تفكيك D-170 أعاد تنسيقه على
-        # ثلاثة أسطر — فصار الاختبار يفشل بـ ValueError «substring not found»
-        # بلا أي خللٍ في الترتيب. نبحث عن بداية الاستدعاء فقط.
-        qo_pos = self.CLIENT_SRC.index("self._stream_question_only_response(")
+        qo_pos = self.CLIENT_SRC.index("_stream_question_only_response(question, history_messages)")
         indexed_pos = self.CLIENT_SRC.index("if self._has_indexed_match(")
         assert greeting_pos < qo_pos < indexed_pos
 

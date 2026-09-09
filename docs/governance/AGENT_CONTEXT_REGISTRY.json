@@ -117,7 +117,7 @@
     {
       "step": 8,
       "id": "commercial",
-      "read": ["docs/architecture/DUAL_TRACK_PRODUCT_SYSTEM.md", "docs/commercial/FOREIGN_CURRENCY_OPERATING_SYSTEM.md", "docs/governance/DUAL_TRACK_ALIGNMENT.json", "docs/commercial/OFFER_CATALOG.json", "docs/commercial/FX_OPPORTUNITY_PORTFOLIO.json", "docs/DEEP_TECH_CONSTITUTION.md"],
+      "read": ["docs/architecture/DUAL_TRACK_PRODUCT_SYSTEM.md", "docs/commercial/FOREIGN_CURRENCY_OPERATING_SYSTEM.md", "docs/governance/DUAL_TRACK_ALIGNMENT.json", "docs/commercial/OFFER_CATALOG.json", "docs/DEEP_TECH_CONSTITUTION.md"],
       "outcome_ar": "ربط المهمة بعميل ومشكلة مدفوعة وعرض ودليل ومسار تحصيل بالدولار أو اليورو"
     },
     {
@@ -179,7 +179,6 @@
     "docs/governance/DUAL_TRACK_ALIGNMENT.json",
     "docs/adr/ADR-015-dual-track-product-system.md",
     "docs/commercial/OFFER_CATALOG.json",
-    "docs/commercial/FX_OPPORTUNITY_PORTFOLIO.json",
     "docs/architecture/CODE_ACCEPTANCE_CONSTITUTION.md",
     "docs/changes/CURRENT_CODE_ACCEPTANCE_PACKET.json",
     "docs/architecture/REFERENCE_BACKBONE_CONSTITUTION.md",

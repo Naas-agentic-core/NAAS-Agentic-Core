@@ -6,11 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy import desc, select
 
 from microservices.user_service.models import AuditLog, User
-from microservices.user_service.security import (
-    get_auth_service,
-    get_current_user,
-    require_role,
-)
+from microservices.user_service.security import get_auth_service, get_current_user, require_role
 from microservices.user_service.src.schemas.ums import (
     AdminCreateUserRequest,
     ChangePasswordRequest,
@@ -119,9 +115,7 @@ async def reset_password(
 
 
 @router.get(
-    "/admin/users",
-    response_model=list[UserOut],
-    dependencies=[Depends(require_role(ADMIN_ROLE))],
+    "/admin/users", response_model=list[UserOut], dependencies=[Depends(require_role(ADMIN_ROLE))]
 )
 async def list_users_admin(
     service: AuthService = Depends(get_auth_service),
@@ -129,12 +123,9 @@ async def list_users_admin(
     result = await service.session.execute(select(User))
     users = result.scalars().all()
 
-    user_ids = [u.id for u in users]
-    user_roles_map = await service.rbac.bulk_user_roles(user_ids)
-
     output = []
     for u in users:
-        roles = user_roles_map.get(u.id, [])
+        roles = await service.rbac.user_roles(u.id)
         output.append(
             UserOut(
                 id=u.id,
@@ -149,9 +140,7 @@ async def list_users_admin(
 
 
 @router.post(
-    "/admin/users",
-    response_model=UserOut,
-    dependencies=[Depends(require_role(ADMIN_ROLE))],
+    "/admin/users", response_model=UserOut, dependencies=[Depends(require_role(ADMIN_ROLE))]
 )
 async def create_user_admin(
     payload: AdminCreateUserRequest,

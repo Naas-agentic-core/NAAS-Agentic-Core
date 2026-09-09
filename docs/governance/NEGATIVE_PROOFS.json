@@ -17,12 +17,6 @@
     "check_agent_skills_spec.py": [
       "tests/fitness/test_agent_standards_gates.py"
     ],
-    "check_agent_assurance_investment_case.py": [
-      "tests/fitness/test_agent_assurance_investment_case_gate.py"
-    ],
-    "check_fx_opportunity_portfolio.py": [
-      "tests/fitness/test_fx_opportunity_portfolio_gate.py"
-    ],
     "check_agentic_design_principles.py": [
       "tests/fitness/test_check_agentic_design_principles.py"
     ],

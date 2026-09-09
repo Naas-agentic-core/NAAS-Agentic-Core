@@ -135,10 +135,7 @@ class ActiveModels:
     # ISS-130 (D-167 — 2026-07-14): gpt-oss-120b:free أُزيل نهائياً من OpenRouter
     # (404) ⇒ إعادة ترقية gpt-oss-20b (الـ PRIMARY المُتحقَّق تاريخياً — D-067،
     # وتعافى من 429 — مُتحقَّق حياً 10.2s عربي+LaTeX finish=stop).
-    # ISS-LLM-CHAIN (2026-09-08): انظر قرار تدوير السلسلة أسفلَ هذه الكتلة —
-    # PRIMARY صار google/gemma-4-26b-a4b-it:free (المُتحقَّق حيّاً الوحيد ذو
-    # endpoints في هذه السلسلة).
-    PRIMARY = _resolve_primary_model("google/gemma-4-26b-a4b-it:free")
+    PRIMARY = _resolve_primary_model("openai/gpt-oss-20b:free")
     LOW_COST = PRIMARY
     GATEWAY_PRIMARY = PRIMARY
     # ISS-107 (2026-06-02): بنشمارك حي بالمفتاح الحقيقي + الـ system prompt الإنتاجي
@@ -169,23 +166,8 @@ class ActiveModels:
     # القرار: إعادة ترقية gpt-oss-20b إلى PRIMARY (هو الـ PRIMARY المُتحقَّق تاريخياً
     # D-067)؛ gemma-4 بإصداريه بعده؛ gpt-oss-120b يبقى في ذيل السلسلة كفتحة
     # تعافٍ آلي إن أعاد OpenRouter نسخته المجانية (الحُرّاس يتجاوزون 404 فوراً).
-    #
-    # ISS-LLM-CHAIN (2026-09-08 — «النظام لا يجيب»): فحصٌ حيّ لـ OpenRouter
-    # `/api/v1/models/<id>/endpoints` كشف أن **كل** نماذج gpt-oss وnemotron في
-    # هذه السلسلة صارت بلا أي endpoint (404 «No endpoints found»):
-    #   ❌ openai/gpt-oss-20b:free             → endpoints=[]
-    #   ❌ openai/gpt-oss-120b:free            → endpoints=[]
-    #   ❌ nvidia/nemotron-3-nano-30b-a3b:free → endpoints=[]
-    #   ❌ nvidia/nemotron-nano-9b-v2:free     → endpoints=[]
-    #   ✅ google/gemma-4-26b-a4b-it:free      → 1 endpoint (Google AI Studio)
-    #   ✅ google/gemma-4-31b-it:free          → 1 endpoint (Google AI Studio)
-    # الأثر الحيّ (مُعاد إنتاجه في هذه الجولة): كل دور طالب كان يبدأ باستدعاء
-    # ميت، وأي مستهلك يستدعي PRIMARY **بلا سلسلة احتياط** يفشل كليّاً — وهو ما
-    # كان يفعله عميل LLM في خدمة التنسيق (`services/llm/client.py`).
-    # القرار: تدوير السلسلة بلا حذف — gemma-4 بإصداريه يتقدّمان إلى PRIMARY
-    # والبديل الأول، وgpt-oss-20b يهبط إلى فتحة التعافي التي صارها فعلاً.
-    GATEWAY_FALLBACK_1 = "google/gemma-4-31b-it:free"  # ✅ حيّ 2026-09-08 — عربي+LaTeX
-    GATEWAY_FALLBACK_2 = "openai/gpt-oss-20b:free"  # ❌ 0 endpoints اليوم — فتحة تعافٍ (جودة D-067)
+    GATEWAY_FALLBACK_1 = "google/gemma-4-26b-a4b-it:free"  # ✅ GOOD حياً (2026-07-14) — عربي+LaTeX
+    GATEWAY_FALLBACK_2 = "google/gemma-4-31b-it:free"  # ✅ GOOD حياً (2026-07-14) — عربي+LaTeX
     GATEWAY_FALLBACK_3 = "nvidia/nemotron-3-nano-30b-a3b:free"  # سريع؛ محميّ بـ content==0 guard
     GATEWAY_FALLBACK_4 = "openai/gpt-oss-120b:free"  # ميت 404 (2026-07-14) — فتحة تعافٍ آلي
     GATEWAY_FALLBACK_5 = "nvidia/nemotron-nano-9b-v2:free"  # ملاذ أخير؛ محميّ بالحُرّاس (D-177: FIRST_TOKEN_TIMEOUT يحدّ تعليقه 62s؛ nemotron-3-super-120b يبقى محظوراً ISS-107 — تسرّب إنجليزي)

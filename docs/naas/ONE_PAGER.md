@@ -6,12 +6,6 @@
 >
 > ⚠️ **وثيقةُ تجهيزٍ داخلية.** لم تُرسَل إلى أحد.
 
-> **الاسم الحالي:** `NAAS Agent Action Assurance` — تحقق قبل الإنتاج من أفعال ومسارات
-> الوكلاء مع دليل قابل لإعادة التشغيل. **الرؤية المستهدفة:**
-> [`NAAS Agent Trust & Control Plane`](../architecture/AGENT_TRUST_CONTROL_PLANE.md).
-> الاعتراض وقت التشغيل والهوية والتفويض والموافقة البشرية والمنع والاستعادة خارطة طريق،
-> وليست قدرات هذه النسخة.
-
 ---
 
 ## 1. المشكلة
@@ -97,8 +91,6 @@ python3.12 scripts/research/probe_external_guard.py   # الهدف الخارج�
 ---
 
 **المراجع:** [`NAAS_VERIFICATION_LAYER.md`](../architecture/NAAS_VERIFICATION_LAYER.md) ·
-[`AGENT_TRUST_CONTROL_PLANE.md`](../architecture/AGENT_TRUST_CONTROL_PLANE.md) ·
-[`ADR-017`](../adr/ADR-017-agent-trust-control-plane.md) ·
 [`GATE_STATE_MACHINE.md`](../governance/GATE_STATE_MACHINE.md) ·
 [`GATE_LEDGER.json`](../governance/GATE_LEDGER.json) ·
 [`EXTERNAL_GUARD_PROBE.json`](../research/EXTERNAL_GUARD_PROBE.json)

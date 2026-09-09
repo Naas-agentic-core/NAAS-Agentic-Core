@@ -20,7 +20,7 @@ aiosqlite>=0.17.0
 openai>=1.58.1
 langgraph
 dspy-ai==2.5.43
-# D-205: `litellm==1.59.3` removed — zero imports anywhere in this service, and
+# D-205: `litellm==1.50.0` removed — zero imports anywhere in this service, and
 # the pin was a second brake on `openai` (1.50.0 predates the langchain-openai
 # range above). dspy-ai depends on litellm and brings a version consistent with
 # whatever else resolves, which is the only reason it was ever present.

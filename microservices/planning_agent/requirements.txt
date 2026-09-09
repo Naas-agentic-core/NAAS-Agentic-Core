@@ -5,19 +5,19 @@ pydantic>=2.8.0,<3.0.0
 pydantic-settings==2.2.1
 sqlmodel==0.0.16
 aiosqlite==0.20.0
-openai==1.59.3
+openai==1.55.0
 langgraph
 dspy-ai==2.5.43
 llama-index-core==0.14.13
 llama-index-embeddings-openai
-dspy==3.0.4b1
+dspy==2.5.7
 # ⛔ COUPLED TO `openai` IN THIS SAME FILE — never raise litellm alone.
-# litellm >= 1.8x requires openai>=2.20.0, but this service pins openai==1.59.3,
+# litellm >= 1.8x requires openai>=2.20.0, but this service pins openai==1.55.0,
 # so pip cannot resolve and the Docker image dies at `pip install` (proven in CI
 # on 66a3e50). Dependabot raised it twice: 4b0db53 → 1.84.0, 91509a0 → 1.96.0.
 # 1.50.0 is the version proven green on b1db497. Raising the pair means migrating
 # to the openai 2.x SDK across six services — an ADR, not a dependency bump.
-litellm==1.59.3
+litellm==1.50.0
 asyncpg>=0.29.0
 psycopg2-binary>=2.9.9
 

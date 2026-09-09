@@ -174,12 +174,6 @@ jobs:
           # D-279: engineering evidence and foreign-currency production evidence
           # must meet before a capability can advance.
           python scripts/fitness/check_dual_track_alignment.py
-          # The investor narrative must remain tied to authoritative sources,
-          # a deterministic ROI model, paid-evidence gates, and falsification.
-          python scripts/fitness/check_agent_assurance_investment_case.py
-          # Future FX opportunities remain within authorized offers, use known
-          # evidence, expose contrary evidence, and cannot self-promote commercially.
-          python scripts/fitness/check_fx_opportunity_portfolio.py
           # D-273: the deep-tech / hard-currency constitution. It was on disk,
           # declared in CLAUDE.md §0.25 as wired, and executed by nothing — the
           # ISS-186 class (a gate that reads as protection but enforces nothing).

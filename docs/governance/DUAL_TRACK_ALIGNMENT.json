@@ -23,17 +23,17 @@
   "alignment_records": [
     {
       "alignment_id": "ALIGN-REDTEAM-MULTILINGUAL",
-      "capability": "ضمان مستقل لمسارات وأفعال وكلاء خدمة العملاء بالعربية، مع اختبار أمني متعدد اللغات",
+      "capability": "اختبار أمان نماذج ووكلاء بالعربية والفرنسية",
       "offer_id": "ai-red-teaming-multilingual",
-      "buyer_or_user": "مالك نشر أو أمن منتج لدى مزود وكلاء خدمة عملاء عرب ينفذون أفعالاً حساسة في الخليج",
-      "paid_problem_or_social_problem": "مراجعة النص النهائي لا تثبت الأداة والتفويض والسياسة وانتقال الحالة، فتترك تكلفة مراجعة وحوادث وتأخير إطلاق بلا دليل مستقل.",
+      "buyer_or_user": "فرق AI خارج الجزائر التي تنشر أنظمة حساسة",
+      "paid_problem_or_social_problem": "فشل أمني لغوي لا تلتقطه اختبارات اللغة الإنجليزية وحدها.",
       "standards": ["browser-use", "awesome-claude-skills", "system-design-primer"],
       "curriculum_domains": ["security_privacy_trust", "ai_ml_data", "software_quality_and_proof"],
-      "evidence": ["nist-ai-rmf-1.0", "nist-agent-standards-initiative", "owasp-agent-security", "agentdojo-2024", "injecagent-acl-2024", "metr-task-horizons-2025", "palo-alto-protect-ai-acquisition-2025", "microsoft-entra-agent-id-2025", "harvard-cs-concentration-domains", "harvard-cs50x-foundations"],
+      "evidence": ["nist-ai-rmf-1.0", "nist-agent-standards-initiative", "owasp-agent-security", "harvard-cs-concentration-domains", "harvard-cs50x-foundations"],
       "engineering_status": "RESEARCH",
       "commercial_status": "PROPOSED",
       "owner": "product-security",
-      "next_gate": "15 مقابلة مشتري مؤهل + مهايئ مسار خارجي مصرح + مقارنة held-out + أول تجربة مدفوعة بعملة صعبة"
+      "next_gate": "مقابلات عميل + منهج اختبار + عينة تقرير + اختبار سلبي"
     },
     {
       "alignment_id": "ALIGN-ONPREM-ENERGY",

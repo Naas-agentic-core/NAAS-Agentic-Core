@@ -68,7 +68,6 @@ class BaseServiceSettings(BaseSettings):
     # Database — APP_DATABASE_URL takes priority over the Replit-managed DATABASE_URL
     APP_DATABASE_URL: str | None = Field(None, description="Override database connection URL")
     DATABASE_URL: str | None = Field(None, description="Database connection URL")
-    DATABASE_READONLY_URL: str | None = Field(None, description="Read-only database connection URL")
 
     @model_validator(mode="before")
     @classmethod

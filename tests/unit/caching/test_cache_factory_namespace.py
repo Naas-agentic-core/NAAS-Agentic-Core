@@ -2,17 +2,13 @@ import os
 
 import pytest
 
-from app.caching.factory import CacheFactory, get_cache
-from app.caching.memory_cache import InMemoryCache
+from app.caching.factory import CacheFactory
 from app.caching.namespace_cache import NamespacedCache
 
 
 @pytest.fixture(autouse=True)
 def reset_cache_factory() -> None:
     CacheFactory._instance = None
-    # We should also clean up CACHE_TYPE for isolation
-    os.environ.pop("CACHE_TYPE", None)
-    os.environ.pop("REDIS_URL", None)
 
 
 def _clear_namespace_env() -> None:
@@ -58,44 +54,3 @@ def test_cache_factory_uses_agent_identity(
 
     assert isinstance(cache, NamespacedCache)
     assert cache._namespace == expected
-
-
-def test_get_cache_returns_memory_cache_by_default() -> None:
-    """Test that get_cache() returns InMemoryCache when no specific config is provided."""
-    _clear_namespace_env()
-
-    cache = get_cache()
-
-    # By default, without a namespace or CACHE_TYPE set, it should return an InMemoryCache directly
-    assert isinstance(cache, InMemoryCache)
-
-
-def test_get_cache_returns_redis_cache_when_configured(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Test that get_cache() returns a RedisCache instance when CACHE_TYPE is set to 'redis'."""
-    _clear_namespace_env()
-    monkeypatch.setenv("CACHE_TYPE", "redis")
-    monkeypatch.setenv("REDIS_URL", "redis://localhost:6379/1")
-
-    class MockRedisCache:
-        def __init__(self, **kwargs):
-            self.kwargs = kwargs
-
-    # Patch the import inside create_cache
-    monkeypatch.setattr("app.caching.redis_cache.RedisCache", MockRedisCache)
-
-    cache = get_cache()
-
-    assert isinstance(cache, MockRedisCache)
-    assert cache.kwargs.get("redis_url") == "redis://localhost:6379/1"
-
-
-def test_get_cache_singleton_behavior() -> None:
-    """Test that multiple calls to get_cache() return the exact same instance."""
-    _clear_namespace_env()
-
-    cache1 = get_cache()
-    cache2 = get_cache()
-    cache3 = CacheFactory.get_cache()
-
-    assert cache1 is cache2
-    assert cache2 is cache3

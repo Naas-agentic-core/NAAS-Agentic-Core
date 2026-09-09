@@ -30,9 +30,7 @@ _FLAG = "ENABLE_RETRIEVAL_RERANK_SKILL"
 try:
     from prometheus_client import REGISTRY, Counter, Histogram
 
-    if "cogniforge_skill_retrieval_invocations" not in {
-        m.name for m in REGISTRY.collect()
-    }:
+    if "cogniforge_skill_retrieval_invocations" not in {m.name for m in REGISTRY.collect()}:
         _INVOCATIONS = Counter(
             "cogniforge_skill_retrieval_invocations_total",
             "RetrievalRerankSkill invocations",
@@ -52,13 +50,8 @@ try:
             if _INVOCATIONS is not None:
                 _INVOCATIONS.labels(stage=stage, status=status).inc()
                 _DURATION.labels(stage=stage).observe(dur)
-        except Exception:
-            logger.debug(
-                "Failed to record retrieval telemetry (stage=%s, status=%s)",
-                stage,
-                status,
-                exc_info=True,
-            )
+        except Exception:  # pragma: no cover
+            pass
 
 except Exception:  # pragma: no cover
 
@@ -70,18 +63,12 @@ class RetrievalRerankInput(RobustBaseModel):
     """مدخلات الاسترجاع + إعادة الترتيب."""
 
     query: str = Field(..., min_length=1, max_length=2000)
-    top_k: int = Field(
-        default=8, ge=1, le=50, description="عدد نتائج الاسترجاع الأولية"
-    )
-    top_n: int = Field(
-        default=5, ge=1, le=50, description="عدد النتائج بعد إعادة الترتيب"
-    )
+    top_k: int = Field(default=8, ge=1, le=50, description="عدد نتائج الاسترجاع الأولية")
+    top_n: int = Field(default=5, ge=1, le=50, description="عدد النتائج بعد إعادة الترتيب")
     documents: list[str] | None = Field(
         default=None, description="وثائق صريحة لإعادة ترتيبها (يتخطّى الاسترجاع)"
     )
-    filters: dict[str, Any] | None = Field(
-        default=None, description="مرشّحات (سنة/مادة...)"
-    )
+    filters: dict[str, Any] | None = Field(default=None, description="مرشّحات (سنة/مادة...)")
 
 
 class RetrievalRerankOutput(RobustBaseModel):
@@ -123,9 +110,7 @@ class RetrievalRerankSkill(BaseSkill[RetrievalRerankInput, RetrievalRerankOutput
             pass
         return False
 
-    async def retrieve(
-        self, payload: RetrievalRerankInput
-    ) -> RetrievalRerankOutput | None:
+    async def retrieve(self, payload: RetrievalRerankInput) -> RetrievalRerankOutput | None:
         """يُنفِّذ الاسترجاع ثم إعادة الترتيب. يُرجِع None عند التعطيل أو الفشل الكامل."""
         if not self.is_enabled():
             return None
@@ -142,9 +127,7 @@ class RetrievalRerankSkill(BaseSkill[RetrievalRerankInput, RetrievalRerankOutput
 
                 res = await LlamaIndexDriver().search(
                     RetrievalQuery(
-                        query=payload.query,
-                        top_k=payload.top_k,
-                        filters=payload.filters,
+                        query=payload.query, top_k=payload.top_k, filters=payload.filters
                     )
                 )
                 if res.get("success"):
@@ -178,9 +161,7 @@ class RetrievalRerankSkill(BaseSkill[RetrievalRerankInput, RetrievalRerankOutput
             from app.drivers.reranker_driver import RerankerDriver
 
             res = await RerankerDriver().rank(
-                ScoringSpec(
-                    query=payload.query, documents=doc_texts, top_n=payload.top_n
-                )
+                ScoringSpec(query=payload.query, documents=doc_texts, top_n=payload.top_n)
             )
             if res.get("success"):
                 reranked = [_as_doc(r) for r in (res.get("reranked_results") or [])]

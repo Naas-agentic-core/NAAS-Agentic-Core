@@ -1,5 +1,5 @@
 {
-  "branch": "fix-useeffect-memory-leak-14470332023576788860-4",
+  "branch": "claude/check-dependabot-branch-xhssli",
   "components": [
     {
       "agreed": false,
@@ -311,10 +311,9 @@
         "app/telemetry/otel_setup.py"
       ],
       "id": "otel_setup",
-      "importer_count": 2,
+      "importer_count": 1,
       "importers_sample": [
-        "app/core/kernel_support/otel.py",
-        "tests/telemetry/test_otel_setup.py"
+        "app/core/kernel_support/otel.py"
       ],
       "name": "OpenTelemetry SDK bootstrap",
       "notes": "Imported by app/kernel.py at boot (setup_otel + instrument_fastapi_app). Hard no-op when OTEL_EXPORTER_OTLP_ENDPOINT is unset, so default Codespaces without the stack still boot. ACTIVE under §6.6 because the import + call chain are present at kernel startup; runtime evidence depends on the stack being up (validated separately by observability_validation CI).",
@@ -351,6 +350,6 @@
       "on_live_chain": true
     }
   ],
-  "generated_at_utc": "2026-09-04T14:03:26.745885+00:00",
+  "generated_at_utc": "2026-08-28T20:13:03.758011+00:00",
   "schema_version": 1
 }

@@ -18,43 +18,6 @@ logger = logging.getLogger("orchestrator-client")
 class TurnFallbackMixin:
     """سلسلة الـ fallback المحلية المحروسة — منقولة حرفياً من ذيل chat_with_agent."""
 
-    async def _build_local_file_count_response(self, question: str) -> str | None:
-        """يجيب عن «كم عدد ملفات بايثون في المشروع؟» حتمياً — صفر LLM وصفر shell.
-
-        ## العطل المُصلَح (ISS-LLM-CHAIN — 2026-09-08)
-
-        `_stage_local_fallback` كان يستدعي هذه الدالّة **ولم تكن معرَّفة أصلاً**
-        بعد تفكيك God-file (D-166/D-170) — والنداء بلا `try/except`، فأي
-        ``AttributeError`` يُسقط **سلسلة الـ fallback المحلية بأكملها**. أي أنّ
-        رافعة الطوارئ `REQUIRE_ORCHESTRATOR=0` — المصمَّمة لإبقاء النظام يُجيب
-        حين تسقط خدمة التنسيق — كانت ميتة هي نفسها. لم يظهر الخلل في CI لأنّ
-        الاختبارات تُستبدل فيها هذه الدالّة بـ monkeypatch.
-
-        التنفيذ يفوِّض للقدرة القانونية
-        `app.services.capabilities.file_intelligence` (عدّ بايثون الخالص،
-        بلا عملية فرعية — M0) بدل أي منطقٍ محلي.
-
-        Returns:
-            رسالة العدّ الجاهزة، أو ``None`` إن لم يكن السؤال سؤالَ عدٍّ.
-        """
-        import asyncio
-
-        from app.services.capabilities.file_intelligence import (
-            FileIntelligenceRequest,
-            count_project_files,
-            default_project_root,
-            detect_file_intelligence,
-            render_compatible_message,
-        )
-
-        decision = detect_file_intelligence(FileIntelligenceRequest(question=question))
-        if not decision.recognized:
-            return None
-        count = await asyncio.to_thread(
-            count_project_files, default_project_root(), decision.extension
-        )
-        return render_compatible_message(decision.extension, count)
-
     async def _stage_local_fallback(self, ctx: TurnContext) -> AsyncGenerator[dict | str, None]:
         """سلسلة الـ fallback المحلية المحروسة (D-047/D-048/ISS-053) — خلف REQUIRE_ORCHESTRATOR=0."""
         question = ctx.question
@@ -89,8 +52,8 @@ class TurnFallbackMixin:
                     status="OK" if local_file_count_response else "SKIP",
                     metrics={"duration_ms": (time.perf_counter() - _fb_t0) * 1000},
                 )
-        except Exception as e:
-            logger.debug(f"Telemetry logging error (silenced): {e}")
+        except Exception:
+            pass
         if local_file_count_response:
             if _root_ctx:
                 with contextlib.suppress(Exception):
@@ -103,10 +66,7 @@ class TurnFallbackMixin:
                         },
                     )
             yield self._normalize_stream_event(
-                {
-                    "type": "assistant_delta",
-                    "payload": {"content": local_file_count_response},
-                }
+                {"type": "assistant_delta", "payload": {"content": local_file_count_response}}
             )
             yield self._normalize_stream_event(
                 {"type": "assistant_final", "payload": {"content": ""}}
@@ -150,8 +110,8 @@ class TurnFallbackMixin:
                         "stream_chars": float(ret_streamed_chars),
                     },
                 )
-        except Exception as e:
-            logger.debug(f"Telemetry logging error (silenced): {e}")
+        except Exception:
+            pass
 
         if ret_streamed_any:
             if _root_ctx:
@@ -221,8 +181,8 @@ class TurnFallbackMixin:
                         "stream_chars": float(exp_streamed_chars),
                     },
                 )
-        except Exception as e:
-            logger.debug(f"Telemetry logging error (silenced): {e}")
+        except Exception:
+            pass
 
         if exp_streamed_any:
             if _root_ctx:
@@ -283,8 +243,8 @@ class TurnFallbackMixin:
                         "stream_chars": float(streamed_chars),
                     },
                 )
-        except Exception as e:
-            logger.debug(f"Telemetry logging error (silenced): {e}")
+        except Exception:
+            pass
 
         if streamed_any:
             if _root_ctx:
@@ -343,8 +303,8 @@ class TurnFallbackMixin:
                             "stream_chars": float(gc_streamed_chars),
                         },
                     )
-            except Exception as e:
-                logger.debug(f"Telemetry logging error (silenced): {e}")
+            except Exception:
+                pass
 
             if gc_streamed_any:
                 if _root_ctx:

@@ -58,7 +58,6 @@ class MissionStateManager:
         event_type: MissionEventType,
         payload: dict[str, JsonValue],
         created_at: datetime,
-        event_id: int | None = None,
     ) -> dict[str, object]:
         """يبني رسالة حدث قابلة للتسلسل وتوافق عقود البث الحالية."""
 
@@ -68,8 +67,6 @@ class MissionStateManager:
             "payload_json": payload,
             "created_at": created_at.isoformat(),
         }
-        if event_id is not None:
-            message["event_id"] = str(event_id)
         json.dumps(message)
         return message
 
@@ -114,7 +111,6 @@ class MissionStateManager:
             return {}
         clean_payload = dict(payload)
         clean_payload.pop("__relay", None)
-        clean_payload.pop("__event_id", None)
         return clean_payload
 
     def _processing_reference_time(self, outbox: MissionOutbox) -> datetime:
@@ -155,7 +151,7 @@ class MissionStateManager:
         reference_time = self._processing_reference_time(outbox)
         return reference_time <= (now - timedelta(seconds=timeout))
 
-    async def relay_outbox_events(  # noqa: PLR0915, PLR0912 (god-function paydown deferred; D-105)
+    async def relay_outbox_events(  # noqa: PLR0915 (god-function paydown deferred; D-105)
         self,
         *,
         batch_size: int = 50,
@@ -228,13 +224,6 @@ class MissionStateManager:
 
             next_attempt = current_attempt + 1
             payload = self._business_payload(outbox)
-
-            # Extract persisted event_id from outbox internal metadata if available
-            raw_payload = outbox["payload_json"] if isinstance(outbox, dict) else outbox.payload_json
-            event_id = None
-            if isinstance(raw_payload, dict):
-                event_id = raw_payload.get("__event_id")
-
             message = {
                 "mission_id": outbox["mission_id"]
                 if isinstance(outbox, dict)
@@ -247,8 +236,6 @@ class MissionStateManager:
                     outbox["created_at"] if isinstance(outbox, dict) else outbox.created_at
                 ).isoformat(),
             }
-            if event_id is not None:
-                message["event_id"] = str(event_id)
 
             error_kind = "publish_error"
             try:
@@ -643,48 +630,21 @@ class MissionStateManager:
 
             now = utc_now()
             payload_text = json.dumps(payload)
-
-            # 1. Log Event (Source of Truth)
-            # In psycopg autocommit mode, each statement commits immediately.
-            # We get the event_id using RETURNING id
-            event_res = await self.session.execute(
+            # 1. Log Event + 2. Outbox في عملية واحدة (commit فوري مع autocommit=True)
+            await self.session.execute(
                 _text(
                     "INSERT INTO mission_events (mission_id, event_type, payload_json, created_at, updated_at) "
-                    f"VALUES ({_pgsafe_lit(mission_id)}, {_pgsafe_lit(event_type.value)}, {_pgsafe_lit(payload_text)}, {_pgsafe_lit(now)}, {_pgsafe_lit(now)}) RETURNING id"
+                    f"VALUES ({_pgsafe_lit(mission_id)}, {_pgsafe_lit(event_type.value)}, {_pgsafe_lit(payload_text)}, {_pgsafe_lit(now)}, {_pgsafe_lit(now)})"
                 ),
                 [],
             )
-            event_id = event_res.fetchone()[0]
-
-            # 2. Add to Outbox (Transactional Guarantee)
-            # We must persist the __event_id in the outbox payload_json so that relays preserve it.
-            outbox_payload = dict(payload)
-            outbox_payload["__event_id"] = str(event_id)
-            outbox_payload_text = json.dumps(outbox_payload)
-
-            outbox_res = await self.session.execute(
+            await self.session.execute(
                 _text(
                     "INSERT INTO mission_outbox (mission_id, event_type, payload_json, status, created_at) "
-                    f"VALUES ({_pgsafe_lit(mission_id)}, {_pgsafe_lit(event_type.value)}, {_pgsafe_lit(outbox_payload_text)}, 'pending', {_pgsafe_lit(now)}) RETURNING id"
+                    f"VALUES ({_pgsafe_lit(mission_id)}, {_pgsafe_lit(event_type.value)}, {_pgsafe_lit(payload_text)}, 'pending', {_pgsafe_lit(now)})"
                 ),
                 [],
             )
-            outbox_id = outbox_res.fetchone()[0]
-
-            # 4. Broadcast immediately (Best effort)
-            message = self._build_event_bus_message(
-                mission_id=mission_id,
-                event_type=event_type,
-                payload=payload,
-                created_at=now,
-                event_id=event_id,
-            )
-            try:
-                await self.event_bus.publish(f"mission:{mission_id}", message)
-                await self._set_outbox_status({"id": outbox_id}, status="published", published_at=utc_now())
-            except Exception as e:
-                await self._set_outbox_status({"id": outbox_id}, status="failed")
-                logger.warning(f"Failed to publish event to Redis: {e}. Outbox record ID: {outbox_id}")
             return
 
         # 1. Log Event (Source of Truth)
@@ -696,19 +656,13 @@ class MissionStateManager:
         )
         self.session.add(event)
 
-        # We need the event.id before creating the outbox so we can embed it
-        await self.session.flush()
-
-        outbox_payload = dict(payload)
-        outbox_payload["__event_id"] = str(event.id)
-
         # 2. Add to Outbox (Transactional Guarantee)
         # The prompt mandates Transactional Outbox to solve dual-write.
         # This ensures that even if Redis fails, the intention to publish is recorded.
         outbox = MissionOutbox(
             mission_id=mission_id,
             event_type=str(event_type.value),
-            payload_json=outbox_payload,
+            payload_json=payload,
             status="pending",
             created_at=utc_now(),
         )
@@ -726,7 +680,6 @@ class MissionStateManager:
             event_type=event_type,
             payload=payload,
             created_at=event.created_at,
-            event_id=event.id,
         )
         try:
             await self.event_bus.publish(f"mission:{mission_id}", message)
@@ -1065,7 +1018,7 @@ class MissionStateManager:
             while True:
                 event = await queue.get()
 
-                # Handle dict events from Redis Bridge (which lack .id attribute natively)
+                # Handle dict events from Redis Bridge (which lack .id attribute)
                 if isinstance(event, dict):
                     try:
                         # Attempt to reconstruct MissionEvent from dict
@@ -1073,12 +1026,8 @@ class MissionStateManager:
                         evt_type = event.get("event_type")
                         payload = event.get("payload_json") or event.get("data") or {}
 
-                        raw_event_id = event.get("event_id")
-                        parsed_event_id = int(raw_event_id) if raw_event_id else None
-
                         # Create transient MissionEvent (not attached to session)
                         event = MissionEvent(
-                            id=parsed_event_id,
                             mission_id=mission_id,
                             event_type=evt_type,
                             payload_json=payload,

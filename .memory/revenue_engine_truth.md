@@ -89,19 +89,3 @@ D-210 — **طبقة القيمة**: ما الذي يُقنع وليّاً جز�
 2. **إضافة/حذف طبقةٍ أو وحدةٍ أو خطّ إيراد** ⇒ قرارٌ مكتوب + تحديث العدّادات في
    `scripts/fitness/check_revenue_doctrine.py`. ⛔ لا حذف صامت.
 3. **الفجوة تُكتب دائماً** — «لا فجوة معروفة» جوابٌ مشروع، والفراغ ليس كذلك.
-
----
-
-### 3.0 — سلّم الترقية لأوّل دولار: من `SEAM` إلى `PAID_PROOF` (`D-211` → `GATE_1`)
-
-> ⛔ **قاعدة L10 (`D-227`):** كل رقم مالي أو سوقي يُوسَم صراحةً بـ `PRICING HYPOTHESIS`. الرقم بلا وسم يُقرَأ دليلاً — وهذا ما يحرّمه الدستور (`L10` · `.memory/naas_verification_constitution.md` §4.2).
-
-| المرحلة | الوحدة / البوّابة | ما يجب إثباته | الملف المرجعي | الحالة |
-|---|---|---|---|---|
-| A | `billing_service` (`D-211`) | عقد `Chargily V2` + `Entitlement`/`Deposit`/`Ledger` + بوّابة `check_entitlement_single_source` | `docs/REVENUE_ENGINE_SPEC.md` (`§D-211`) | `SEAM` → `ACTIVE` |
-| B | `GATE_0` | ١٥ مقابلة مشتري مؤهل (٥ تُوثِّق تكلفة/خطراً + مالك ميزانية) | `.memory/issues.md` (`ISS-xxx`) | `ABSENT` → `CLEARED` |
-| C | `GATE_1` (العقبة الحاسمة) | ٣ عملاء غير مرتبطين يدفعون (`positive amount`) + فشل شديد مُؤكَّد من العميل (`independent adjudication`) | `.memory/revenue_engine_truth.md` + `GATE_LEDGER.json` | `ABSENT` → `CLEARED` |
-| D | `GATE_2` | `≥70%` إعادة استخدام + تجديد واحد (`renewal`) + هامش ربح مقيس (`net_benefit > 0`) | `.memory/decisions.md` (`D-xxx`) | `ABSENT` → `CLEARED` |
-| E | `GATE_3` | ١٠ عملاء متكرِّرون (`no concentration`: لا عميل `>30%`) + احتفاظ (`retention`) + توسُّع (`expansion`) | `.memory/revenue_engine_truth.md` (`§2.c`) | `ABSENT` → `CLEARED` |
-
-> ⚠️ `GATE_1` ليست خطوة تُكتَب — هي **حدث تجاري** (`commercial event`) يجب تسجيله بعقد (`contract`) + دفعة (`payment`) عبر مزوِّد قابل للمطابقة (`provider_ref`) + مبلغ موجب (`positive amount`) بالعملة الصعبة (`foreign currency`) + تاريخ (`paid_at`) قبل أي إعلان عام (`public announcement`).

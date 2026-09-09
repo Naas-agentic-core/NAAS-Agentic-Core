@@ -9,9 +9,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### ⭐ API-First Architecture - Complete Transformation
 
-#### Removed
-- 🗑️ **`app/core/static_handler.py`**: Removed completely after deprecation. All usages should now use `app.middleware.static_files_middleware.setup_static_files_middleware(app, config)`.
-
 #### Added
 - ✨ **API-First Architecture 100%**: System now fully designed as API-First
   - Created `app/middleware/static_files_middleware.py` - Separate static files serving
@@ -34,6 +31,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Added API-First badge
   - Clarified principle and benefits
   - Link to comprehensive guide
+
+#### Deprecated
+- ⚠️ **static_handler.py**: Marked `app/core/static_handler.py` as Deprecated
+  - Added note to use `static_files_middleware` instead
+  - Will be removed in next major version
+  - Clear migration guide provided
 
 ### Impact
 - ✅ **Zero Breaking Changes**: All API endpoints work as before

@@ -69,11 +69,34 @@ class RedisEventBridge:
                 data = message["data"]
                 try:
                     payload = json.loads(data)
-                    # Payload format from Microservice:
-                    # {"event_id": "123", "event_type": ..., "payload_json": ...}
-                    # We forward the raw dictionary directly to the internal EventBus.
-                    # Consumers (e.g. `monitor_mission_events` or websocket routers)
-                    # use `event_id` to deduplicate messages against what they fetched from the DB.
+                    # Payload format from Microservice: {"event_type": ..., "data": ...}
+
+                    # We need to construct a domain event object or pass raw dict?
+                    # The internal bus expects `EventPayload` which is `object`.
+                    # But the websocket handler expects `MissionEvent` OR similar structure.
+
+                    # The `EventBus` puts items into a queue.
+                    # The `stream_mission_ws` reads from queue: `event = await queue.get()`.
+                    # Then it does: `if event.id <= last_event_id: continue` (This assumes `event` has ID).
+
+                    # Wait, the internal `EventBus` was carrying `MissionEvent` objects (SQLModel).
+                    # Now we are receiving JSON dicts.
+                    # This is a BREAKING CHANGE for the consumer.
+
+                    # I must adapt the message to match what `stream_mission_ws` expects.
+                    # Or update `stream_mission_ws` to handle dicts.
+
+                    # Adapting is better for "BFF" logic.
+                    # But `MissionEvent` has an ID from DB. Redis events might NOT have ID if they are transient?
+                    # The Microservice saves event to DB then publishes. So it has ID?
+                    # The payload I implemented in Microservice: `{"event_type": ..., "data": ...}`.
+                    # It does NOT include the Event ID.
+
+                    # FIX: Update Microservice to include Event ID in payload?
+                    # Yes, `_log_event` in Microservice saves to DB. I should include `event.id` in the payload.
+
+                    # Assume for now I will fix Microservice later or handle it here.
+                    # Let's forward the Dict and update the Router to handle Dict.
 
                     await self._internal_bus.publish(channel, payload)
 

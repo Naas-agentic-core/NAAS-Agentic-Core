@@ -28,9 +28,6 @@ class ProbabilityUIMixin:
     # fallback النهائي ملموس ("الحدث الأول") — لا حرف A أبداً.
     # ─────────────────────────────────────────────────────────────────────────
 
-    _DECIMAL_PATTERN = re.compile(r"\b0?\.\d+\b")
-    _PERCENT_PATTERN = re.compile(r"\b(\d{1,3})\s*%")
-
     # كيانات ملموسة شائعة في مسائل بكالوريا الاحتمالات (لون + اسم، نتائج ثنائية).
     _CONCRETE_EVENT_PATTERNS: tuple[tuple[tuple[str, ...], str, str], ...] = (
         (("كرة حمراء", "كرات حمراء", "أحمر", "حمراء"), "كرة حمراء", "كرة غير حمراء"),
@@ -102,21 +99,9 @@ class ProbabilityUIMixin:
         )
 
         # استخراج القيم الاحتمالية: كسور عشرية (0.3) أو نسب مئوية (30%)
-        probs: list[float] = []
-        for m in cls._DECIMAL_PATTERN.finditer(normalized):
-            val = float(m.group(0))
-            if 0.0 < val < 1.0:
-                probs.append(val)
-                if len(probs) == 2:
-                    break
-
-        if len(probs) < 2:
-            for m in cls._PERCENT_PATTERN.finditer(normalized):
-                val = float(m.group(1)) / 100.0
-                if 0.0 < val < 1.0:
-                    probs.append(val)
-                    if len(probs) == 2:
-                        break
+        decimals = [float(m) for m in re.findall(r"\b0?\.\d+\b", normalized)]
+        percents = [float(m) / 100.0 for m in re.findall(r"\b(\d{1,3})\s*%", normalized)]
+        probs = [p for p in (decimals + percents) if 0.0 < p < 1.0][:2]
 
         if not has_explicit and not (has_probability_word and probs):
             return None
@@ -197,9 +182,7 @@ class ProbabilityUIMixin:
             )
 
             skill = ProbabilityCalculatorSkill()
-            result = skill.analyze(
-                ProbabilityInput(question=question, history=history_messages)
-            )
+            result = skill.analyze(ProbabilityInput(question=question, history=history_messages))
             if not isinstance(result, ProbabilityModelOutput):
                 return None
             return {
@@ -257,9 +240,7 @@ class ProbabilityUIMixin:
         فوراً بعد بثّ المكوّن البصري و``companion_text`` — لا LLM، لا synthesizer.
         """
         try:
-            from app.services.capabilities.topic_authority import (
-                is_foreign_to_probability,
-            )
+            from app.services.capabilities.topic_authority import is_foreign_to_probability
             from app.services.skills.probability_skill import (
                 CombinationsModelOutput,
                 FullExerciseStoryOutput,
@@ -290,9 +271,7 @@ class ProbabilityUIMixin:
                 if isinstance(m, dict) and m.get("role") in ("user", "assistant")
             ]
             _combined_text = (
-                question
-                + " "
-                + " ".join(str(m.get("content", "")) for m in _dialogue_history)
+                question + " " + " ".join(str(m.get("content", "")) for m in _dialogue_history)
             )
 
             # D-122/D-123: حارس سياق الاحتمالات (مُعرَّف مبكراً — للتحصين والتركيز).
@@ -311,16 +290,7 @@ class ProbabilityUIMixin:
                         return False
                 return any(
                     marker in t
-                    for marker in (
-                        "كرات",
-                        "كرة",
-                        "كيس",
-                        "احتمال",
-                        "سحب",
-                        "نسحب",
-                        "p(a",
-                        "p(b",
-                    )
+                    for marker in ("كرات", "كرة", "كيس", "احتمال", "سحب", "نسحب", "p(a", "p(b")
                 )
 
             # ─────────────────────────────────────────────────────────────────
@@ -345,9 +315,7 @@ class ProbabilityUIMixin:
             # المخزَّن تفوز بالاستخراج، فيرى الطالب كيساً ليس كيسَه.
             if not _result_ok(result) and _is_probability_context(_combined_text):
                 with contextlib.suppress(Exception):
-                    from app.services.skills.exercise_context import (
-                        resolve_exercise_context,
-                    )
+                    from app.services.skills.exercise_context import resolve_exercise_context
 
                     _resolved = resolve_exercise_context(question, history_messages)
                     if _resolved is not None:
@@ -360,9 +328,7 @@ class ProbabilityUIMixin:
                                 history=None,
                             )
                         )
-                        result = (
-                            _ctx_result if _result_ok(_ctx_result) else _resolved.combo
-                        )
+                        result = _ctx_result if _result_ok(_ctx_result) else _resolved.combo
 
             # (3) آخر ملاذ — السلوك الأصلي (history). نادر بعد التحصين.
             if not _result_ok(result):
@@ -492,9 +458,7 @@ class ProbabilityUIMixin:
                     _content = str(_msg.get("content", ""))
                     if not _content:
                         continue
-                    _recovered = _detect_focus_step(_content) or _detect_part_reference(
-                        _content
-                    )
+                    _recovered = _detect_focus_step(_content) or _detect_part_reference(_content)
                     if _recovered:
                         return _recovered
                 return None
@@ -516,20 +480,12 @@ class ProbabilityUIMixin:
             _is_no_model = getattr(result, "success", True) is False and getattr(
                 result, "reason", ""
             ) in ("no_model_extracted", "no_probability_intent_in_question")
-            if (
-                (result is None or _is_no_model)
-                and _focus_step_id
-                and _dialogue_history
-            ):
+            if (result is None or _is_no_model) and _focus_step_id and _dialogue_history:
                 # ISS-131: الاستخراج من حوار الطالب/المساعد حصراً (لا نثر system).
-                _history_context = " ".join(
-                    str(m.get("content", "")) for m in _dialogue_history
-                )
+                _history_context = " ".join(str(m.get("content", "")) for m in _dialogue_history)
                 _contextual_question = f"{_history_context} {question}".strip()
                 result = skill.analyze(
-                    ProbabilityInput(
-                        question=_contextual_question, history=history_messages
-                    )
+                    ProbabilityInput(question=_contextual_question, history=history_messages)
                 )
 
             # ISS-110: نقبل أيضاً `no_probability_intent_in_question` — سؤال متابعة
@@ -542,15 +498,11 @@ class ProbabilityUIMixin:
                     # D-191 (ISS-140 د): إعادة تحليل خطوة التركيز تمرّ بالمُحلّ
                     # الواحد أيضاً. الحقن المباشر للنصّ الرسمي هنا كان يُعيد إدخال
                     # أرقام التمرين المخزَّن حتى بعد أن نجح مسار الطالب أعلاه.
-                    from app.services.skills.exercise_context import (
-                        resolve_exercise_context,
-                    )
+                    from app.services.skills.exercise_context import resolve_exercise_context
 
                     _resolved = resolve_exercise_context(question, history_messages)
                     if _resolved is not None:
-                        _contextual_question = (
-                            f"{_resolved.composition_text} {question}".strip()
-                        )
+                        _contextual_question = f"{_resolved.composition_text} {question}".strip()
                         result = skill.analyze(
                             ProbabilityInput(
                                 question=_contextual_question, history=history_messages
@@ -565,20 +517,14 @@ class ProbabilityUIMixin:
             _is_no_model = getattr(result, "success", True) is False and getattr(
                 result, "reason", ""
             ) in ("no_model_extracted", "no_probability_intent_in_question")
-            if (
-                (result is None or _is_no_model)
-                and _is_deep_pedagogy
-                and _dialogue_history
-            ):
+            if (result is None or _is_no_model) and _is_deep_pedagogy and _dialogue_history:
                 # ISS-131: الاستخراج من حوار الطالب/المساعد حصراً (لا نثر system).
                 _history_context = " ".join(
                     str(m.get("content", "")) for m in _dialogue_history
                 ).strip()
                 if _history_context:
                     result = skill.analyze(
-                        ProbabilityInput(
-                            question=_history_context, history=history_messages
-                        )
+                        ProbabilityInput(question=_history_context, history=history_messages)
                     )
 
             def _companion_text_for_focus(default_text: str) -> str:
@@ -592,9 +538,7 @@ class ProbabilityUIMixin:
                 if _focus_step_id == "random_variable":
                     return "سنركّز الآن على المتغير X وقانونه خطوة بخطوة داخل الواجهة."
                 if _focus_step_id == "sample_space":
-                    return (
-                        "سنبدأ من فضاء العينة C(n,k) ثم نبني باقي النتائج عليه بصرياً."
-                    )
+                    return "سنبدأ من فضاء العينة C(n,k) ثم نبني باقي النتائج عليه بصرياً."
                 if _focus_step_id == "sequential_zero_product":
                     return (
                         "سنركّز على السحب المتتالي بدون إرجاع: لماذا يتغيّر عدد "
@@ -790,9 +734,7 @@ class ProbabilityUIMixin:
                         "إليك الشرح البصري المفصل للتمرين خطوة بخطوة 🪄"
                     ),
                     "props": props,
-                    "fallback_text": (
-                        "شجرة الاحتمالات (تعذّر عرض الرسم التفاعلي — هذا نص بديل)."
-                    ),
+                    "fallback_text": ("شجرة الاحتمالات (تعذّر عرض الرسم التفاعلي — هذا نص بديل)."),
                     "aek_state": _aek_state,
                 }
             return None
@@ -899,9 +841,7 @@ class ProbabilityUIMixin:
         )
         ai_client = get_ai_client()
         raw = await asyncio.wait_for(
-            ai_client.send_message(
-                system_prompt, question.strip()[:1200], temperature=0.2
-            ),
+            ai_client.send_message(system_prompt, question.strip()[:1200], temperature=0.2),
             timeout=8.0,
         )
         if not raw or not isinstance(raw, str):

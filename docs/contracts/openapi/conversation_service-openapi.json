@@ -6,44 +6,6 @@
     "version": "2.0.0"
   },
   "paths": {
-    "/api/v1/conversations/import": {
-      "post": {
-        "summary": "Import Conversation",
-        "operationId": "import_conversation_api_v1_conversations_import_post",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ImportConversationRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ImportConversationResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/health": {
       "get": {
         "summary": "Health",
@@ -574,75 +536,6 @@
         ],
         "title": "HealthResponse",
         "description": "\u0627\u0633\u062a\u062c\u0627\u0628\u0629 \u0641\u062d\u0635 \u0627\u0644\u0635\u062d\u0629."
-      },
-      "ImportConversationRequest": {
-        "properties": {
-          "conversation_id": {
-            "type": "integer",
-            "title": "Conversation Id"
-          },
-          "user_id": {
-            "type": "integer",
-            "title": "User Id"
-          },
-          "idempotency_key": {
-            "type": "string",
-            "minLength": 3,
-            "title": "Idempotency Key"
-          },
-          "max_messages": {
-            "type": "integer",
-            "maximum": 200.0,
-            "minimum": 1.0,
-            "title": "Max Messages",
-            "default": 50
-          },
-          "conversation_metadata": {
-            "additionalProperties": true,
-            "type": "object",
-            "title": "Conversation Metadata"
-          },
-          "messages": {
-            "items": {
-              "additionalProperties": true,
-              "type": "object"
-            },
-            "type": "array",
-            "title": "Messages"
-          }
-        },
-        "type": "object",
-        "required": [
-          "conversation_id",
-          "user_id",
-          "idempotency_key",
-          "conversation_metadata",
-          "messages"
-        ],
-        "title": "ImportConversationRequest"
-      },
-      "ImportConversationResponse": {
-        "properties": {
-          "status": {
-            "type": "string",
-            "title": "Status"
-          },
-          "conversation_id": {
-            "type": "integer",
-            "title": "Conversation Id"
-          },
-          "messages_imported": {
-            "type": "integer",
-            "title": "Messages Imported"
-          }
-        },
-        "type": "object",
-        "required": [
-          "status",
-          "conversation_id",
-          "messages_imported"
-        ],
-        "title": "ImportConversationResponse"
       },
       "ValidationError": {
         "properties": {

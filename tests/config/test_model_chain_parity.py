@@ -25,12 +25,9 @@ def _load_gate():
 
 
 def test_canonical_chain_is_the_verified_primary_first():
-    # ISS-LLM-CHAIN (2026-09-08): PRIMARY must be a model with LIVE OpenRouter
-    # endpoints — gemma-4-26b is the verified-live model today; the dead
-    # gpt-oss/nemotron models stay in the chain as tail recovery slots.
-    assert MODEL_CHAIN[0] == "google/gemma-4-26b-a4b-it:free"
+    # D-167: PRIMARY must be the verified gpt-oss-20b; 120b stays as tail recovery slot.
+    assert MODEL_CHAIN[0] == "openai/gpt-oss-20b:free"
     assert "openai/gpt-oss-120b:free" in MODEL_CHAIN[1:]
-    assert "openai/gpt-oss-20b:free" in MODEL_CHAIN[1:]
     # No reasoning-only / dead models proven catastrophic live (D-067/ISS-107).
     joined = " ".join(MODEL_CHAIN)
     assert "reasoning:free" not in joined

@@ -36,9 +36,6 @@ Repository `NAAS-Agentic-Core` · engine **CogniForge** · product **ETAALIM.AI*
 > Chat is a delivery surface. The core is: interactive object UI, cognitive modelling, error memory, adaptive generation, simulation.
 > — [`CLAUDE.md`](CLAUDE.md) §0, the operational constitution every contributor and every agent inherits.
 
-> [!NOTE]
-> **This repository also contains an independent B2B verification track.** [`NAAS Verification Layer`](docs/architecture/NAAS_VERIFICATION_LAYER.md) evaluates supplied agent trajectories across five dimensions and emits evidence-bound verdicts. Its proposed product evolution is [`NAAS Agent Action Assurance → Agent Trust & Control Plane`](docs/architecture/AGENT_TRUST_CONTROL_PLANE.md). Runtime interception, identity, authorization, human approval, blocking, and recovery are explicitly **roadmap capabilities, not current implementation claims**. The two products do not borrow evidence from each other.
-
 ---
 
 ## Table of contents
@@ -321,7 +318,6 @@ make microservices-health
 │   └── api/routers/        HTTP + WebSocket entrypoints (chat is WS-only)
 ├── shared/                 dependency-free engines: curriculum · scheduling · notation
 │                           illusion · analytics · messaging · retrieval · ai_models
-├── naas_verifier/          independent trajectory verification and evidence core
 ├── microservices/          service islands — each with its own contract and Dockerfile
 ├── frontend/               Next.js app · design tokens · theme contracts
 ├── scripts/fitness/        the enforcers — one gate per law
@@ -340,8 +336,6 @@ make microservices-health
 ## 12 · Roadmap
 
 The single live source is [`.memory/roadmap.md`](.memory/roadmap.md) — phases `M0 → M11` for the pedagogical engine, plus parallel tracks for the product, value and revenue layers, the cognitive execution engine, and the cognitive digital twin. Every planned unit carries a status from the proof ladder, a file-level evidence path, a written gap, and an explicit promotion condition.
-
-The independent verification track follows a separate evidence-gated path: supplied-trajectory verification today, then an authorized third-party adapter, paid and repeatable Agent Action Assurance, non-blocking shadow runtime, and only then bounded inline control. The target architecture, safety requirements, competitive boundaries, and stop conditions are documented in [`docs/architecture/AGENT_TRUST_CONTROL_PLANE.md`](docs/architecture/AGENT_TRUST_CONTROL_PLANE.md); implementation truth remains solely in [`.memory/naas_verification_truth.md`](.memory/naas_verification_truth.md).
 
 Ambition is classified, never concealed: `PLANNED`, `SEAM` and `ABSENT` are tracked declarations. Unclassified ambition is the kind that gets forgotten.
 

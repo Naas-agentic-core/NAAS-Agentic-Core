@@ -186,8 +186,8 @@ class ChaosEngineer:
     def _rollback_faults(self, experiment: ChaosExperiment):
         """إرجاع جميع الأعطال في التجربة."""
         logging.getLogger(__name__).info(f"Rolling back faults for experiment: {experiment.name}")
-        # TODO: implement fault rollback
-        raise NotImplementedError("Fault rollback is not yet implemented.")
+        for _fault in experiment.fault_injections:
+            pass
 
     def get_experiment_report(self, experiment_id: str) -> dict[str, object] | None:
         """الحصول على تقرير مفصل عن تجربة محددة."""

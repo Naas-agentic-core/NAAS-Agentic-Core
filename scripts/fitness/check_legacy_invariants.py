@@ -113,10 +113,7 @@ REQUIRED: dict[str, list[str]] = {
         "ISS-052",  # iss-052-bac-display-streaming.yml
     ],
     "app/core/ai_config.py": [
-        # ISS-LLM-CHAIN (2026-09-08): PRIMARY صار google/gemma-4-26b-a4b-it:free
-        # (gpt-oss-20b:free صار بلا endpoints على OpenRouter — 404). البوابة تبقى
-        # تُثبِّت سطر PRIMARY حرفيّاً؛ الذي تغيَّر هو النموذج المُتحقَّق حيّاً.
-        'PRIMARY = _resolve_primary_model("google/gemma-4-26b-a4b-it:free")',  # iss-079-catastrophic-trio-gate.yml
+        'PRIMARY = _resolve_primary_model("openai/gpt-oss-20b:free")',  # iss-079-catastrophic-trio-gate.yml
     ],
     "app/services/capabilities/exercise_retrieval.py": [
         '"أريد شرح"',  # iss-075-greeting-explanation-gate.yml
@@ -259,9 +256,7 @@ REQUIRED: dict[str, list[str]] = {
         "/compose",  # microservices-step10-postgres-checkpointer.yml
     ],
     "microservices/orchestrator_service/src/core/ai_config.py": [
-        # ISS-LLM-CHAIN (2026-09-08): انتقل PRIMARY إلى GEMMA_4_26B_A4B_IT_FREE
-        # (النموذج الحيّ الوحيد في السلسلة) — نفس قيد البوابة، قيمةٌ جديدة.
-        "PRIMARY = _resolve_primary_model(AvailableModels.GEMMA_4_26B_A4B_IT_FREE)",  # iss-079-catastrophic-trio-gate.yml
+        "PRIMARY = _resolve_primary_model(AvailableModels.GPT_OSS_20B_FREE)",  # iss-079-catastrophic-trio-gate.yml
     ],
     "microservices/orchestrator_service/src/core/config.py": [
         '"8002"',  # microservices-step9-skills-pipeline.yml

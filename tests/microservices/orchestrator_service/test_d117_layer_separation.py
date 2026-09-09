@@ -144,5 +144,5 @@ class TestProbabilityConfusionReEmitsVisual:
         # D-164: هذا المنطق يعيش داخل `_build_calculated_ui` في ProbabilityUIMixin الآن.
         # ISS-131 (D-169 — قاعدة D-102): الاستخراج صار من حوار الطالب/المساعد حصراً
         # (`_dialogue_history` — رسائل system لا تدخل الكاشف).
-        assert "_is_deep_pedagogy\n                and _dialogue_history" in TUTOR_SRC
-        assert "ProbabilityInput(\n                            question=_history_context" in TUTOR_SRC
+        assert "_is_deep_pedagogy and _dialogue_history" in TUTOR_SRC
+        assert "ProbabilityInput(question=_history_context" in TUTOR_SRC

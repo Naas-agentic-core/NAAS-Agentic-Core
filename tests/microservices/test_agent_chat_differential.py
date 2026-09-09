@@ -214,7 +214,7 @@ def test_customer_string_chunks_stream_persist_and_finalise(
 ) -> None:
     """أبسط مسار حيّ: قطع الوكيل الحقيقية ⇒ deltas + حفظ + إطار نهائي واحد."""
     _authenticate(monkeypatch, user_id=7, role="customer")
-    _patch_caller(monkeypatch, "get_ai_client", object)
+    _patch_caller(monkeypatch, "get_ai_client", lambda: object())
     _patch_caller(
         monkeypatch,
         "OrchestratorAgent",
@@ -242,7 +242,7 @@ def test_no_frame_is_encoded_twice_and_no_envelope_is_persisted(
     `_serialize_stream_frame`. والمُراكِم كان يجمع المظروف فيتسمّم الصفّ المحفوظ.
     """
     _authenticate(monkeypatch, user_id=7, role="customer")
-    _patch_caller(monkeypatch, "get_ai_client", object)
+    _patch_caller(monkeypatch, "get_ai_client", lambda: object())
     _patch_caller(
         monkeypatch,
         "OrchestratorAgent",
@@ -274,7 +274,7 @@ def test_customer_dict_delta_and_final_chunks(
 ) -> None:
     """شكلا الـdict: `assistant_delta` يُبَثّ، و`assistant_final` يُلتقط ولا يُبَثّ خاماً."""
     _authenticate(monkeypatch, user_id=7, role="customer")
-    _patch_caller(monkeypatch, "get_ai_client", object)
+    _patch_caller(monkeypatch, "get_ai_client", lambda: object())
     _patch_caller(
         monkeypatch,
         "OrchestratorAgent",
@@ -297,7 +297,7 @@ def test_customer_empty_response_persists_nothing_and_emits_no_terminal_frame(
 ) -> None:
     """المسار الفارغ: لا حفظ ولا إطار نهائي — سلوكٌ قائم يُجمَّد كما هو."""
     _authenticate(monkeypatch, user_id=7, role="customer")
-    _patch_caller(monkeypatch, "get_ai_client", object)
+    _patch_caller(monkeypatch, "get_ai_client", lambda: object())
     _patch_caller(monkeypatch, "OrchestratorAgent", _FakeAgent([]))
 
     frames = _drive(CUSTOMER_BODY)
@@ -311,7 +311,7 @@ def test_customer_persistence_failure_still_ends_with_one_terminal_frame(
 ) -> None:
     """فشل الحفظ لا يُسكِت الدور: خطأ ثمّ إطار نهائي (§6.5 — لا فشل صامت)."""
     _authenticate(monkeypatch, user_id=7, role="customer")
-    _patch_caller(monkeypatch, "get_ai_client", object)
+    _patch_caller(monkeypatch, "get_ai_client", lambda: object())
     _patch_caller(monkeypatch, "OrchestratorAgent", _FakeAgent(["نص"]))
 
     async def boom(**_kwargs: object) -> None:
@@ -330,7 +330,7 @@ def test_customer_agent_failure_emits_a_single_safe_error(
 ) -> None:
     """انفجار الوكيل ⇒ إطار خطأ واحد آمن، بلا تسريب تشخيصي."""
     _authenticate(monkeypatch, user_id=7, role="customer")
-    _patch_caller(monkeypatch, "get_ai_client", object)
+    _patch_caller(monkeypatch, "get_ai_client", lambda: object())
     _patch_caller(monkeypatch, "OrchestratorAgent", _FakeAgent(raises=True))
 
     frames = _drive(CUSTOMER_BODY)
@@ -344,7 +344,7 @@ def test_compatibility_facade_delegates_the_user_message_to_the_monolith(
 ) -> None:
     """مصافحة §6.5: الواجهة التوافقية ⇒ `skip_user_message=True` — كاتبٌ واحد."""
     _authenticate(monkeypatch, user_id=7, role="customer")
-    _patch_caller(monkeypatch, "get_ai_client", object)
+    _patch_caller(monkeypatch, "get_ai_client", lambda: object())
     _patch_caller(monkeypatch, "OrchestratorAgent", _FakeAgent(["نص"]))
 
     _drive({**CUSTOMER_BODY, "context": {"compatibility_facade": True}})
@@ -357,7 +357,7 @@ def test_without_the_facade_the_orchestrator_writes_the_user_message(
 ) -> None:
     """الطرف المقابل للمصافحة — وإلّا مرّ العقد بنصفه."""
     _authenticate(monkeypatch, user_id=7, role="customer")
-    _patch_caller(monkeypatch, "get_ai_client", object)
+    _patch_caller(monkeypatch, "get_ai_client", lambda: object())
     _patch_caller(monkeypatch, "OrchestratorAgent", _FakeAgent(["نص"]))
 
     _drive(CUSTOMER_BODY)
@@ -370,7 +370,7 @@ def test_jwt_identity_overrides_a_forged_body_user_id(
 ) -> None:
     """أمنيّ: هوية الـJWT تتفوّق على `user_id` في الجسم — لا انتحال."""
     _authenticate(monkeypatch, user_id=7, role="customer")
-    _patch_caller(monkeypatch, "get_ai_client", object)
+    _patch_caller(monkeypatch, "get_ai_client", lambda: object())
     _patch_caller(monkeypatch, "OrchestratorAgent", _FakeAgent(["نص"]))
 
     _drive({**CUSTOMER_BODY, "user_id": 99999})
@@ -546,7 +546,7 @@ def test_a_non_admin_jwt_cannot_reach_the_admin_graph(
     _authenticate(monkeypatch, user_id=12, role="customer")
     fake_admin = _FakeAdminApp([_ADMIN_FINAL_EVENT])
     app.state.admin_app = fake_admin
-    _patch_caller(monkeypatch, "get_ai_client", object)
+    _patch_caller(monkeypatch, "get_ai_client", lambda: object())
     _patch_caller(monkeypatch, "OrchestratorAgent", _FakeAgent(["مسار الزبون"]))
 
     _drive(ADMIN_BODY)

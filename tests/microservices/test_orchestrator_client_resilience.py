@@ -41,9 +41,7 @@ def _event_types(events: list[dict]) -> list[str]:
     return [str(event.get("type")) for event in events]
 
 
-async def _collect_events(
-    client: OrchestratorClient, question: str, user_id: int
-) -> list[dict]:
+async def _collect_events(client: OrchestratorClient, question: str, user_id: int) -> list[dict]:
     """يستهلك chat_with_agent ويعيد الأحداث المُطبَّعة (dicts) فقط."""
     events: list[dict] = []
     async for item in client.chat_with_agent(question=question, user_id=user_id):
@@ -140,9 +138,7 @@ class _AlwaysFailClient:
         raise httpx.ConnectError("lookup orchestrator-service:8006 failed")
 
 
-def _wire_failing_http(
-    client: OrchestratorClient, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def _wire_failing_http(client: OrchestratorClient, monkeypatch: pytest.MonkeyPatch) -> None:
     async def fake_get_client():
         return _AlwaysFailClient()
 
@@ -150,7 +146,6 @@ def _wire_failing_http(
 
 
 @pytest.mark.asyncio
-@pytest.mark.skip(reason='Mismatched test from incomplete refactor')
 async def test_user_facing_error_is_sanitized(monkeypatch: pytest.MonkeyPatch) -> None:
     """يتأكد من عدم تسريب hostnames أو المنافذ أو سلسلة المحاولات لواجهة المستخدم."""
     monkeypatch.setenv("ORCHESTRATOR_SERVICE_URL", "http://orchestrator-service:8006")
@@ -178,10 +173,7 @@ async def test_user_facing_error_is_sanitized(monkeypatch: pytest.MonkeyPatch) -
 
 
 @pytest.mark.asyncio
-@pytest.mark.skip(reason='Mismatched test from incomplete refactor')
-async def test_local_fallback_still_works_for_file_count(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+async def test_local_fallback_still_works_for_file_count(monkeypatch: pytest.MonkeyPatch) -> None:
     """يحافظ على مسار التدهور المحلي الحالي عندما يكون السؤال من نمط عدّ الملفات."""
     monkeypatch.setenv("ORCHESTRATOR_SERVICE_URL", "http://orchestrator-service:8006")
     client = OrchestratorClient(base_url="http://orchestrator-service:8006")
@@ -199,7 +191,6 @@ async def test_local_fallback_still_works_for_file_count(
 
 
 @pytest.mark.asyncio
-@pytest.mark.skip(reason='Mismatched test from incomplete refactor')
 async def test_local_fallback_supports_generic_extension_file_count(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -222,7 +213,6 @@ async def test_local_fallback_supports_generic_extension_file_count(
 
 
 @pytest.mark.asyncio
-@pytest.mark.skip(reason='Mismatched test from incomplete refactor')
 async def test_local_retrieval_fallback_for_exercise_request(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -242,15 +232,11 @@ async def test_local_retrieval_fallback_for_exercise_request(
 
     events = await _collect_events(client, "أعطني تمرين الاحتمالات", user_id=1)
 
-    assert (
-        _delta_text(events)
-        == "تم العثور على تمرين الاحتمالات المطلوب من المسار المحلي."
-    )
+    assert _delta_text(events) == "تم العثور على تمرين الاحتمالات المطلوب من المسار المحلي."
     _assert_final_contract(events)
 
 
 @pytest.mark.asyncio
-@pytest.mark.skip(reason='Mismatched test from incomplete refactor')
 async def test_local_general_chat_fallback_when_specialized_fallbacks_miss(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -274,23 +260,16 @@ async def test_local_general_chat_fallback_when_specialized_fallbacks_miss(
 
     monkeypatch.setattr(client, "_build_local_file_count_response", no_file_count)
     monkeypatch.setattr(client, "_build_local_retrieval_response", no_retrieval)
-    monkeypatch.setattr(
-        client, "_stream_local_general_chat_response", local_general_chat_stream
-    )
+    monkeypatch.setattr(client, "_stream_local_general_chat_response", local_general_chat_stream)
 
     events = await _collect_events(client, "حدثني عن أهمية تنظيم الوقت", user_id=7)
 
-    assert (
-        _delta_text(events) == "مرحبًا! هذه إجابة محلية عامة لضمان استمرارية الدردشة."
-    )
+    assert _delta_text(events) == "مرحبًا! هذه إجابة محلية عامة لضمان استمرارية الدردشة."
     _assert_final_contract(events)
 
 
 @pytest.mark.asyncio
-@pytest.mark.skip(reason='Mismatched test from incomplete refactor')
-async def test_local_fallback_can_be_disabled_with_flag(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+async def test_local_fallback_can_be_disabled_with_flag(monkeypatch: pytest.MonkeyPatch) -> None:
     """يعطل fallback المحلي عند تفعيل العلم لضمان تحكم تشغيل آمن أثناء الـ canary."""
     monkeypatch.setenv("ORCHESTRATOR_SERVICE_URL", "http://orchestrator-service:8006")
     monkeypatch.setenv("ORCHESTRATOR_LOCAL_FALLBACK_ENABLED", "0")
@@ -311,7 +290,6 @@ async def test_local_fallback_can_be_disabled_with_flag(
 
 
 @pytest.mark.asyncio
-@pytest.mark.skip(reason='Mismatched test from incomplete refactor')
 async def test_local_fallback_supports_csv_and_json_file_count(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -336,7 +314,6 @@ async def test_local_fallback_supports_csv_and_json_file_count(
 
 
 @pytest.mark.asyncio
-@pytest.mark.skip(reason='Mismatched test from incomplete refactor')
 async def test_unsupported_extension_returns_sanitized_error_when_count_fails(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -382,9 +359,7 @@ async def test_normalize_stream_event_sanitizes_topology_tokens() -> None:
     assert "orchestrator-service" not in str(payload.get("details", "")).lower()
 
 
-def test_multi_target_candidates_disabled_by_default(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+def test_multi_target_candidates_disabled_by_default(monkeypatch: pytest.MonkeyPatch) -> None:
     """يفرض مرشح URL وحيد افتراضيًا لمنع split-brain إلا في وضع breakglass.
 
     D-025: الهدف الافتراضي هو StateGraph ⇒ ``/api/chat/messages``
@@ -421,7 +396,6 @@ def test_multi_target_candidates_enabled_only_in_breakglass(
 
 
 @pytest.mark.asyncio
-@pytest.mark.skip(reason='Mismatched test from incomplete refactor')
 async def test_file_intelligence_fallback_concurrency_smoke(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -443,13 +417,10 @@ async def test_file_intelligence_fallback_concurrency_smoke(
         return _delta_text(events)
 
     results = await asyncio.gather(*[run_once() for _ in range(8)])
-    assert all(
-        result == "عدد الملفات بامتداد .pdf في المشروع هو: 3 ملف." for result in results
-    )
+    assert all(result == "عدد الملفات بامتداد .pdf في المشروع هو: 3 ملف." for result in results)
 
 
 @pytest.mark.asyncio
-@pytest.mark.skip(reason='Mismatched test from incomplete refactor')
 async def test_exercise_retrieval_fallback_concurrency_smoke(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -476,59 +447,3 @@ async def test_exercise_retrieval_fallback_concurrency_smoke(
 
     results = await asyncio.gather(*[run_once() for _ in range(8)])
     assert all(result == "تم العثور على تمرين محلي." for result in results)
-
-@pytest.mark.asyncio
-@pytest.mark.skip(reason='Mismatched test from incomplete refactor')
-async def test_chat_turn_silenced_exception_logs_warning(monkeypatch, caplog):
-    """
-    Test that an exception during routing metrics recording in `chat_with_agent`
-    is logged as a WARNING without interrupting the chat turn.
-    """
-    from app.infrastructure.clients.orchestrator import chat_turn
-    from app.telemetry.unified_observability import UnifiedObservabilityService
-
-    # 1. Patch the metrics recorder to raise simulated exception
-    original_record_metric = UnifiedObservabilityService.record_metric
-
-    def mocked(self, name, *args, **kwargs):
-        if "routing." in name:
-            raise RuntimeError("simulated metric failure")
-        return original_record_metric(self, name, *args, **kwargs)
-
-    monkeypatch.setattr(UnifiedObservabilityService, "record_metric", mocked)
-
-    # 2. Patch the specific logger in chat_turn
-    class MockLogger:
-        def __init__(self):
-            self.warnings = []
-        def warning(self, msg, *args, **kwargs):
-            self.warnings.append((msg, kwargs))
-        def info(self, *args, **kwargs):
-            pass
-        def exception(self, *args, **kwargs):
-            pass
-        def error(self, *args, **kwargs):
-            pass
-
-    mock_logger = MockLogger()
-    monkeypatch.setattr(chat_turn, "logger", mock_logger)
-
-    # 3. Ensure we fallback so we don't need real microservices up.
-    monkeypatch.setenv("REQUIRE_ORCHESTRATOR", "0")
-
-    _client = OrchestratorClient(base_url="http://fake:8006")
-
-    # Bypass all preempts to force hitting HTTP logic (which triggers metrics)
-    async def _empty_stream(*_args, **_kwargs):
-        if False:
-            yield ""
-
-    _stages = [
-        "_stage_policy_gate", "_stage_greeting", "_stage_question_only",
-        "_stage_computational", "_stage_escalation_matrix", "_stage_definitional",
-        "_stage_conceptual", "_stage_socratic_interception", "_stage_indexed_retrieval",
-        "_stage_calculated_ui", "_stage_explanation_with_context"
-    ]
-    assert any(
-        "Fallback telemetry failed" in msg for msg in caplog.text.splitlines()
-    ), "Expected warning log not found"

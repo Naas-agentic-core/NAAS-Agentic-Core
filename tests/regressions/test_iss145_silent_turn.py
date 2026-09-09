@@ -65,7 +65,7 @@ def spy(monkeypatch: pytest.MonkeyPatch) -> type[_SpyService]:
     module = "app.api.routers.customer_chat_support.pedagogy"
     _SpyService.instances = []
     monkeypatch.setattr(f"{module}.CustomerChatBoundaryService", _SpyService)
-    monkeypatch.setattr(f"{module}.async_session_factory", _NullSession)
+    monkeypatch.setattr(f"{module}.async_session_factory", lambda: _NullSession())
     return _SpyService
 
 

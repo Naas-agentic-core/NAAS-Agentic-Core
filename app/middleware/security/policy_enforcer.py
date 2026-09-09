@@ -24,7 +24,6 @@ class PolicyEnforcer(BaseMiddleware):
 
     name = "PolicyEnforcer"
     order = 50
-    _EXEMPT_PATHS = frozenset({"/health", "/api/health", "/ping", "/", "/login"})
 
     def _setup(self):
         """Initialize policy engine"""
@@ -43,7 +42,7 @@ class PolicyEnforcer(BaseMiddleware):
             MiddlewareResult indicating if access is allowed
         """
         self.enforced_count += 1
-        if ctx.path in self._EXEMPT_PATHS:
+        if ctx.path in ["/health", "/api/health", "/ping", "/", "/login"]:
             return MiddlewareResult.success()
         policy = self._get_policy_for_path(ctx.path)
         if not policy:

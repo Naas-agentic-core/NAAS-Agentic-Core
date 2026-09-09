@@ -474,12 +474,12 @@ REQUIRED_SCHEMA: Final[dict[str, TableSchemaConfig]] = {
         "columns": ["id", "user_id", "plan", "source", "granted_at", "expires_at"],
         "auto_fix": {},
         "indexes": {
-            "expires_at": 'CREATE INDEX IF NOT EXISTS "ix_entitlements_expires_at" ON "entitlements"("expires_at")',
-            "ix_entitlements_user_id_expires_at_id": 'CREATE INDEX IF NOT EXISTS "ix_entitlements_user_id_expires_at_id" ON "entitlements"("user_id","expires_at","id")',
+            "user_id": 'CREATE INDEX IF NOT EXISTS "ix_entitlements_user_id" ON "entitlements"("user_id")',
+            "expires_at": 'CREATE INDEX IF NOT EXISTS "ix_entitlements_expires_at" ON "entitlements"("user_id","expires_at")',
         },
         "index_names": {
+            "user_id": "ix_entitlements_user_id",
             "expires_at": "ix_entitlements_expires_at",
-            "ix_entitlements_user_id_expires_at_id": "ix_entitlements_user_id_expires_at_id",
         },
         "create_table": (
             'CREATE TABLE IF NOT EXISTS "entitlements"('
@@ -652,9 +652,7 @@ REQUIRED_SCHEMA: Final[dict[str, TableSchemaConfig]] = {
         "indexes": {
             "linked_mission_id": 'CREATE INDEX IF NOT EXISTS "ix_admin_conversations_linked_mission_id" ON "admin_conversations"("linked_mission_id")'
         },
-        "index_names": {
-            "linked_mission_id": "ix_admin_conversations_linked_mission_id"
-        },
+        "index_names": {"linked_mission_id": "ix_admin_conversations_linked_mission_id"},
         "create_table": (
             'CREATE TABLE IF NOT EXISTS "admin_conversations"('
             '"id" SERIAL PRIMARY KEY,'
@@ -1074,10 +1072,7 @@ REQUIRED_SCHEMA: Final[dict[str, TableSchemaConfig]] = {
             "mission_id": 'CREATE INDEX IF NOT EXISTS "ix_tasks_mission_id" ON "tasks"("mission_id")',
             "plan_id": 'CREATE INDEX IF NOT EXISTS "ix_tasks_plan_id" ON "tasks"("plan_id")',
         },
-        "index_names": {
-            "mission_id": "ix_tasks_mission_id",
-            "plan_id": "ix_tasks_plan_id",
-        },
+        "index_names": {"mission_id": "ix_tasks_mission_id", "plan_id": "ix_tasks_plan_id"},
         "create_table": (
             'CREATE TABLE IF NOT EXISTS "tasks"('
             '"id" SERIAL PRIMARY KEY,'
@@ -1108,9 +1103,7 @@ REQUIRED_SCHEMA: Final[dict[str, TableSchemaConfig]] = {
     },
     "mission_events": {
         "columns": ["id", "mission_id", "event_type", "payload_json", "created_at"],
-        "auto_fix": {
-            "payload_json": 'ALTER TABLE "mission_events" ADD COLUMN "payload_json" TEXT'
-        },
+        "auto_fix": {"payload_json": 'ALTER TABLE "mission_events" ADD COLUMN "payload_json" TEXT'},
         "indexes": {
             "mission_id": 'CREATE INDEX IF NOT EXISTS "ix_mission_events_mission_id" ON "mission_events"("mission_id")'
         },

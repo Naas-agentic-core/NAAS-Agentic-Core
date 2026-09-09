@@ -162,19 +162,17 @@ class VoucherService:
 
     async def entitlement_status(self, user_id: int) -> EntitlementStatus:
         """أبعد حقٍّ حيّ للمستخدم، أو `active=False`."""
-        stmt = (
-            select(Entitlement)
-            .where(Entitlement.user_id == user_id)
-            .order_by(Entitlement.expires_at.desc(), Entitlement.id.desc())
-            .limit(1)
-        )
-        row = (await self.db.execute(stmt)).scalar_one_or_none()
+        rows = await self.db.execute(select(Entitlement).where(Entitlement.user_id == user_id))
         now = datetime.now(UTC)
-        if row is None or _as_utc(row.expires_at) <= now:
+        best: Entitlement | None = None
+        for row in rows.scalars().all():
+            if _as_utc(row.expires_at) <= now:
+                continue
+            if best is None or _as_utc(row.expires_at) > _as_utc(best.expires_at):
+                best = row
+        if best is None:
             return EntitlementStatus(active=False, plan=None, expires_at=None)
-        return EntitlementStatus(
-            active=True, plan=row.plan, expires_at=_as_utc(row.expires_at)
-        )
+        return EntitlementStatus(active=True, plan=best.plan, expires_at=_as_utc(best.expires_at))
 
 
 __all__ = [

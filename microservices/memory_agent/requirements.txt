@@ -21,14 +21,14 @@ bcrypt==3.2.0
 argon2-cffi==23.1.0
 argon2-cffi-bindings==25.1.0
 cryptography>=50.0.0
-Authlib==1.6.12
+Authlib==1.6.6
 httpx==0.27.0
-python-dotenv==1.2.2
-python-multipart==0.0.31
+python-dotenv==1.0.1
+python-multipart==0.0.22
 Jinja2==3.1.6
 typer==0.20.0
 tenacity==8.2.3
-langgraph==1.0.10rc1
+langgraph==0.2.39
 langchain-core>=0.2.39
 
 # Supporting Libraries
@@ -40,7 +40,7 @@ httptools>=0.6.0
 anyio>=4.0.0
 sniffio>=1.3.0
 certifi>=2023.0.0
-idna>=3.19
+idna>=3.0
 inflection==0.5.1
 MarkupSafe>=2.1.0
 shellingham==1.5.4
@@ -76,7 +76,7 @@ huggingface-hub>=0.23.0
 # imports anywhere under microservices/memory_agent/. It pulled torch (~2GB) into an
 # image that never used it. research_agent is the only real consumer.
 dspy-ai==2.5.43
-openai==1.59.3
+openai==1.55.0
 # llama-index meta-package removed to reduce bloat/conflicts
 llama-index-core==0.14.13
 llama-index-readers-file
@@ -89,11 +89,11 @@ argon2-cffi
 vecs==0.4.5
 flupy==1.2.3
 # ⛔ COUPLED TO `openai` IN THIS SAME FILE — never raise litellm alone.
-# litellm >= 1.8x requires openai>=2.20.0, but this service pins openai==1.59.3,
+# litellm >= 1.8x requires openai>=2.20.0, but this service pins openai==1.55.0,
 # so pip cannot resolve and the Docker image dies at `pip install` (proven in CI
 # on 66a3e50). Dependabot raised it twice: 4b0db53 → 1.84.0, 91509a0 → 1.96.0.
 # 1.50.0 is the version proven green on b1db497. Raising the pair means migrating
 # to the openai 2.x SDK across six services — an ADR, not a dependency bump.
-litellm==1.59.3
-dspy==3.0.4b1
+litellm==1.50.0
+dspy==2.5.7
 llama-index-workflows==2.14.0
