@@ -20,7 +20,7 @@
 fastapi==0.109.2
 uvicorn==0.52.3
 SQLAlchemy==2.0.52
-sqlmodel==0.0.39
+sqlmodel==0.0.42
 alembic==1.19.1
 asyncpg==0.31.0
 # ⛔ NOT 0.22.1 (#2293 proposed it): the test harness keeps one cached engine
@@ -34,7 +34,7 @@ asyncpg==0.31.0
 # Moving to 0.22.1 means giving the harness one engine per loop, which is a
 # change to shared test infrastructure (D-258), not a dependency bump.
 # Tracked for removal in #2303 (engine cached per loop).
-aiosqlite==0.17.0
+aiosqlite==0.22.1
 psycopg2-binary==2.9.12
 pydantic>=2.13.4,<3.0.0
 pydantic-settings>=2.15.0,<3.0.0
