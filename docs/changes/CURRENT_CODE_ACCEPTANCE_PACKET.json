@@ -1,116 +1,98 @@
 {
   "$schema_version": "1",
-  "packet_id": "CAP-2026-08-30-close-iss-199-deferred-findings-report-not-block",
+  "packet_id": "CAP-2026-09-09-d288-d289-live-model-chain-rotation-and-structural-guard",
   "status": "READY_FOR_GATE",
   "decision": "D-277",
-  "changed_paths": [
-    ".github/workflows/repo-sync.yml",
-    ".memory/README.md",
-    ".memory/issues.md",
-    "README.ar.md",
-    "README.md",
-    "docs/changes/CURRENT_CODE_ACCEPTANCE_PACKET.json",
-    "scripts/ci/repo_sync_parity.py",
-    "scripts/ci/test_repo_sync_parity.py"
-  ],
   "standards": [
     "system-design-primer",
     "clean-code-book"
   ],
   "evidence": [
-    "nist-ai-rmf-1.0",
-    "nist-agent-standards-initiative",
-    "nist-ssdf-1.1",
-    "owasp-agent-security",
-    "openssf-scorecard",
-    "slsa-1.2",
-    "dora-core",
     "mit-6824-distributed-systems",
-    "stanford-cs231n",
-    "stanford-cs224n",
-    "cmu-15619-cloud-computing",
-    "berkeley-cs162"
+    "dora-core",
+    "nist-ai-rmf-1.0"
   ],
   "local_application": [
     {
       "standard": "system-design-primer",
       "paths": [
-        ".github/workflows/live-e2e.yml",
-        ".github/workflows/ci.yml"
+        "shared/ai_models/model_chain.py",
+        "shared/ai_models/registry.py",
+        "microservices/orchestrator_service/src/services/llm/client.py",
+        "app/core/ai_config.py",
+        "microservices/orchestrator_service/src/core/ai_config.py",
+        "scripts/verify_model_registry_live.py"
       ],
-      "gate": "scripts/fitness/check_ci_workflow_hygiene.py",
-      "application_ar": "بوّابةٌ حاجبة يجب أن تحرس ضدّ **انحدار**، لا أن تمنع كلّ دفعة. الدفعة `3176fe6` وصلت `live-e2e` بـ`required-ci` ولم تلمس رأس `live-e2e.yml` القائل «ليس في required-ci» (`diff`ها يبدأ عند `@@ -25`)، فوُجِّهت الحراسة إلى ISS-150 وهو 🔴 مفتوحٌ بقرارٍ مكتوبٍ بتأجيله — والنتيجة خمسة تشغيلاتٍ حمراء متتالية على `main` في المستودعين، وامتناعُ الأخضر بالبناء. الرأس صار يصف النطاق الحقيقي وما يحجب وما يُبلِّغ، وبقيت الوظيفة داخل `required-ci` حاجبةً على **عقد التسليم** وحده."
+      "gate": "scripts/fitness/check_model_chain_parity.py",
+      "application_ar": "الثلاثةُ أصولٌ واحدة: السلسلة تعيش في `shared/ai_models/model_chain.py` والدماغان ينعكسان فيها حرفيّاً تحت بوّابة parity، فالتجاوزُ في مكانٍ واحد لا في ثلاثة — لأن تكرارَ مُعرِّف النموذج في ثلاثة مواضع هو ما أنتج ISS-157 ثم ISS-200. والفشلُ يُدارى بالتدوير على السلسلة (402/404/406/408/409/413/425/429/5xx) ويُعلَن فوراً على 401/403، لأنّ مفتاحاً ميتاً لا يُداوَى بنموذجٍ آخر؛ و`max_retries=0` لأنّ آلية إعادة المحاولة **هي** السلسلة، لا شيء يوازيها. والتدهورُ موصوفٌ لا ملفَّق: `provider_down` حالةُ تشغيلٍ في الـ state، ومُخرَجٌ بلا محتوى (`content_chunks==0`) فشلٌ لا إجابة. والقدرةُ لا تُطعِم طالباً: سجلُّ القدرات لا يُغني عن سؤال الكتالوج الحيّ، فمسبارٌ `--check-key` قبل الإقلاع في `live-e2e.yml`، fail-closed عند انقطاع الشبكة (خروج 2 «لا حكم»)."
     },
     {
       "standard": "clean-code-book",
       "paths": [
-        "scripts/e2e/deferred_findings.py",
-        "scripts/e2e/live_student_journey.py",
-        "scripts/e2e/universal_answerability_live.py",
-        "scripts/fitness/check_e2e_deferred_findings.py",
-        "tests/fitness/test_check_e2e_deferred_findings.py"
+        "microservices/orchestrator_service/src/services/llm/client.py",
+        "app/services/skills/content_integrity_skill.py",
+        "app/services/skills/doctrine/platform_layer.py",
+        "microservices/conversation_service/src/math_pipeline.py",
+        "microservices/conversation_service/src/conversation_graph.py"
       ],
-      "gate": "scripts/fitness/check_e2e_deferred_findings.py",
-      "application_ar": "موطنٌ واحد لما يُبلَّغ ولا يحجب، يقرؤه السكربتان ولا ينسخانه (D-186). والتغطية **كاملةٌ أو لا شيء**: مخالفةٌ تسمّي بلاغَين وأحدهما غير مؤجَّل تبقى حاجبة، فلا يُعفي بلاغٌ مؤجَّلٌ رفيقَه بالمصادفة. والتأجيل ليس إسكاتاً: المخالفة تُطبَع بنصّها وسببها في كل تشغيل، ويتغيّر رمز الخروج وحده. ⚠️ وطفرتان على المصدر كشفتا أنّ اختبارَين من اختباراتي كانا يمرّان لسببٍ خطأ (`!= 0` وحدها) — وهو صنف ISS-145، فصار كلّ برهانٍ سلبي يؤكّد **نصّ** الانتهاك."
+      "gate": "scripts/fitness/check_model_client_literals.py",
+      "application_ar": "أسماءُ النماذج المُكرَّرة حرفيّاً في عملاء المسار الطالبي صارت صفراً — البوّابة تقرأ الملفات بـAST وتُسمِّي كلَّ حرفيةٍ متبقّية، فـ«سطرٌ واحدٌ فقط» لم يعد حجّة. والقانونُ يُسمَّى حيث يُقرأ: حارسُ النزاهة يستثني البنيةَ اللاتينية (`_is_structural_token`) ويُوسِّع قائمةً بيضاء مُسمَّاة (`_TECH_ALLOWLIST`) بدل عتبةٍ غامضة أو رقمٍ سحري، والسياسةُ منشورةٌ بنداً في دستور الطبقة برقم إصدارٍ **يُشتَقّ** من الثابت نفسه (`CONTENT_INTEGRITY_DOCTRINE_VERSION` 1.0.0 → 1.1.0) فلا ينفصل البندُ عن رقمه. والتعليقاتُ صارت تُسمّي الدليلَ والتاريخ (D-288/ISS-200) لا النية، لأنّ التعليقَ الذي لا يمنع شيئاً هو ما سمح لـ ISS-079 بالوقوع."
     }
   ],
   "production": {
-    "owner": "platform-dependencies",
-    "status": "DEFERRED_FINDINGS_DECLARED_AND_GUARDED",
+    "owner": "orchestrator-llm-path",
+    "status": "STUDENT_REPLY_PATH_REPAIRED_AND_LIVE_GUARDED",
     "interfaces": [
-      "scripts/e2e/deferred_findings.py: الموطن الوحيد — `DEFERRED_FINDINGS` + `FROZEN_DEFERRED_COUNT` + `split_problems`",
-      ".github/workflows/live-e2e.yml: رأسٌ يصرّح بالنطاق الحقيقي وبما يحجب وما يُبلِّغ",
-      "scripts/fitness/check_e2e_deferred_findings.py: خمسة فحوصٍ تُحمِّر CI (مُغلَقٌ باقٍ · سببٌ مقتضب · رقمٌ مخالف · قائمةٌ ثانية · ملفٌّ لا يُحلَّل)",
-      "tests/fitness/test_check_e2e_deferred_findings.py: 15 اختباراً يشغّلها `pytest tests` في ci.yml"
+      "microservices/orchestrator_service/src/services/llm/client.py: `model_chain()` · `_should_rotate` · `last_model` · `health_snapshot()['chain']` · `AllModelsFailedError` · `PROVIDER_UNAVAILABLE_MESSAGE`",
+      "shared/ai_models/model_chain.py: السلسلة القانونية + `resolve_primary_model()` (تجاوزُ المشغِّل فوقها)",
+      "shared/ai_models/registry.py: قدراتٌ مُصرَّحةٌ بدليلٍ مؤرَّخ، وحظرٌ لا يُرفَع بتحرير سطر",
+      "scripts/verify_model_registry_live.py (`make model-check`، خطوةٌ في `live-e2e.yml` قبل الإقلاع)",
+      "app/services/skills/content_integrity_skill.py + doctrine/platform_layer.py: حمايةُ البنية وبندُ الدستور"
     ],
-    "failure_behavior_ar": "مخالفةُ **العقد** ما زالت تُفشِل الوظيفة كما كانت — أُثبت على ثلاث حالات (إطاران نهائيان · دورٌ صامت · مكوّنٌ لا تعرف الواجهة رسمه) كلّها رمز الخروج 1. والمؤجَّل بتصريحٍ وحده يُبلَّغ ولا يحجب، ومقصورٌ اليوم على بندٍ واحد. ⛔ ولا تخطٍّ صامت: «Refuse to run blind» على حاله، والوظيفة تفشل صراحةً عند غياب أيّ سرّ.",
-    "observability_ar": "سطر الحصيلة صار يفصل «مخالفات حاجبة» عن «مؤجَّلة بتصريح»، وكلّ مخالفةٍ مؤجَّلة تُطبَع بنصّها ومُعرَّف بلاغها وسبب تأجيلها — حتى في التشغيل الأخضر، لأنّ خُضرةً لا تقول ما رأته تُقرأ «لم يحدث شيء» (D-206 L11).",
-    "security_boundary_ar": "لا صلاحية جديدة ولا سرّ جديد ولا تبعية جديدة. السجلّ والبوّابة بمكتبة قياسية فقط، والبوّابة تقرأ ملفّاتٍ محلّية ولا تلمس شبكةً ولا سرّاً.",
-    "rollback_ar": "حذف `deferred_findings.py` وسطر البوّابة في `ci.yml` يعيد السلوك السابق حرفيّاً (كل مخالفةٍ حاجبة) — أي يعيد `main` أحمرَ حتى يُغلَق ISS-150. وإرجاع الرأس يعيد عقداً يصف نقيض تنفيذه.",
+    "failure_behavior_ar": "سقوطُ نموذجٍ واحد ⇒ دورانٌ إلى التالي مع سطرِ تحذيرٍ يسمّي السبب؛ سقوطُ السلسلة كلها ⇒ `AllModelsFailedError` ورسالةُ اعتذارٍ واحدة صريحة + `provider_down` في حالة الدور، ولا نصَّ لمزوّdٍ ولا لمُعرِّف نموذجٍ يدخل حمولةَ الطالب؛ 401/403 ⇒ فشلٌ فوريّ بلا دوران (لا استنزافَ سلسلةٍ بمفتاحٍ ميت)؛ بطءُ أوّل رمزٍ ⇒ مهلةُ أول محتوى تُسقِط ذلك النموذج وحده.",
+    "observability_ar": "لا logs في المسار الساخن سوى سطرين قِطعيّين في `ai-client`: `… failed (<err>) — rotating` و`AI stream served by model=<id> chunks=<n>` — أي أنّ «أيُّ نموذجٍ خدم فعلاً» صار سؤالاً له جوابٌ في السجلّ، وكان مستحيلاً حين يقرّرPRIMARY ملفُ إعداداتٍ لا مُشغِّل. يوازيه `/health` للـ orchestrator بحقلِ `chain`، ومخرَجُ المسبار لكلّ نموذجٍ حكمٌ (endpoints · provider · ctx) لا مجرّد لون.",
+    "security_boundary_ar": "لا سرَّ في المستودع: المفاتيح و`OPENROUTER_BASE_URL` من بيئة التشغيل (في Codespaces: Secrets)؛ و`OPENROUTER_BASE_URL` ضبطُ مُشغِّلٍ لا مُدخلٌ طالبيّ، فبوّابةُ اختبارٍ مزدوجة لا تُوجَّه من طلبِ مستخدم. ولا رسالةَ خطأِ مزوّد تُعاد للطالب (قد تحمل مُعرِّفاتٍ داخلية)، ولا مفتاحٌ يُطبع في سجلّ. وتضييقُ حارسِ النزاهة على البنية لم يُرخِّ حذفَ تسريبِ التفكير: الهذيانُ اللاتيني يبقى محذوفاً، ومُثبَتٌ ذلك باختبارٍ لا بوعْد.",
+    "rollback_ar": "revertٌ لهذين الـ commitين يعيد السلوك السابق حرفيّاً؛ لا هجرةَ قاعدة بيانات ولا تغييرَ عقدٍ خارجي. والتراجعُ الجزئيّ ممكنٌ بطبيعته: نقلُ الصدارة سطرٌ في `shared/ai_models/model_chain.py`، وإسكاتُ المسبار خطوةٌ محذوفةٌ من `live-e2e.yml`، وكسرُ الزجاج المُصرَّح `--allow-dead-primary` لا يمسّ الإنتاج.",
     "runtime_evidence_paths": [
-      "scripts/e2e/deferred_findings.py",
-      "scripts/fitness/check_e2e_deferred_findings.py",
-      ".github/workflows/live-e2e.yml",
-      ".memory/issues.md"
+      ".memory/issues.md",
+      ".memory/decisions.md",
+      "CHANGELOG.md",
+      ".runtime/truth_table.lock.json"
     ]
   },
   "commercial_trace": {
     "offer_ids": [
       "ai-red-teaming-multilingual",
-      "niche-rlhf-data",
-      "on-premise-energy-ai",
-      "physics-informed-ai",
-      "formal-verification-ai",
-      "eu-ai-act-compliance",
-      "high-rpm-ai-affiliation"
+      "high-rpm-ai-affiliation",
+      "eu-ai-act-compliance"
     ],
-    "customer_problem_ar": "بوّابةٌ حمراء دائماً لا تُقرأ حراسةً بل ضجيجاً، فيتعلّم الفريق تجاهلها — ويوم يقع انحدارٌ حقيقي لا يراه أحد. والمشتري المؤسّسي يسأل عن **ما تحجبه** بوّاباتك، لا عن عددها.",
-    "value_hypothesis_ar": "التمييز بين «ما نفرضه» و«ما أجّلناه بقرارٍ مكتوب» يجعل الخُضرة بياناً قابلاً للتصديق؛ وبوّابةٌ تمنع كلّ دفعة تُسقط قيمة كلّ بوّابةٍ أخرى معها (حدّ المصداقية — D-227).",
-    "foreign_currency_path_ar": "لا إيراد في هذه الدفعة ولا ادّعاء عقد؛ صدقُ منظومة الحراسة التي تقف عليها الخطوط المُصرَّحة في OFFER_CATALOG.",
-    "foundation_exception_ar": "بنية تمكينية مشتركة لا عرضٌ مدفوع مستقلّ؛ حالة العروض تبقى كما هي."
+    "customer_problem_ar": "منصّةٌ تعليميةٌ عربية تُجيب باللاتينية الممزَّقة أو باعتذارٍ واحدٍ لكلّ سؤال تفقدُ العقدَ لا مع المِزود بل مع الطالب: المُشترِي المؤسّسي (وزارة/جامعة/مدرسة) يقيس «هل يصل الجواب؟» و«هل تعرفُ متى ينهار؟»، وسؤالُ نزاهةِ المخرَج (multilingual red-teaming) لا يُجاب عنه بملفِّ ادّعاءاتٍ أخضر. والطبقة المجانية عند مزوّdٍ عامٍّ تتغيّر بلا إشعار — وهو عُطْبُ منتجٍ لا عُطْبُ اختبار.",
+    "value_hypothesis_ar": "«يجيب دائماً، أو يقول صراحةً أنه لم يُجب» قابلٌ للقياس عندنا الآن: سلسلةٌ تُدارى أخطاؤها بالتدوير، وحارسٌ يحمي البنيةَ ولا يمزّقها، ومسبارٌ يسأل الكتالوجَ الحيَّ قبل كلِّ رحلةٍ حيّة ويُسقِط الحفلَ برسالةٍ لا بصمت. هذا فرقُ بيعٍ مُباشِر أمام مُقدِّمِي LMS لا يُعلنون حالةَ التدهور، وهو ما يُبرِر بنودَ التدقيق في `eu-ai-act-compliance` بأثرٍ رجعيّ مُثبَتٍ لا بسرد.",
+    "foreign_currency_path_ar": "العملة الأجنبية هنا عقدُ تشغيلٍ مُدقَّق (availability + disclosure of degradation)، وطريقُها المُسلَك: بوّاباتٌ خضراءُ بمعنىً حقيقي — `live-e2e` على OpenRouter الحقيقي يثبِت أن السلسلة تُخدَم، والدليلُ المؤرَّخ في `shared/ai_models/registry.py` هو ما يُعرَض على المُدقِّق. ولا عملةَ ببيعِ نموذجٍ بديلٍ غير مصرَّحٍ به: السلسلةُ مُعلَنةٌ بحُكمِها لا بأسمائها التجارية.",
+    "foundation_exception_ar": "ليست استثناءً: هذا المسارُ منتجٌ طالبِيٌّ صِرْف (ردُّ الطالب الحيّ)، فالحزمَةُ تلتزم الحدَّ الأدنى بلا إعفاءٍ مؤسَّسي ولا ادّعاءِ «بُنيةٍ تحتيةٍ لاحقاً». والمُنجَز المُعلَن مُقاسٌ الآن: ثلاثُ ساقٍ تُعيد النصَّ نفسه، ودورانٌ مُثبَتٌ بصدارةٍ ميتةٍ متعمَّدة."
   },
   "deletions": {
     "count": 0,
     "paths": [],
-    "policy_ar": "الحذف غير مسموح في هذه الحزمة."
+    "policy_ar": "لم يُحذَف ملفٌّ ولا وظيفة: ما مات من النماذج أُنزِل عن الصدارة وبقي في الذيل يُدَار تعافياً آليّاً (D-167)، وما شُدِّدَ في حارسِ النزاهة زُيدَ استثناءً ولم يُقلَص قانوناً، والتعليقاتُ التي وصفتِ العطبَ صارت تصفُ الحكمَ مع دليله. الحذفُ في هذه الحزمة ممنوعٌ لا مُستبعَد."
   },
   "verification": {
     "result": "PASS",
     "commands": [
-      "# الجذر مقيسٌ لا مُستنتَج — الدفعة التي وصلت الوظيفة لم تلمس رأسها:",
-      "git show 3176fe6 -- .github/workflows/live-e2e.yml | grep -m1 '^@@'   # @@ -25,6 +25,28 @@",
-      "grep -n 'live-e2e-required,' .github/workflows/ci.yml   # 1281",
-      "# أحمر قبل · أخضر بعد على الشظيّة الحيّة نفسها ('or solution in'):",
-      "python3 scratchpad/repro.py <origin/main journey>   # قبل: 1 · بعد: 0 — والمخالفة تُطبَع في الحالتين",
-      "# ومخالفةُ العقد ما زالت تحجب (ثلاث حالات، كلّها رمز الخروج 1)",
-      "# الاختبارات (pytest غير مثبّت محليّاً؛ ci.yml يشغّلها بـ pytest tests):",
-      "python3 <driver> tests/fitness/test_check_e2e_deferred_findings.py   # 15 passed, 0 failed",
-      "# البوّابة والطفرات:",
-      "python3 scripts/fitness/check_e2e_deferred_findings.py   # ✅",
-      "python3.12 scripts/run_fitness_gates.py   # 73/76 (الثلاث الفاشلة بيئية: No module named pytest/pydantic)",
-      "ruff check . && ruff format --check ."
+      "# المسارُ الطالبي حيٌّ على ثلاث ساق (مزوّدٌ مزدوج يصرّف عقد OpenRouter: 404 بلا endpoint، SSE عربي، reasoning-only، بطءُ أول رمز)",
+      "python scripts/e2e_orchestrator_live.py 'اشرح قانون نيوتن الثاني بإيجاز مع مثال عددي'",
+      "#   [2] DIRECT   ok=True deltas=10 chars=245 ttft=0.53 terminal=assistant_final",
+      "#   [3] MONOLITH ok=True deltas=3  chars=245   [4] FRONTEND ok=True deltas=3 chars=245  → RESULT: direct=True monolith=True frontend=True",
+      "# الدورانُ مُثبَتٌ لا موصوف: صدارةٌ ميتةٌ متعمَّدة في البيئة",
+      "OPENROUTER_PRIMARY_MODEL=openai/gpt-oss-20b:free python -m uvicorn microservices.orchestrator_service.main:app --port 8006",
+      "#   '… failed (NotFoundError(404) \\'No endpoints found\\') — rotating' → 'AI stream served by model=google/gemma-4-26b-a4b-it:free chunks=9' → الطالب حصل على ردٍّ (249 حرفاً)",
+      "python scripts/verify_model_registry_live.py --check-key        # exit 0 · الميّتتان في الذيل 🕳 بلا إفشال",
+      "python -m pytest -q tests/config/test_model_chain_parity.py tests/config/test_model_registry_probe.py tests/microservices/orchestrator_service/test_llm_client_model_chain.py tests/shared/test_model_registry.py tests/services/test_content_integrity_skill.py tests/services/test_iss079_catastrophic_fixes.py   # 96 passed, 0 failed",
+      "ruff check . && ruff format --check .                            # 0.14.0 (إصدار CI) — نظيف",
+      "python scripts/fitness/check_model_registry.py && python scripts/fitness/check_model_chain_parity.py && python scripts/fitness/check_model_client_literals.py && python scripts/fitness/check_legacy_invariants.py && python scripts/fitness/check_memory_coherence.py && python scripts/fitness/check_constitution_reality.py && python scripts/fitness/check_core_kernel_env_profile.py",
+      "python scripts/runtime_truth.py --update                        # قفلُ الحقيقة مُجدَّدٌ مع D-289/ISS-201"
     ],
-    "measured_ar": "الجذر مقيس: `diff` الدفعة `3176fe6` على `live-e2e.yml` يبدأ عند `@@ -25` — أي أنّ الرأس (١→٢٤) القائل «**ليس** في `required-ci`» لم يُلمَس، بينما `ci.yml:1281` يضع `live-e2e-required` في `needs`. والأثر مقيسٌ حيّاً في الوظيفة `99203645768`: كل الأسرار حاضرة ومُقنَّعة، و«Refuse to run blind» نجحت، والرحلة عملت — والفشل الوحيد `❌ شظيّة لاتينية في ردٍّ عربي: 'or solution in' (ISS-150)` وهو بلاغٌ 🔴 مفتوحٌ بقرارٍ مكتوبٍ بتأجيله. ⚠️ والتشخيص الأوّل («الأسرار غائبة في المرآة») كان خاطئاً ويُسجَّل نتيجةً سلبية (D-228). والعلاج مُبرهَنٌ أحمرَ قبل وأخضرَ بعد على الشظيّة نفسها، مع بقاء مخالفات العقد حاجبة على ثلاث حالات. وثلاث طفراتٍ على المصدر تُحمِّر ثلاثة اختباراتٍ مختلفة، والمصدر مُستعادٌ متطابقاً بالبايت — واثنتان منها كشفتا ضعفاً في الاختبارات نفسها (`!= 0` وحدها تمرّ لسببٍ خطأ — صنف ISS-145) فصار كلّ برهانٍ يؤكّد نصّ الانتهاك. ⛔ وبديلا «أَخرِج الوظيفة من required-ci» و«أَسكِت الفحص» مرفوضان بسببٍ مكتوب في ISS-199."
+    "measured_ar": "المقيسُ لا المُستنتَج: 96 اختباراً أخضر بلا تراجعٍ في حارسِ D-067/D-079 (وهو الأخطر ههنا لأنّه يثبيت الافتراضيات)؛ ثلاثُ ساقٍ تُعيد 245 حرفاً **متطابقةً** وLaTeX صحيحٌ (`$$F = m \\cdot a$$`، `6\\,N`) حيث كان此前 `://./` و`3.12`؛ `RESULT: direct=True monolith=True frontend=True`؛ سبعةُ بوّاباتٍ خضراء (سجلُّ النماذج · parity · حِرفيةُ العملاء · 349 تثبيتاً إرثيّاً · تماسكُ الذاكرة · دستور=واقع · عزلُ التكوين)؛ والمسبارُ مقابل شبكةٍ مستحيلةٍ خروجٌ 2 «لا حكم» لا خُضرةٌ كاذبة — وهو ما يجعلُ أخضرَ CI ادّعاءً قابلاً للتكذيب. ⚠️ توليدٌ حقيقيٌّ على OpenRouter لم يُقَس من هذه البيئة (لا صولَ منها: SSL_ERROR_SYSCALL)، بل من خطوةِ `live-e2e` المضافة هنا."
   },
   "curriculum": {
     "catalog_path": "docs/research/UNIVERSITY_CURRICULUM_CATALOG.json",
@@ -118,14 +100,6 @@
     "all_catalog_courses_loaded": true,
     "catalog_course_count": 59,
     "considered_course_ids": [
-      "COMPSCI 20",
-      "COMPSCI 32",
-      "COMPSCI 50",
-      "COMPSCI 51",
-      "COMPSCI 61",
-      "COMPSCI 79",
-      "COMPSCI 85",
-      "COMPSCI 91R",
       "COMPSCI 1050",
       "COMPSCI 1066",
       "COMPSCI 1090A",
@@ -148,6 +122,7 @@
       "COMPSCI 1820",
       "COMPSCI 1840",
       "COMPSCI 1960",
+      "COMPSCI 20",
       "COMPSCI 2050",
       "COMPSCI 2211",
       "COMPSCI 2242",
@@ -176,39 +151,110 @@
       "COMPSCI 2883R",
       "COMPSCI 2901",
       "COMPSCI 2902",
-      "COMPSCI 2990R"
+      "COMPSCI 2990R",
+      "COMPSCI 32",
+      "COMPSCI 50",
+      "COMPSCI 51",
+      "COMPSCI 61",
+      "COMPSCI 79",
+      "COMPSCI 85",
+      "COMPSCI 91R"
     ],
     "baseline_evidence_ids": [
       "harvard-cs50x-foundations",
       "harvard-cs-concentration-domains"
     ],
     "task_specific_evidence_ids": [
-      "harvard-cs50x-foundations",
-      "harvard-cs-concentration-domains"
+      "mit-6824-distributed-systems",
+      "dora-core"
     ],
-    "unapplied_course_policy_ar": "كل المقررات قُرئت على مستوى الكتالوج والمصفوفة؛ ما لا ينطبق مباشرة على حزمة الحوكمة يُسجل كغير منطبق مع سبب، ولا يتحول إلى ادعاء تطبيق أو حذف من الكتالوج.",
+    "unapplied_course_policy_ar": "كل المقررات قُرئت على مستوى الكتالوج والمصفوفة؛ ما لا ينطبق مباشرةً على إصلاحِ مسارِ ردٍّ طالبيٍّ (تدرّس الرسوميات، المعالِجات، نظرية التعقيد…) يُسجَّل غيرَ منطبِقٍ مع سببه، ولا يتحوَّل إلى ادّعاءِ تطبيقٍ ولا يُحذَف من الكتالوج. وما ينطبق انطباقاً فعليّاً ذُكر باسمه في `local_application` (أنظمة موزّعة: تدويرٌ وحتميةُ فشل؛ قياساتُ التسليم: ability إلى الإعلان عن التدهور)، لا باسم مقررٍ لم يُلهم شيئاً في هذه الدفعات.",
     "applicability_result": "ALL_CATALOG_COURSES_CONSIDERED",
     "owner": "curriculum-governance"
   },
+  "changed_paths": [
+    ".env.codespaces.example",
+    ".env.example",
+    ".github/workflows/live-e2e.yml",
+    ".memory/README.md",
+    ".memory/decisions.md",
+    ".memory/issues.md",
+    ".runtime/truth_table.lock.json",
+    "CHANGELOG.md",
+    "CLAUDE.md",
+    "Makefile",
+    "README.ar.md",
+    "README.md",
+    "app/core/ai_config.py",
+    "app/core/gateway/simple_client.py",
+    "app/services/skills/content_integrity_skill.py",
+    "app/services/skills/doctrine/platform_layer.py",
+    "docs/DOCUMENTATION_INDEX.md",
+    "docs/changes/CURRENT_CODE_ACCEPTANCE_PACKET.json",
+    "docs/changes/current_changed_paths.txt",
+    "microservices/conversation_service/src/conversation_graph.py",
+    "microservices/conversation_service/src/math_pipeline.py",
+    "microservices/orchestrator_service/src/core/ai_config.py",
+    "microservices/orchestrator_service/src/core/gateway/simple_client.py",
+    "microservices/orchestrator_service/src/services/llm/client.py",
+    "microservices/orchestrator_service/src/services/overmind/graph/general_knowledge.py",
+    "microservices/orchestrator_service/src/services/overmind/graph/nodes.py",
+    "microservices/orchestrator_service/src/services/overmind/graph/search.py",
+    "microservices/orchestrator_service/src/services/overmind/graph/state.py",
+    "microservices/research_agent/src/search_engine/super_search.py",
+    "scripts/fitness/check_legacy_invariants.py",
+    "scripts/verify_model_registry_live.py",
+    "shared/ai_models/model_chain.py",
+    "shared/ai_models/registry.py",
+    "tests/config/test_model_chain_parity.py",
+    "tests/config/test_model_registry_probe.py",
+    "tests/microservices/orchestrator_service/test_llm_client_model_chain.py",
+    "tests/services/test_content_integrity_skill.py",
+    "tests/services/test_iss079_catastrophic_fixes.py"
+  ],
   "git_change_snapshot": {
     "base_ref": "origin/main",
     "changed_paths_excluding_packet": [
-      ".github/workflows/ci.yml",
+      ".env.codespaces.example",
+      ".env.example",
       ".github/workflows/live-e2e.yml",
       ".memory/README.md",
-      ".memory/ci-gates.md",
+      ".memory/decisions.md",
       ".memory/issues.md",
+      ".runtime/truth_table.lock.json",
+      "CHANGELOG.md",
+      "CLAUDE.md",
+      "Makefile",
       "README.ar.md",
       "README.md",
-      "docs/governance/NEGATIVE_PROOFS.json",
-      "scripts/e2e/deferred_findings.py",
-      "scripts/e2e/live_student_journey.py",
-      "scripts/e2e/universal_answerability_live.py",
-      "scripts/fitness/check_e2e_deferred_findings.py",
-      "tests/fitness/test_check_e2e_deferred_findings.py"
+      "app/core/ai_config.py",
+      "app/core/gateway/simple_client.py",
+      "app/services/skills/content_integrity_skill.py",
+      "app/services/skills/doctrine/platform_layer.py",
+      "docs/DOCUMENTATION_INDEX.md",
+      "docs/changes/current_changed_paths.txt",
+      "microservices/conversation_service/src/conversation_graph.py",
+      "microservices/conversation_service/src/math_pipeline.py",
+      "microservices/orchestrator_service/src/core/ai_config.py",
+      "microservices/orchestrator_service/src/core/gateway/simple_client.py",
+      "microservices/orchestrator_service/src/services/llm/client.py",
+      "microservices/orchestrator_service/src/services/overmind/graph/general_knowledge.py",
+      "microservices/orchestrator_service/src/services/overmind/graph/nodes.py",
+      "microservices/orchestrator_service/src/services/overmind/graph/search.py",
+      "microservices/orchestrator_service/src/services/overmind/graph/state.py",
+      "microservices/research_agent/src/search_engine/super_search.py",
+      "scripts/fitness/check_legacy_invariants.py",
+      "scripts/verify_model_registry_live.py",
+      "shared/ai_models/model_chain.py",
+      "shared/ai_models/registry.py",
+      "tests/config/test_model_chain_parity.py",
+      "tests/config/test_model_registry_probe.py",
+      "tests/microservices/orchestrator_service/test_llm_client_model_chain.py",
+      "tests/services/test_content_integrity_skill.py",
+      "tests/services/test_iss079_catastrophic_fixes.py"
     ],
-    "content_sha256_excluding_packet": "ae23326b8e0639e12f66a4a83f1394e2237d6a10b893545c5b44cfb68dc073da",
-    "refreshed_on": "2026-08-21",
-    "refresh_command": "python3 scripts/research/refresh_acceptance_diff_snapshot.py"
+    "content_sha256_excluding_packet": "39289e32c64fe87fa4e9a1575ade7cb6928ec11f96bb5ba020b344d05684ed25",
+    "refreshed_on": "2026-09-09",
+    "refresh_command": "python scripts/fitness/check_code_acceptance.py  # with CODE_ACCEPTANCE_BASE_SHA=<PR base>"
   }
 }
