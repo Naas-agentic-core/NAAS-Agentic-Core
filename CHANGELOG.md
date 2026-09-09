@@ -85,6 +85,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   في `tests/services/test_iss079_catastrophic_fixes.py`؛ `ruff check`/`format` (0.14.0) نظيف؛ البوّابات
   `check_model_registry` / `check_model_chain_parity` / `check_legacy_invariants` / `check_model_client_literals` خضراء.
 
+- **تصحيحٌ من ثاني تشغيلٍ CIّ — المسبارُ كان هو العطب.** خطوة «Live model registry probe» حمُرَت
+  بخروج 1 بلا سببٍ مقروء، ومراجعةُ الكتالوج الحيّ في الساعة نفسها أثبتت أنّ PRIMARY مُدرَجٌ
+  بنقاطِ خدمةٍ غير فارغة: بقي فرعٌ قاطعٌ واحد — `--check-key`. فالقاعدة الآن: **401 وحده** رفضٌ
+  يقيني، أمّا **403 فليس حكماً على مفتاحنا** (جدارٌ أماميّ يرفض متصفّح المشغِّل) فيبقى تحذيراً
+  يرتقي خطأً تحت `--strict` فقط؛ و`check_api_key` صار لا يُخرج استثناءً على أيّ جسدٍ غير متوقّع؛
+  و200 بشكلٍ غير موسومٍ للنموذج يُقرأ «لم نرَه» لا «ليست في الكتالوج». وخُفِّفت خطوة «Backend
+  log» فلا تُنشئ سببَ موتٍ ثانياً بـ`tail` على ملفٍّ لم يُخلق. والاختبارات: 13 (كانت 11) تُميِّز
+  «لم نرَ» من «مات» في المفتاح كما في النماذج (تفصيلٌ في D-288، إلحاق 2026-09-09 بند 3).
+- **ISS-202 — ستّ صورٍ تُبنى من `main` كانت تُفشِل `required-ci` لكلّ فرع.** الملفّات الستّة
+  (`auditor_service` · `memory_agent` · `observability_service` · `planning_agent` ·
+  `reasoning_agent` · `user_service`) تحمل `litellm==1.50.0` وقد **اختفت هذه النسخة من PyPI**
+  (الفهرس يقفز 1.27.1.x ← 1.53.1)، فـ`pip install` يموت قبل قراءة بنية الملفّ — والنتيجة على
+  `main` عند `4e14758`: نفسُ الستّ حمراء، ومعها `required-ci`. العِلاج هو علاج D-205 حرفيّاً:
+  **حذفُ المكبح الميّت** لا استبدالُه برقمٍ «يبدو متوافقاً» (لا أحد يستورد `litellm` في خمسٍ
+  منها، والسادسة تستطلِعها بـ`find_spec` وستبقى مُثبَتةً متعدّياً عبر `dspy-ai`)، و`openai==1.55.0`
+  تُركت كما هي لأنّ رفعها هجرةُ SDK لا تصليحُ اعتماد. **المُبرهَن محلّياً:** محلّل الصورة نفسُه
+  (`pip 25.0.1 --ignore-installed`) يقبل الملفات الستّة · `check_supply_chain` ✅ ودَينُ التثبيت
+  لم يتّسع (160) · `check_legacy_invariants` ✅ 349 · صفر إشارةٍ إلى `litellm` في `tests/`.
+  **⛔ غير المُدَّعى:** لم تُبنَ صورةٌ هنا (لا `docker` في البيئة)؛ اليقينُ في `images-build`.
+
 ### Added - 2026-08-20 - D-240: Transition Service (multi-agent AI work-transition layer)
 - `microservices/transition_service/` — 13 specialized agents (early warning, occupation
   exposure, skills gap, career transition, education/curriculum, job creation, social

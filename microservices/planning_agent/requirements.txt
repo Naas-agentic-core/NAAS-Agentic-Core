@@ -11,13 +11,13 @@ dspy-ai==2.5.43
 llama-index-core==0.14.13
 llama-index-embeddings-openai
 dspy==2.5.7
-# ⛔ COUPLED TO `openai` IN THIS SAME FILE — never raise litellm alone.
-# litellm >= 1.8x requires openai>=2.20.0, but this service pins openai==1.55.0,
-# so pip cannot resolve and the Docker image dies at `pip install` (proven in CI
-# on 66a3e50). Dependabot raised it twice: 4b0db53 → 1.84.0, 91509a0 → 1.96.0.
-# 1.50.0 is the version proven green on b1db497. Raising the pair means migrating
-# to the openai 2.x SDK across six services — an ADR, not a dependency bump.
-litellm==1.50.0
+# ⛔ REMOVED AS *UNSOLVABLE*, NOT RETARGETED — the D-205 remedy (ISS-202).
+# `litellm==1.50.0` is no longer published: the PyPI index jumps 1.27.1.x → 1.53.1,
+# so every image build of this service died at `pip install` (reproduced with the
+# image's own resolver, pip 25.0.1). Nothing here imports litellm — the pin was a
+# second brake on `openai==1.55.0`, not a dependency. Raising the pair to litellm
+# >=1.8x/openai 2.x is still an ADR across six services, and is NOT done here.
+# litellm still installs transitively (via dspy) wherever the runtime wants it.
 asyncpg>=0.29.0
 psycopg2-binary>=2.9.9
 
