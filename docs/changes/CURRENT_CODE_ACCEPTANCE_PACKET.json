@@ -227,8 +227,19 @@
   ],
   "git_change_snapshot": {
     "base_ref": "origin/main",
-    "changed_paths_excluding_packet": [],
-    "content_sha256_excluding_packet": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "changed_paths_excluding_packet": [
+      "benchmarks/dz_bac_bench/v2/CDKC_BENCHMARK_SPEC.md",
+      "docs/changes/current_changed_paths.txt",
+      "docs/commercial/CDKC_EXPORTABLE_EVAL_OFFER.md",
+      "docs/research/HARD_CURRENCY_NEW_KNOWLEDGE_CDKC.md",
+      "docs/research/README_NEW_KNOWLEDGE.md",
+      "shared/research/__init__.py",
+      "shared/research/durable_knowledge.py",
+      "shared/research/exportable_eval.py",
+      "tests/shared/test_cdkc_durable_knowledge.py",
+      "tests/shared/test_cdkc_exportable_eval.py"
+    ],
+    "content_sha256_excluding_packet": "d187a867cbc11eba466c9902bb4fca6df9dee128a73611120589d2f00198428c",
     "refreshed_on": "2026-08-21",
     "refresh_command": "python3 scripts/research/refresh_acceptance_diff_snapshot.py"
   }
