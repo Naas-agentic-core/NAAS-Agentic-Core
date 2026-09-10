@@ -1,3 +1,11 @@
-A	docs/commercial/AR_FR_RED_TEAMING_PROBE_DESIGN.md
+A	shared/research/__init__.py
+A	shared/research/durable_knowledge.py
+A	shared/research/exportable_eval.py
+A	docs/research/HARD_CURRENCY_NEW_KNOWLEDGE_CDKC.md
+A	docs/research/README_NEW_KNOWLEDGE.md
+A	docs/commercial/CDKC_EXPORTABLE_EVAL_OFFER.md
+A	benchmarks/dz_bac_bench/v2/CDKC_BENCHMARK_SPEC.md
+A	tests/shared/test_cdkc_durable_knowledge.py
+A	tests/shared/test_cdkc_exportable_eval.py
 M	docs/changes/CURRENT_CODE_ACCEPTANCE_PACKET.json
 M	docs/changes/current_changed_paths.txt

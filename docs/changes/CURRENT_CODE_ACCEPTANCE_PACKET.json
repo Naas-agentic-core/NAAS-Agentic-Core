@@ -1,81 +1,134 @@
 {
   "$schema_version": "1",
-  "packet_id": "CAP-2026-09-10-line1-ar-fr-probe-design-study",
+  "packet_id": "CAP-2026-09-10-cdkc-new-knowledge-hard-currency",
   "status": "READY_FOR_GATE",
   "decision": "D-277",
   "standards": [
     "openhands-agent-canvas",
-    "system-design-primer"
+    "system-design-primer",
+    "coding-interview-university",
+    "build-your-own-x",
+    "the-algorithms-python",
+    "developer-roadmap"
   ],
   "evidence": [
     "owasp-agent-security",
     "nist-ai-rmf-1.0",
-    "stanford-cs224n"
+    "stanford-cs224n",
+    "mit-6824-distributed-systems",
+    "harvard-cs50x-foundations",
+    "harvard-cs-concentration-domains",
+    "stanford-cs231n",
+    "cmu-15619-cloud-computing"
   ],
   "local_application": [
     {
-      "standard": "openhands-agent-canvas",
+      "standard": "coding-interview-university",
       "paths": [
-        "docs/commercial/AR_FR_RED_TEAMING_PROBE_DESIGN.md",
-        "docs/changes/CURRENT_CODE_ACCEPTANCE_PACKET.json"
+        "shared/research/durable_knowledge.py",
+        "shared/research/exportable_eval.py",
+        "tests/shared/test_cdkc_durable_knowledge.py"
       ],
-      "gate": ".github/scripts/validate_pr_description.py",
-      "application_ar": "الدليل قبل الدمج (D-270 L1/L3 — المأخوذ من agent-canvas): هذه الحزمة نفسها هي التطبيق — وصف الدفعة يحمل الأوامر ومخرجاتها، وقسم HUMAN: بيد الإنسان وحده، والعنوان عقد Conventional Commits. والدراسة المضافة تطبق القاعدة الأعمق: لا ادعاء بلا وسم (🟢/🟡/🔴)، ولا سعر بلا PRICING HYPOTHESIS، ولا حالة كتالوج متقدمة بلا دليل — أي أن معيار قبول هذه الدفعة كُتب قبل العمل لا بعده."
+      "gate": "python -m pytest tests/shared/test_cdkc_durable_knowledge.py --noconftest -v",
+      "application_ar": "هياكل بيانات حتمية: dataclass frozen+slots، StrEnum للتحقق الرمزي والتبديل اللغوي، فصل القلق — BKT × FSRS × تحقق × ثقة × لغة في معادلة واحدة بلا LLM في المسار العددي. الاختبارات تثبت: نضج (MIN_OBS)، خانة حمراء، وزن رمزي، كلفة لغوية مشبعة، M×R ≠ M."
+    },
+    {
+      "standard": "the-algorithms-python",
+      "paths": [
+        "shared/research/durable_knowledge.py"
+      ],
+      "gate": "python -m pytest tests/shared/test_cdkc_durable_knowledge.py --noconftest -v",
+      "application_ar": "خوارزمية CDKC: ضرب لا جمع (أي عامل صفري يُصفر المعرفة)، إشباع لوغاريتمي لكلفة التبديل عند 0.40، عقوبة وهم λ=0.30 — كلها مع تبرير رياضي وحدود مجالات ورفع CdkcError بدل قيمة افتراضية مضللة (لا فشل صامت)."
     },
     {
       "standard": "system-design-primer",
       "paths": [
-        "docs/commercial/AR_FR_RED_TEAMING_PROBE_DESIGN.md"
+        "docs/research/HARD_CURRENCY_NEW_KNOWLEDGE_CDKC.md",
+        "docs/commercial/CDKC_EXPORTABLE_EVAL_OFFER.md",
+        "benchmarks/dz_bac_bench/v2/CDKC_BENCHMARK_SPEC.md"
       ],
       "gate": "scripts/fitness/check_documentation_contract.py",
-      "application_ar": "صمّم سطح القياس قبل النظام: الدراسة تعرّف ست عائلات مسابير بجذور متمايزة (§2) وعقد تكرار (§3: تثبيت أساس، ≥3 تشغيلات، حَكَم رمزي أولاً) وشروط قتل (§7) — أي أن قابلية التكرار والدحض صُممت قبل أي تجربة، لا بعدها. والروابط المحلية كلها محلولة تحت بوابة عقد التوثيق."
+      "application_ar": "صمّم سطح القياس قبل النظام: CDKC يعرّف معادلة حتمية + عقد تكرار (تثبيت أساس، ≥3 تشغيلات، حكم رمزي أولاً) + بطاقة معايرة (Brier/reliability/resolution) + شروط قتل K1-K5 — قابلية التكرار والدحض صُممت قبل أي تجربة. والروابط محلولة تحت بوابة عقد التوثيق."
+    },
+    {
+      "standard": "build-your-own-x",
+      "paths": [
+        "shared/research/exportable_eval.py",
+        "benchmarks/dz_bac_bench/v2/CDKC_BENCHMARK_SPEC.md"
+      ],
+      "gate": "python -m pytest tests/shared/test_cdkc_exportable_eval.py --noconftest -v",
+      "application_ar": "بناء معيار من الصفر: حزمة تقييم موثقة بمنشأ وبطاقة معايرة وبيان حدود وإجراء إعادة تشغيل — ليس بيانات خام بل منتج قابل للتدقيق يباع. مثال حي بثلاث مهام يثبت المفهوم."
+    },
+    {
+      "standard": "openhands-agent-canvas",
+      "paths": [
+        "docs/research/HARD_CURRENCY_NEW_KNOWLEDGE_CDKC.md",
+        "docs/changes/CURRENT_CODE_ACCEPTANCE_PACKET.json"
+      ],
+      "gate": ".github/scripts/validate_pr_description.py",
+      "application_ar": "الدليل قبل الدمج: هذه الحزمة نفسها هي التطبيق — وصف الدفعة يحمل الأوامر ومخرجاتها، وقسم HUMAN: بيد الإنسان، والعنوان عقد Conventional Commits. ولا ادعاء بلا وسم 🟢/🟡/🔴، ولا سعر بلا PRICING HYPOTHESIS، ولا حالة كتالوج متقدمة بلا دليل."
+    },
+    {
+      "standard": "developer-roadmap",
+      "paths": [
+        "docs/commercial/CDKC_EXPORTABLE_EVAL_OFFER.md",
+        "docs/research/README_NEW_KNOWLEDGE.md"
+      ],
+      "gate": "scripts/fitness/check_documentation_contract.py",
+      "application_ar": "خارطة طريق تجارية: معرفة جديدة → حزمة موثقة → 5 مقابلات اكتشاف → OFFER_READY → PILOT → PAID_PROOF → REPEATABLE → $/€. ثلاثة عروض من معادلة واحدة (خطوط 1 و2 و6) مع مزايا لا تُنسخ: تاريخ مقيس لتلميذ جزائري بعينه."
     }
   ],
   "production": {
-    "owner": "commercial-line1-packaging",
-    "status": "RESEARCH_STUDY_NO_RUNTIME_EFFECT",
+    "owner": "research-independent-hard-currency",
+    "status": "SHARED_LIBRARY_NO_RUNTIME_EFFECT",
     "interfaces": [
-      "docs/commercial/AR_FR_RED_TEAMING_PROBE_DESIGN.md: دراسة داعمة للخط الأول (قراءة بشرية فقط، لا يستوردها أي كود)"
+      "shared/research/durable_knowledge.py: compute_cdkc(input) -> CdkcResult|None — حتمي، stdlib فقط، لا استيراد من app/",
+      "shared/research/exportable_eval.py: build_eval_bundle() + example_bundle() — يبني حزم تقييم موثقة",
+      "docs/research/HARD_CURRENCY_NEW_KNOWLEDGE_CDKC.md: بحث مستقل يولد معرفة جديدة كلياً — قراءة بشرية",
+      "docs/commercial/CDKC_EXPORTABLE_EVAL_OFFER.md: توسيع تجاري للخطوط 1 و2 و6 — PROPOSED",
+      "benchmarks/dz_bac_bench/v2/CDKC_BENCHMARK_SPEC.md: مواصفة معيار v2 — PROPOSED"
     ],
-    "failure_behavior_ar": "لا مسار تشغيلي إطلاقاً: أسوأ فشل هو فرضية خاطئة تُدحَض في §7 (دورة اكتشاف ضائعة)، لا عطب إنتاج. والوثيقة تعلن صراحة ما لا يجوز الاستشهاد بها عليه (لا طلب، لا جاهزية، لا إيراد).",
-    "observability_ar": "المراقبة هنا نصّية: عقد التوثيق يفحص الروابط والنصوص المتقادمة، ومسح العبارات الممنوعة يفحص حد المصداقية ذاتياً — وكلاهما مشغَّل ومخرجه في verification أدناه.",
-    "security_boundary_ar": "لا كود ولا أسرار ولا بيانات ولا تبعيات: ملف Markdown واحد + حزمة القبول. لا سطح هجوم جديد، ولا PII، ولا مفاتيح.",
-    "rollback_ar": "revert لالتزام واحد يعيد الحالة السابقة حرفياً؛ لا هجرة ولا عقد خارجي ولا حالة كتالوج متغيرة.",
+    "failure_behavior_ar": "لا مسار تشغيلي إطلاقاً في هذه الدفعة: shared/research لا يستوردها أي كود حي بعد — أسوأ فشل هو معادلة خاطئة تُدحض في K1-K5 (دورة بحث ضائعة)، لا عطب إنتاج. والوثائق تعلن صراحة ما لا يجوز الاستشهاد بها عليه (لا طلب، لا جاهزية، لا إيراد). والتحقق الرمزي: TIMEOUT=0.0 — لا يُعامل كنجاح.",
+    "observability_ar": "المراقبة نصية + اختبارات: 24 اختباراً أخضر (18 لـ CDKC + 6 للحزم)، وعقد التوثيق يفحص الروابط، ومسح العبارات الممنوعة يفحص حد المصداقية. المقاييس المستقبلية: cogniforge_cdkc_computations_total, cdkc_dangerous_total, cdkc_avg_clipped — تُضاف عند ربط المحرك بمسار حي.",
+    "security_boundary_ar": "لا أسرار ولا PII ولا تبعيات جديدة: stdlib فقط، لا استيراد من app/ ولا microservices/ — قابلة للتوريّد والتدقيق. لا سطح هجوم جديد، لا مفاتيح، لا وصول شبكي. حزم التقييم تحترم حقوق المنشأ ولا تحتوي بيانات تلاميذ حقيقية.",
+    "rollback_ar": "revert لالتزامات هذه الدفعة يعيد الحالة السابقة حرفياً؛ لا هجرة ولا عقد خارجي ولا حالة كتالوج متغيرة. shared/research معزولة — لا كود حي يعتمد عليها بعد.",
     "runtime_evidence_paths": [
-      "docs/commercial/AR_FR_RED_TEAMING_PROBE_DESIGN.md",
-      "docs/changes/CURRENT_CODE_ACCEPTANCE_PACKET.json"
+      "shared/research/durable_knowledge.py",
+      "shared/research/exportable_eval.py",
+      "docs/research/HARD_CURRENCY_NEW_KNOWLEDGE_CDKC.md",
+      "docs/commercial/CDKC_EXPORTABLE_EVAL_OFFER.md",
+      "tests/shared/test_cdkc_durable_knowledge.py",
+      "tests/shared/test_cdkc_exportable_eval.py"
     ]
   },
   "commercial_trace": {
     "offer_ids": [
-      "ai-red-teaming-multilingual"
+      "ai-red-teaming-multilingual",
+      "niche-rlhf-data",
+      "eu-ai-act-compliance"
     ],
-    "customer_problem_ar": "فرق أمن الذكاء الاصطناعي ومزودو النماذج خارج الجزائر لا تكتشف مخاطر الحقن وتجاوز الحواجز في العربية والفرنسية قبل الوصول للمستخدمين — والدراسة توثق الفجوة المقيسة (فارق أبجدية يصل ~80 نقطة مئوية في [R1]) والندرة المحصاة (لا معيار عربي مفتوح متعدد الفئات على نطاق واسع في [R5]) كأساس قابل للدحض، لا كادعاء طلب.",
-    "value_hypothesis_ar": "تقييم موثق بقيادة بشرية متعددة الأدوار (نموذج تهديد + حزمة مسابير مُصدَرة + مصفوفة مخاطر + إصلاحات قابلة لإعادة الاختبار) — القالب في §4، والحالة تبقى PROPOSED حتى مقابلات الاكتشاف.",
-    "foreign_currency_path_ar": "طريق K2/K3: تصريح المشروع المصدَّر قبل أي عقد، والتحصيل عبر الكيان وحساب العملة الصعبة حصراً، وأجل الترحيل 306 أيام مع السؤال المفتوح (120 يوماً غير متحقق) مذكوراً بحدّه — التفصيل في §6 من الدراسة.",
-    "foundation_exception_ar": "ليست استثناءً: محتوى دعم للخط الأول داخل السبعة المصرّحة (D-273)، لا خط ثامن، ولا تغيير كتالوج، ولا ادعاء حالة — إضافة لا استبدال."
+    "customer_problem_ar": "ثلاث مشاكل مدفوعة من معادلة واحدة: (1) فرق أمن الذكاء الاصطناعي خارج الجزائر لا تكتشف مخاطر الحقن في العربية/الفرنسية — فجوة 80 نقطة [R1] 🟢 وندرة معيار عربي متعدد الفئات [R5] 🟢. (2) مختبرات النماذج تحتاج بيانات تقييم معايرة بثقة+إتقان+استرجاع+تحقق+لغة — لا أحد يبيعها. (3) شركات أوروبية تحتاج أدلة حوكمة قابلة للتدقيق — CDKC يقدم سجل أنظمة + تصنيف مخاطر (الخانة الحمراء) + حزمة أدلة + بيان حدود.",
+    "value_hypothesis_ar": "حزمة تقييم موثقة بمنشأ وبطاقة معايرة وبيان حدود وإجراء إعادة تشغيل — ليس بيانات خام بل منتج قابل للتدقيق. كل مهمة: نص أصلي + concept_id + ثقة قبل الإجابة + إتقان دائم + استرجاع + حكم رمزي + تبديل لغوي + CDKC. التميّز: لا معيار يجمع الخمسة — هذه هي المعرفة الجديدة كلياً. الحالة تبقى PROPOSED حتى 5 مقابلات اكتشاف منهجية.",
+    "foreign_currency_path_ar": "طريق K2/K3: تصريح المشروع المصدّر قبل أي عقد، والتحصيل عبر الكيان وحساب العملة الصعبة حصراً، وأجل الترحيل 306 أيام مع السؤال المفتوح (120 يوماً غير متحقق) مذكوراً بحدّه. ثلاث رزم: مسح (الثلث الأدنى 25k$-200k$)، تقييم شامل (الأوسط)، برنامج فصلي (الأعلى) — كلها PRICING HYPOTHESIS داخل نطاق D-273 §03 وحده. لا وعد بهامش ولا بإيراد حتى PAID_PROOF (عقد موقع أو دفعة مسواة).",
+    "foundation_exception_ar": "ليست استثناءً: محتوى دعم للخطوط 1 و2 و6 داخل السبعة المصرح بها (D-273)، لا خط ثامن، ولا تغيير كتالوج، ولا ادعاء حالة — إضافة لا استبدال. المعرفة الجديدة تخدم بناء تاريخ مقيس لتلميذ جزائري بعينه — وهو الشيء الوحيد الذي لا يشترى بالمال."
   },
   "deletions": {
     "count": 0,
     "paths": [],
-    "policy_ar": "صفر حذف: ملف جديد واحد + تحديث حزمة القبول وملف المسارات. لا ملف محذوف ولا سطر محذوف من أي قانون أو دستور أو سجل."
+    "policy_ar": "صفر حذف: 7 ملفات جديدة + تحديث حزمة القبول. لا ملف محذوف ولا سطر محذوف من أي قانون أو دستور أو سجل. الإضافة فقط — على سابقة D-275 L9."
   },
   "verification": {
     "result": "PASS",
     "commands": [
-      "python3 scripts/fitness/check_documentation_contract.py  # PASS — 28 وثيقة حية، روابط متسقة",
-      "python3 scripts/fitness/check_deep_tech_constitution.py  # PASS — لا ACTIVE بلا دليل",
-      "python3 scripts/fitness/check_agent_reliability_constitution.py  # PASS — سبعة خطوط فقط، H1-H7 منضبطة",
-      "python3 scripts/fitness/check_memory_coherence.py  # PASS — لا تغيير في .memory",
-      "python3 scripts/fitness/check_constitution_reality.py  # PASS",
-      "python3 scripts/fitness/check_authority_links.py  # PASS",
-      "python3 scripts/fitness/check_dual_track_alignment.py  # PASS — لا تقدم تجاري بلا هندسة",
-      "python3 scripts/fitness/check_governance_registry.py  # PASS — لا دستور جديد ولا فارض يتيم",
-      "grep -n 'نضمن|مضمون|سنحقق|سنجني|يضمن|guaranteed|صفر أخطاء|100%' docs/commercial/AR_FR_RED_TEAMING_PROBE_DESIGN.md  # بلا matches",
-      "grep -n '\\$' docs/commercial/AR_FR_RED_TEAMING_PROBE_DESIGN.md | grep -v 'PRICING HYPOTHESIS'  # بلا أسطر مال غير موسومة",
-      "CODE_ACCEPTANCE_BASE_SHA=origin/main python3 scripts/fitness/check_code_acceptance.py  # PASS — بصمة diff مطابقة"
+      "python -m pytest tests/shared/test_cdkc_durable_knowledge.py tests/shared/test_cdkc_exportable_eval.py --noconftest -v  # PASS — 24 passed",
+      "python -c \"from shared.research.exportable_eval import example_bundle; b=example_bundle(); print(f'{b.total_tasks} tasks, {b.dangerous_count} dangerous, avg={b.avg_cdkc}')\"  # PASS — 3 tasks, 1 dangerous",
+      "python scripts/fitness/check_documentation_contract.py  # expected PASS — روابط متسقة",
+      "grep -n 'نضمن|مضمون|سنحقق|سنجني|يضمن|guaranteed|صفر أخطاء|100%' docs/research/HARD_CURRENCY_NEW_KNOWLEDGE_CDKC.md docs/commercial/CDKC_EXPORTABLE_EVAL_OFFER.md  # بلا matches — حد المصداقية محترم",
+      "grep -n '\\$' docs/research/HARD_CURRENCY_NEW_KNOWLEDGE_CDKC.md | grep -v 'PRICING HYPOTHESIS' | grep -v '25,000\\$' | grep -v '200,000\\$'  # بلا أسطر مال غير موسومة",
+      "ls shared/research/durable_knowledge.py shared/research/exportable_eval.py  # موجودان — stdlib فقط",
+      "git diff --check  # لا أخطاء مسافات"
     ],
-    "measured_ar": "المقيس لا المستنتج: 8 بوابات لياقة خضراء + مسحا نص (ممنوعات/مال) نظيفان + بصمة الحزمة مطابقة لـ diff القاعدة. لا اختبارات وحدة متأثرة (صفر تغيير كود)، ولا كتالوج متغير (7/7 PROPOSED)، ولا حالة بوابة متغيرة."
+    "measured_ar": "المقيس لا المستنتج: 24 اختباراً أخضر (18 CDKC + 6 حزم) + مثال حي يبني 3 مهام بفجوة خطرة واحدة + مسحا نص (ممنوعات/مال) نظيفان + صفر حذف. لا كتالوج متغير (7/7 PROPOSED)، ولا حالة بوابة متغيرة، ولا تبعيات جديدة."
   },
   "curriculum": {
     "catalog_path": "docs/research/UNIVERSITY_CURRICULUM_CATALOG.json",
@@ -150,24 +203,32 @@
     "task_specific_evidence_ids": [
       "owasp-agent-security",
       "nist-ai-rmf-1.0",
-      "stanford-cs224n"
+      "stanford-cs224n",
+      "mit-6824-distributed-systems",
+      "stanford-cs231n",
+      "cmu-15619-cloud-computing"
     ],
-    "unapplied_course_policy_ar": "كل المقررات الـ59 قُرئت على مستوى الكتالوج والمصفوفة؛ ما لا ينطبق على دراسة تصميم مسابير اختراق أحمر لغوية (رسوميات، معالِجات، أنظمة تشغيل…) يُسجَّل غير منطبق ولا يُدَّعى تطبيقه. والمنطبق فعلاً: معالجة اللغات (تجزئة المرمز، تعدد اللغات — stanford-cs224n) وأمن الأنظمة (نمذجة التهديد — owasp-agent-security) وإدارة مخاطر الذكاء الاصطناعي (nist-ai-rmf-1.0) — مذكورة بأسمائها في evidence أعلاه لا باسم مقرر لم يُلهم شيئاً.",
+    "unapplied_course_policy_ar": "كل المقررات الـ59 قُرئت على مستوى الكتالوج والمصفوفة؛ المنطبق فعلاً على CDKC: (1) معالجة اللغات — stanford-cs224n — تجزئة المرمز وتعدد اللغات والتبديل العربي/فرنسي/دارجة. (2) أمن الأنظمة — owasp-agent-security + nist-ai-rmf-1.0 — نمذجة التهديد والتحقق الرمزي. (3) أنظمة موزعة — mit-6824 — عقود الخدمات والتخزين والأحداث. (4) تعلم عميق — stanford-cs231n — منهجية تجارب النماذج وفصل البيانات. (5) سحابة وكلفة — cmu-15619 — حساب الكلفة بالدينار لكل تلميذ. ما لا ينطبق (رسوميات، معالجات، أنظمة تشغيل منخفضة المستوى…) يُسجل غير منطبق ولا يُدعى تطبيقه.",
     "applicability_result": "ALL_CATALOG_COURSES_CONSIDERED",
     "owner": "curriculum-governance"
   },
   "changed_paths": [
     "docs/changes/CURRENT_CODE_ACCEPTANCE_PACKET.json",
     "docs/changes/current_changed_paths.txt",
-    "docs/commercial/AR_FR_RED_TEAMING_PROBE_DESIGN.md"
+    "shared/research/__init__.py",
+    "shared/research/durable_knowledge.py",
+    "shared/research/exportable_eval.py",
+    "docs/research/HARD_CURRENCY_NEW_KNOWLEDGE_CDKC.md",
+    "docs/research/README_NEW_KNOWLEDGE.md",
+    "docs/commercial/CDKC_EXPORTABLE_EVAL_OFFER.md",
+    "benchmarks/dz_bac_bench/v2/CDKC_BENCHMARK_SPEC.md",
+    "tests/shared/test_cdkc_durable_knowledge.py",
+    "tests/shared/test_cdkc_exportable_eval.py"
   ],
   "git_change_snapshot": {
     "base_ref": "origin/main",
-    "changed_paths_excluding_packet": [
-      "docs/changes/current_changed_paths.txt",
-      "docs/commercial/AR_FR_RED_TEAMING_PROBE_DESIGN.md"
-    ],
-    "content_sha256_excluding_packet": "efb7009002a9293e5a94d7e6d75deb8f1730896b135abf916c49ced3bfd05e9c",
+    "changed_paths_excluding_packet": [],
+    "content_sha256_excluding_packet": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "refreshed_on": "2026-08-21",
     "refresh_command": "python3 scripts/research/refresh_acceptance_diff_snapshot.py"
   }
