@@ -1,185 +1,188 @@
 {
-  "$schema_version": "1",
-  "decision": "D-270",
-  "law": "L4 — البوّابة تُثبِت أنّها تحجب",
-  "purpose_ar": "لكلّ بوّابةٍ برهانٌ سلبي: مُدخَلٌ مكسورٌ اصطناعياً يجعلها تخرج بـ≠ 0. ISS-148 أثبتت أنّ فارضاً بلا مرمى أخطر من غيابه — وهذا القانون يطبّق الدرس على الفوارض نفسها. تحرسه scripts/fitness/check_gate_negative_proof.py.",
-  "rules_ar": [
-    "كل بوّابةٍ على القرص إمّا في proven بملفّ اختبارٍ يؤكّد الفشل، وإمّا في frozen_debt بسببٍ منطوق. الخانة الفارغة تُقرأ نجاحاً (D-206 L11).",
-    "الدَّين يتقلّص في الاتجاهين: بوّابةٌ اكتسبت برهاناً وبقيت في الدَّين ⇒ CI أحمر (نمط D-189).",
-    "«اختبارٌ يستدعي البوّابة ويتوقّع نجاحها» ليس برهاناً سلبياً — يُثبِت أنّها تعمل لا أنّها تحجب."
+ "$schema_version": "1",
+ "decision": "D-270",
+ "law": "L4 — البوّابة تُثبِت أنّها تحجب",
+ "purpose_ar": "لكلّ بوّابةٍ برهانٌ سلبي: مُدخَلٌ مكسورٌ اصطناعياً يجعلها تخرج بـ≠ 0. ISS-148 أثبتت أنّ فارضاً بلا مرمى أخطر من غيابه — وهذا القانون يطبّق الدرس على الفوارض نفسها. تحرسه scripts/fitness/check_gate_negative_proof.py.",
+ "rules_ar": [
+  "كل بوّابةٍ على القرص إمّا في proven بملفّ اختبارٍ يؤكّد الفشل، وإمّا في frozen_debt بسببٍ منطوق. الخانة الفارغة تُقرأ نجاحاً (D-206 L11).",
+  "الدَّين يتقلّص في الاتجاهين: بوّابةٌ اكتسبت برهاناً وبقيت في الدَّين ⇒ CI أحمر (نمط D-189).",
+  "«اختبارٌ يستدعي البوّابة ويتوقّع نجاحها» ليس برهاناً سلبياً — يُثبِت أنّها تعمل لا أنّها تحجب."
+ ],
+ "measured_2026_08_19": {
+  "gates": 81,
+  "proven": 30,
+  "debt": 51
+ },
+ "proven": {
+  "check_agent_skills_spec.py": [
+   "tests/fitness/test_agent_standards_gates.py"
   ],
-  "measured_2026_08_19": {
-    "gates": 81,
-    "proven": 30,
-    "debt": 51
-  },
-  "proven": {
-    "check_agent_skills_spec.py": [
-      "tests/fitness/test_agent_standards_gates.py"
-    ],
-    "check_agentic_design_principles.py": [
-      "tests/fitness/test_check_agentic_design_principles.py"
-    ],
-    "check_ambient_identity.py": [
-      "tests/fitness/test_ambient_identity_gate.py"
-    ],
-    "check_bundle_budget.py": [
-      "tests/fitness/test_check_design_tokens.py"
-    ],
-    "check_cognitive_execution.py": [
-      "tests/architecture/test_cognitive_execution_gate.py"
-    ],
-    "check_config_credibility.py": [
-      "tests/fitness/test_delivery_standards_gates.py"
-    ],
-    "check_correlated_http.py": [
-      "tests/fitness/test_check_correlated_http.py"
-    ],
-    "check_design_tokens.py": [
-      "tests/fitness/test_check_design_tokens.py"
-    ],
-    "check_documentation_contract.py": [
-      "tests/fitness/test_documentation_contract_gate.py"
-    ],
-    "check_dual_track_alignment.py": [
-      "tests/fitness/test_dual_track_alignment_gate.py"
-    ],
-    "check_e2e_deferred_findings.py": [
-      "tests/fitness/test_check_e2e_deferred_findings.py"
-    ],
-    "check_endpoint_complexity.py": [
-      "tests/fitness/test_check_endpoint_complexity.py"
-    ],
-    "check_external_standards.py": [
-      "tests/fitness/test_agent_standards_gates.py"
-    ],
-    "check_gate_negative_proof.py": [
-      "tests/fitness/test_agent_standards_gates.py"
-    ],
-    "check_governance_registry.py": [
-      "tests/fitness/test_delivery_standards_gates.py",
-      "tests/fitness/test_process_governance_gates.py"
-    ],
-    "check_image_matrix_parity.py": [
-      "tests/architecture/test_image_build_matrix.py"
-    ],
-    "check_legacy_traffic_zero_window.py": [
-      "tests/contracts/test_legacy_traffic_zero_window.py"
-    ],
-    "check_memory_coherence.py": [
-      "tests/fitness/test_check_memory_coherence.py"
-    ],
-    "check_model_client_literals.py": [
-      "tests/fitness/test_check_model_client_literals.py"
-    ],
-    "check_naas_verification.py": [
-      "tests/architecture/test_naas_verification_gate.py"
-    ],
-    "check_naas_verifier_boundary.py": [
-      "tests/fitness/test_naas_verifier_boundary_gate.py"
-    ],
-    "check_no_committed_secrets.py": [
-      "tests/fitness/test_secret_capture_parity.py"
-    ],
-    "check_no_double_encoded_frames.py": [
-      "tests/fitness/test_check_no_double_encoded_frames.py"
-    ],
-    "check_no_magic_strings.py": [
-      "tests/fitness/test_agent_standards_gates.py"
-    ],
-    "check_no_system_text_as_user.py": [
-      "tests/fitness/test_research_doctrine_gates.py"
-    ],
-    "check_prerequisite_single_graph.py": [
-      "tests/architecture/test_prerequisite_graph_gate.py"
-    ],
-    "check_redaction_parity.py": [
-      "tests/architecture/test_redaction_parity_gate.py"
-    ],
-    "check_research_doctrines.py": [
-      "tests/fitness/test_research_doctrine_gates.py"
-    ],
-    "check_revenue_doctrine.py": [
-      "tests/architecture/test_revenue_doctrine_gate.py"
-    ],
-    "check_router_domain_logic.py": [
-      "tests/services/test_review_schedule_persistence.py"
-    ],
-    "check_secret_capture_parity.py": [
-      "tests/fitness/test_secret_capture_parity.py"
-    ],
-    "check_source_adoption_matrix.py": [
-      "tests/fitness/test_source_adoption_ratchet.py"
-    ],
-    "check_supply_chain.py": [
-      "tests/fitness/test_delivery_standards_gates.py"
-    ],
-    "check_test_hygiene.py": [
-      "tests/fitness/test_check_test_hygiene.py"
-    ],
-    "check_topic_contract_parity.py": [
-      "tests/architecture/test_topic_bootstrap_and_parity.py"
-    ],
-    "check_ui_component_parity.py": [
-      "tests/fitness/test_ui_component_parity_gate.py"
-    ]
-  },
-  "frozen_debt": {
-    "check_abstraction_consumed.py": "مذكورة في اختبارٍ لا يؤكّد فشلاً — تُثبِت أنّها تعمل ولا تُثبِت أنّها تحجب",
-    "check_adaptive_study_planner.py": "بلا أيّ اختبار — لا يُعرَف إن كانت تحجب عند الخرق",
-    "check_agentic_orchestration.py": "بلا أيّ اختبار — لا يُعرَف إن كانت تحجب عند الخرق",
-    "check_authority_links.py": "بلا أيّ اختبار — لا يُعرَف إن كانت تحجب عند الخرق",
-    "check_breakglass_expiry_enforcement.py": "مذكورة في اختبارٍ لا يؤكّد فشلاً — تُثبِت أنّها تعمل ولا تُثبِت أنّها تحجب",
-    "check_ci_workflow_hygiene.py": "بلا أيّ اختبار — لا يُعرَف إن كانت تحجب عند الخرق",
-    "check_cognitive_twin.py": "بلا أيّ اختبار — لا يُعرَف إن كانت تحجب عند الخرق",
-    "check_constitution_reality.py": "بلا أيّ اختبار — لا يُعرَف إن كانت تحجب عند الخرق",
-    "check_contracts_verified.py": "بلا أيّ اختبار — لا يُعرَف إن كانت تحجب عند الخرق",
-    "check_core_kernel_acl.py": "بلا أيّ اختبار — لا يُعرَف إن كانت تحجب عند الخرق",
-    "check_core_kernel_env_profile.py": "بلا أيّ اختبار — لا يُعرَف إن كانت تحجب عند الخرق",
-    "check_cs_knowledge_map.py": "بلا أيّ اختبار — لا يُعرَف إن كانت تحجب عند الخرق",
-    "check_default_routing_no_legacy_targets.py": "مذكورة في اختبارٍ لا يؤكّد فشلاً — تُثبِت أنّها تعمل ولا تُثبِت أنّها تحجب",
-    "check_docs_runtime_parity.py": "بلا أيّ اختبار — لا يُعرَف إن كانت تحجب عند الخرق",
-    "check_error_contract_parity.py": "مذكورة في اختبارٍ لا يؤكّد فشلاً — تُثبِت أنّها تعمل ولا تُثبِت أنّها تحجب",
-    "check_exercise_context_single_source.py": "بلا أيّ اختبار — لا يُعرَف إن كانت تحجب عند الخرق",
-    "check_exercise_scope_single_source.py": "بلا أيّ اختبار — لا يُعرَف إن كانت تحجب عند الخرق",
-    "check_gate_parse_honesty.py": "بلا أيّ اختبار — لا يُعرَف إن كانت تحجب عند الخرق",
-    "check_gateway_provider_contracts.py": "مذكورة في اختبارٍ لا يؤكّد فشلاً — تُثبِت أنّها تعمل ولا تُثبِت أنّها تحجب",
-    "check_gateway_route_registry_alignment.py": "مذكورة في اختبارٍ لا يؤكّد فشلاً — تُثبِت أنّها تعمل ولا تُثبِت أنّها تحجب",
-    "check_import_boundaries.py": "بلا أيّ اختبار — لا يُعرَف إن كانت تحجب عند الخرق",
-    "check_intent_single_source.py": "مذكورة في اختبارٍ لا يؤكّد فشلاً — تُثبِت أنّها تعمل ولا تُثبِت أنّها تحجب",
-    "check_legacy_invariants.py": "مذكورة في اختبارٍ لا يؤكّد فشلاً — تُثبِت أنّها تعمل ولا تُثبِت أنّها تحجب",
-    "check_legacy_routes_monotonic.py": "بلا أيّ اختبار — لا يُعرَف إن كانت تحجب عند الخرق",
-    "check_model_chain_parity.py": "مذكورة في اختبارٍ لا يؤكّد فشلاً — تُثبِت أنّها تعمل ولا تُثبِت أنّها تحجب",
-    "check_model_registry.py": "بلا أيّ اختبار — لا يُعرَف إن كانت تحجب عند الخرق",
-    "check_no_app_imports_in_microservices.py": "مذكورة في اختبارٍ لا يؤكّد فشلاً — تُثبِت أنّها تعمل ولا تُثبِت أنّها تحجب",
-    "check_no_cross_service_imports.py": "بلا أيّ اختبار — لا يُعرَف إن كانت تحجب عند الخرق",
-    "check_no_new_any.py": "بلا أيّ اختبار — لا يُعرَف إن كانت تحجب عند الخرق",
-    "check_no_self_announcement.py": "بلا أيّ اختبار — لا يُعرَف إن كانت تحجب عند الخرق",
-    "check_no_shell_true.py": "بلا أيّ اختبار — لا يُعرَف إن كانت تحجب عند الخرق",
-    "check_notation_definable.py": "بلا أيّ اختبار — لا يُعرَف إن كانت تحجب عند الخرق",
-    "check_notation_parity.py": "مذكورة في اختبارٍ لا يؤكّد فشلاً — تُثبِت أنّها تعمل ولا تُثبِت أنّها تحجب",
-    "check_openapi_parity.py": "مذكورة في اختبارٍ لا يؤكّد فشلاً — تُثبِت أنّها تعمل ولا تُثبِت أنّها تحجب",
-    "check_overmind_copy_coupling.py": "مذكورة في اختبارٍ لا يؤكّد فشلاً — تُثبِت أنّها تعمل ولا تُثبِت أنّها تحجب",
-    "check_pedagogical_os.py": "مذكورة في اختبارٍ لا يؤكّد فشلاً — تُثبِت أنّها تعمل ولا تُثبِت أنّها تحجب",
-    "check_pedagogy_engine.py": "بلا أيّ اختبار — لا يُعرَف إن كانت تحجب عند الخرق",
-    "check_ports_consistency.py": "بلا أيّ اختبار — لا يُعرَف إن كانت تحجب عند الخرق",
-    "check_probability_brain_parity.py": "بلا أيّ اختبار — لا يُعرَف إن كانت تحجب عند الخرق",
-    "check_route_registry_parity.py": "مذكورة في اختبارٍ لا يؤكّد فشلاً — تُثبِت أنّها تعمل ولا تُثبِت أنّها تحجب",
-    "check_secret_key_consistency.py": "بلا أيّ اختبار — لا يُعرَف إن كانت تحجب عند الخرق",
-    "check_service_catalog_parity.py": "مذكورة في اختبارٍ لا يؤكّد فشلاً — تُثبِت أنّها تعمل ولا تُثبِت أنّها تحجب",
-    "check_single_brain_control_plane.py": "مذكورة في اختبارٍ لا يؤكّد فشلاً — تُثبِت أنّها تعمل ولا تُثبِت أنّها تحجب",
-    "check_skills_doctrine.py": "بلا أيّ اختبار — لا يُعرَف إن كانت تحجب عند الخرق",
-    "check_spec_kit_governance.py": "بلا أيّ اختبار — لا يُعرَف إن كانت تحجب عند الخرق",
-    "check_stategraph_runtime_backbone.py": "مذكورة في اختبارٍ لا يؤكّد فشلاً — تُثبِت أنّها تعمل ولا تُثبِت أنّها تحجب",
-    "check_symbolic_reveal_ledger.py": "بلا أيّ اختبار — لا يُعرَف إن كانت تحجب عند الخرق",
-    "check_topic_authority_single_source.py": "بلا أيّ اختبار — لا يُعرَف إن كانت تحجب عند الخرق",
-    "check_tracing_gate.py": "مذكورة في اختبارٍ لا يؤكّد فشلاً — تُثبِت أنّها تعمل ولا تُثبِت أنّها تحجب",
-    "check_transcript_stage_coverage.py": "مذكورة في اختبارٍ لا يؤكّد فشلاً — تُثبِت أنّها تعمل ولا تُثبِت أنّها تحجب",
-    "check_understanding_evidence.py": "بلا أيّ اختبار — لا يُعرَف إن كانت تحجب عند الخرق",
-    "check_agent_context.py": "بوابة سياق الوكيل جديدة في سجل البراهين؛ تحتاج اختبارًا يكسر مصدرًا أو مسارًا ويثبت خروجًا غير صفري.",
-    "check_code_acceptance.py": "بوابة حزمة القبول جديدة في سجل البراهين؛ تحتاج اختبارًا يقدّم packet غير صالح ويثبت رفضه.",
-    "check_reference_backbone.py": "بوابة العمود المرجعي بلا اختبار سلبي مخصص؛ لا يُعلن برهان الحجب قبل إضافة fixture مكسور.",
-    "check_deep_tech_constitution.py": "Newly added, lacking negative proof for now.",
-    "check_pocock_gates.py": "Newly added, lacking negative proof for now."
-  }
+  "check_agentic_design_principles.py": [
+   "tests/fitness/test_check_agentic_design_principles.py"
+  ],
+  "check_ambient_identity.py": [
+   "tests/fitness/test_ambient_identity_gate.py"
+  ],
+  "check_bundle_budget.py": [
+   "tests/fitness/test_check_design_tokens.py"
+  ],
+  "check_cognitive_execution.py": [
+   "tests/architecture/test_cognitive_execution_gate.py"
+  ],
+  "check_config_credibility.py": [
+   "tests/fitness/test_delivery_standards_gates.py"
+  ],
+  "check_correlated_http.py": [
+   "tests/fitness/test_check_correlated_http.py"
+  ],
+  "check_design_tokens.py": [
+   "tests/fitness/test_check_design_tokens.py"
+  ],
+  "check_documentation_contract.py": [
+   "tests/fitness/test_documentation_contract_gate.py"
+  ],
+  "check_dual_track_alignment.py": [
+   "tests/fitness/test_dual_track_alignment_gate.py"
+  ],
+  "check_e2e_deferred_findings.py": [
+   "tests/fitness/test_check_e2e_deferred_findings.py"
+  ],
+  "check_endpoint_complexity.py": [
+   "tests/fitness/test_check_endpoint_complexity.py"
+  ],
+  "check_external_standards.py": [
+   "tests/fitness/test_agent_standards_gates.py"
+  ],
+  "check_gate_negative_proof.py": [
+   "tests/fitness/test_agent_standards_gates.py"
+  ],
+  "check_governance_registry.py": [
+   "tests/fitness/test_delivery_standards_gates.py",
+   "tests/fitness/test_process_governance_gates.py"
+  ],
+  "check_image_matrix_parity.py": [
+   "tests/architecture/test_image_build_matrix.py"
+  ],
+  "check_legacy_traffic_zero_window.py": [
+   "tests/contracts/test_legacy_traffic_zero_window.py"
+  ],
+  "check_memory_coherence.py": [
+   "tests/fitness/test_check_memory_coherence.py"
+  ],
+  "check_model_client_literals.py": [
+   "tests/fitness/test_check_model_client_literals.py"
+  ],
+  "check_naas_verification.py": [
+   "tests/architecture/test_naas_verification_gate.py"
+  ],
+  "check_naas_verifier_boundary.py": [
+   "tests/fitness/test_naas_verifier_boundary_gate.py"
+  ],
+  "check_no_committed_secrets.py": [
+   "tests/fitness/test_secret_capture_parity.py"
+  ],
+  "check_no_double_encoded_frames.py": [
+   "tests/fitness/test_check_no_double_encoded_frames.py"
+  ],
+  "check_no_magic_strings.py": [
+   "tests/fitness/test_agent_standards_gates.py"
+  ],
+  "check_no_system_text_as_user.py": [
+   "tests/fitness/test_research_doctrine_gates.py"
+  ],
+  "check_prerequisite_single_graph.py": [
+   "tests/architecture/test_prerequisite_graph_gate.py"
+  ],
+  "check_redaction_parity.py": [
+   "tests/architecture/test_redaction_parity_gate.py"
+  ],
+  "check_research_doctrines.py": [
+   "tests/fitness/test_research_doctrine_gates.py"
+  ],
+  "check_revenue_doctrine.py": [
+   "tests/architecture/test_revenue_doctrine_gate.py"
+  ],
+  "check_router_domain_logic.py": [
+   "tests/services/test_review_schedule_persistence.py"
+  ],
+  "check_secret_capture_parity.py": [
+   "tests/fitness/test_secret_capture_parity.py"
+  ],
+  "check_source_adoption_matrix.py": [
+   "tests/fitness/test_source_adoption_ratchet.py"
+  ],
+  "check_supply_chain.py": [
+   "tests/fitness/test_delivery_standards_gates.py"
+  ],
+  "check_test_hygiene.py": [
+   "tests/fitness/test_check_test_hygiene.py"
+  ],
+  "check_topic_contract_parity.py": [
+   "tests/architecture/test_topic_bootstrap_and_parity.py"
+  ],
+  "check_ui_component_parity.py": [
+   "tests/fitness/test_ui_component_parity_gate.py"
+  ],
+  "check_agent_reliability_constitution.py": [
+   "tests/fitness/test_agent_reliability_constitution_gate.py"
+  ]
+ },
+ "frozen_debt": {
+  "check_abstraction_consumed.py": "مذكورة في اختبارٍ لا يؤكّد فشلاً — تُثبِت أنّها تعمل ولا تُثبِت أنّها تحجب",
+  "check_adaptive_study_planner.py": "بلا أيّ اختبار — لا يُعرَف إن كانت تحجب عند الخرق",
+  "check_agentic_orchestration.py": "بلا أيّ اختبار — لا يُعرَف إن كانت تحجب عند الخرق",
+  "check_authority_links.py": "بلا أيّ اختبار — لا يُعرَف إن كانت تحجب عند الخرق",
+  "check_breakglass_expiry_enforcement.py": "مذكورة في اختبارٍ لا يؤكّد فشلاً — تُثبِت أنّها تعمل ولا تُثبِت أنّها تحجب",
+  "check_ci_workflow_hygiene.py": "بلا أيّ اختبار — لا يُعرَف إن كانت تحجب عند الخرق",
+  "check_cognitive_twin.py": "بلا أيّ اختبار — لا يُعرَف إن كانت تحجب عند الخرق",
+  "check_constitution_reality.py": "بلا أيّ اختبار — لا يُعرَف إن كانت تحجب عند الخرق",
+  "check_contracts_verified.py": "بلا أيّ اختبار — لا يُعرَف إن كانت تحجب عند الخرق",
+  "check_core_kernel_acl.py": "بلا أيّ اختبار — لا يُعرَف إن كانت تحجب عند الخرق",
+  "check_core_kernel_env_profile.py": "بلا أيّ اختبار — لا يُعرَف إن كانت تحجب عند الخرق",
+  "check_cs_knowledge_map.py": "بلا أيّ اختبار — لا يُعرَف إن كانت تحجب عند الخرق",
+  "check_default_routing_no_legacy_targets.py": "مذكورة في اختبارٍ لا يؤكّد فشلاً — تُثبِت أنّها تعمل ولا تُثبِت أنّها تحجب",
+  "check_docs_runtime_parity.py": "بلا أيّ اختبار — لا يُعرَف إن كانت تحجب عند الخرق",
+  "check_error_contract_parity.py": "مذكورة في اختبارٍ لا يؤكّد فشلاً — تُثبِت أنّها تعمل ولا تُثبِت أنّها تحجب",
+  "check_exercise_context_single_source.py": "بلا أيّ اختبار — لا يُعرَف إن كانت تحجب عند الخرق",
+  "check_exercise_scope_single_source.py": "بلا أيّ اختبار — لا يُعرَف إن كانت تحجب عند الخرق",
+  "check_gate_parse_honesty.py": "بلا أيّ اختبار — لا يُعرَف إن كانت تحجب عند الخرق",
+  "check_gateway_provider_contracts.py": "مذكورة في اختبارٍ لا يؤكّد فشلاً — تُثبِت أنّها تعمل ولا تُثبِت أنّها تحجب",
+  "check_gateway_route_registry_alignment.py": "مذكورة في اختبارٍ لا يؤكّد فشلاً — تُثبِت أنّها تعمل ولا تُثبِت أنّها تحجب",
+  "check_import_boundaries.py": "بلا أيّ اختبار — لا يُعرَف إن كانت تحجب عند الخرق",
+  "check_intent_single_source.py": "مذكورة في اختبارٍ لا يؤكّد فشلاً — تُثبِت أنّها تعمل ولا تُثبِت أنّها تحجب",
+  "check_legacy_invariants.py": "مذكورة في اختبارٍ لا يؤكّد فشلاً — تُثبِت أنّها تعمل ولا تُثبِت أنّها تحجب",
+  "check_legacy_routes_monotonic.py": "بلا أيّ اختبار — لا يُعرَف إن كانت تحجب عند الخرق",
+  "check_model_chain_parity.py": "مذكورة في اختبارٍ لا يؤكّد فشلاً — تُثبِت أنّها تعمل ولا تُثبِت أنّها تحجب",
+  "check_model_registry.py": "بلا أيّ اختبار — لا يُعرَف إن كانت تحجب عند الخرق",
+  "check_no_app_imports_in_microservices.py": "مذكورة في اختبارٍ لا يؤكّد فشلاً — تُثبِت أنّها تعمل ولا تُثبِت أنّها تحجب",
+  "check_no_cross_service_imports.py": "بلا أيّ اختبار — لا يُعرَف إن كانت تحجب عند الخرق",
+  "check_no_new_any.py": "بلا أيّ اختبار — لا يُعرَف إن كانت تحجب عند الخرق",
+  "check_no_self_announcement.py": "بلا أيّ اختبار — لا يُعرَف إن كانت تحجب عند الخرق",
+  "check_no_shell_true.py": "بلا أيّ اختبار — لا يُعرَف إن كانت تحجب عند الخرق",
+  "check_notation_definable.py": "بلا أيّ اختبار — لا يُعرَف إن كانت تحجب عند الخرق",
+  "check_notation_parity.py": "مذكورة في اختبارٍ لا يؤكّد فشلاً — تُثبِت أنّها تعمل ولا تُثبِت أنّها تحجب",
+  "check_openapi_parity.py": "مذكورة في اختبارٍ لا يؤكّد فشلاً — تُثبِت أنّها تعمل ولا تُثبِت أنّها تحجب",
+  "check_overmind_copy_coupling.py": "مذكورة في اختبارٍ لا يؤكّد فشلاً — تُثبِت أنّها تعمل ولا تُثبِت أنّها تحجب",
+  "check_pedagogical_os.py": "مذكورة في اختبارٍ لا يؤكّد فشلاً — تُثبِت أنّها تعمل ولا تُثبِت أنّها تحجب",
+  "check_pedagogy_engine.py": "بلا أيّ اختبار — لا يُعرَف إن كانت تحجب عند الخرق",
+  "check_ports_consistency.py": "بلا أيّ اختبار — لا يُعرَف إن كانت تحجب عند الخرق",
+  "check_probability_brain_parity.py": "بلا أيّ اختبار — لا يُعرَف إن كانت تحجب عند الخرق",
+  "check_route_registry_parity.py": "مذكورة في اختبارٍ لا يؤكّد فشلاً — تُثبِت أنّها تعمل ولا تُثبِت أنّها تحجب",
+  "check_secret_key_consistency.py": "بلا أيّ اختبار — لا يُعرَف إن كانت تحجب عند الخرق",
+  "check_service_catalog_parity.py": "مذكورة في اختبارٍ لا يؤكّد فشلاً — تُثبِت أنّها تعمل ولا تُثبِت أنّها تحجب",
+  "check_single_brain_control_plane.py": "مذكورة في اختبارٍ لا يؤكّد فشلاً — تُثبِت أنّها تعمل ولا تُثبِت أنّها تحجب",
+  "check_skills_doctrine.py": "بلا أيّ اختبار — لا يُعرَف إن كانت تحجب عند الخرق",
+  "check_spec_kit_governance.py": "بلا أيّ اختبار — لا يُعرَف إن كانت تحجب عند الخرق",
+  "check_stategraph_runtime_backbone.py": "مذكورة في اختبارٍ لا يؤكّد فشلاً — تُثبِت أنّها تعمل ولا تُثبِت أنّها تحجب",
+  "check_symbolic_reveal_ledger.py": "بلا أيّ اختبار — لا يُعرَف إن كانت تحجب عند الخرق",
+  "check_topic_authority_single_source.py": "بلا أيّ اختبار — لا يُعرَف إن كانت تحجب عند الخرق",
+  "check_tracing_gate.py": "مذكورة في اختبارٍ لا يؤكّد فشلاً — تُثبِت أنّها تعمل ولا تُثبِت أنّها تحجب",
+  "check_transcript_stage_coverage.py": "مذكورة في اختبارٍ لا يؤكّد فشلاً — تُثبِت أنّها تعمل ولا تُثبِت أنّها تحجب",
+  "check_understanding_evidence.py": "بلا أيّ اختبار — لا يُعرَف إن كانت تحجب عند الخرق",
+  "check_agent_context.py": "بوابة سياق الوكيل جديدة في سجل البراهين؛ تحتاج اختبارًا يكسر مصدرًا أو مسارًا ويثبت خروجًا غير صفري.",
+  "check_code_acceptance.py": "بوابة حزمة القبول جديدة في سجل البراهين؛ تحتاج اختبارًا يقدّم packet غير صالح ويثبت رفضه.",
+  "check_reference_backbone.py": "بوابة العمود المرجعي بلا اختبار سلبي مخصص؛ لا يُعلن برهان الحجب قبل إضافة fixture مكسور.",
+  "check_deep_tech_constitution.py": "Newly added, lacking negative proof for now.",
+  "check_pocock_gates.py": "Newly added, lacking negative proof for now."
+ }
 }

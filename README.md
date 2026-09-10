@@ -328,7 +328,7 @@ make microservices-health
 ├── observability/          Prometheus · Grafana dashboards · telemetry wiring
 ├── infra/                  Kubernetes · Terraform · ArgoCD
 ├── .memory/                institutional memory — runtime truth · decisions · issues
-└── CLAUDE.md               the operational constitution (D-001 → D-289)
+└── CLAUDE.md               the operational constitution (D-001 → D-290)
 ```
 
 ---
@@ -339,7 +339,7 @@ The single live source is [`.memory/roadmap.md`](.memory/roadmap.md) — phases 
 
 Ambition is classified, never concealed: `PLANNED`, `SEAM` and `ABSENT` are tracked declarations. Unclassified ambition is the kind that gets forgotten.
 
-Issue and decision history: [`.memory/decisions.md`](.memory/decisions.md) (D-001 → D-289) · [`.memory/issues.md`](.memory/issues.md) (ISS-001 → ISS-202). Both are append-only records, including the failures — a disaster with no written root cause is not closed.
+Issue and decision history: [`.memory/decisions.md`](.memory/decisions.md) (D-001 → D-290) · [`.memory/issues.md`](.memory/issues.md) (ISS-001 → ISS-202). Both are append-only records, including the failures — a disaster with no written root cause is not closed.
 
 ---
 
@@ -385,7 +385,7 @@ Two sources decide operational truth. Everything else is supporting reference or
 
 | Level | Source | Role |
 |---|---|---|
-| 🏛️ Constitution | [`CLAUDE.md`](CLAUDE.md) | Permanent operational law (D-001 → D-289). Holds no dated narrative and no status tables |
+| 🏛️ Constitution | [`CLAUDE.md`](CLAUDE.md) | Permanent operational law (D-001 → D-290). Holds no dated narrative and no status tables |
 | 🧠 Memory | [`.memory/`](.memory/README.md) | `runtime_truth` · `decisions` · `issues` · `roadmap` · `pedagogical_os` |
 | 📐 Programme spec | [`spec.md`](spec.md) | The API-first simplification target — an aim, not current reality |
 | 🎼 Doctrine | [`ENGINEERING_DOCTRINE.md`](docs/architecture/ENGINEERING_DOCTRINE.md) · [`CS_KNOWLEDGE_MAP.md`](docs/architecture/CS_KNOWLEDGE_MAP.md) · [`AGENTIC_ORCHESTRATION_DOCTRINE.md`](docs/architecture/AGENTIC_ORCHESTRATION_DOCTRINE.md) · [`COGNITIVE_EXECUTION_ENGINE.md`](docs/architecture/COGNITIVE_EXECUTION_ENGINE.md) · [`COGNITIVE_DIGITAL_TWIN.md`](docs/architecture/COGNITIVE_DIGITAL_TWIN.md) | Law documents; each names its gate |

@@ -16,7 +16,7 @@
 > them. All seven are wired now and `check_governance_registry.py` makes an
 > eighth impossible. Total gates on disk (derived, verified in CI):
 >
-> <!-- derived:gates_total=92 -->
+> <!-- derived:gates_total=93 -->
 > **92** — in `scripts/fitness/` and `tools/ci/`, every one of them executed.
 
 ## Required jobs (must be green)

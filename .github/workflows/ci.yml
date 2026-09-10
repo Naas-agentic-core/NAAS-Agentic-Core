@@ -178,6 +178,12 @@ jobs:
           # declared in CLAUDE.md §0.25 as wired, and executed by nothing — the
           # ISS-186 class (a gate that reads as protection but enforces nothing).
           python scripts/fitness/check_deep_tech_constitution.py
+          # D-290: agent reliability & hard-currency constitution. Non-bypassable
+          # by construction: this gate verifies its own wiring here, rejects
+          # unverifiable claims (with the explicit prohibition/negation marker
+          # exception), keeps the 7 canonical offer lines closed, and requires
+          # every hypothesis H1-H7 to hold a closed-state, evidence-backed row.
+          python scripts/fitness/check_agent_reliability_constitution.py
           # D-267 §3.1: the verifier's dependency map was prose. This turns it into a
           # contract — and enforces the D-187 lock structurally (no sandbox executor
           # or network client inside the product path before M1→M4).

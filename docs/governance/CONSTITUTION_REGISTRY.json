@@ -464,6 +464,21 @@
       "enforcers": [
         "check_code_acceptance.py"
       ]
+    },
+    {
+      "section": "0.29",
+      "id": "D-290",
+      "title_en": "Agent Reliability & Hard-Currency Constitution",
+      "title_ar": "دستور اعتمادية الوكلاء والعملة الصعبة",
+      "law_docs": [
+        ".memory/agent_reliability_hard_currency_constitution.md"
+      ],
+      "status_docs": [
+        ".memory/agent_reliability_hard_currency_truth.md"
+      ],
+      "enforcers": [
+        "check_agent_reliability_constitution.py"
+      ]
     }
   ]
 }
