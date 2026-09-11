@@ -1,6 +1,6 @@
 {
   "$schema_version": "1",
-  "packet_id": "CAP-2026-09-10-cdkc-new-knowledge-hard-currency",
+  "packet_id": "CAP-2026-09-11-vera-verifiable-evidence-protocol",
   "status": "READY_FOR_GATE",
   "decision": "D-277",
   "standards": [
@@ -27,55 +27,66 @@
       "paths": [
         "shared/research/durable_knowledge.py",
         "shared/research/exportable_eval.py",
-        "tests/shared/test_cdkc_durable_knowledge.py"
+        "tests/shared/test_cdkc_durable_knowledge.py",
+        "shared/research/verifiable_evidence.py",
+        "shared/research/portable_trust.py",
+        "tests/shared/test_vera_receipt.py",
+        "tests/shared/test_vera_portable_trust.py"
       ],
-      "gate": "python -m pytest tests/shared/test_cdkc_durable_knowledge.py --noconftest -v",
-      "application_ar": "هياكل بيانات حتمية: dataclass frozen+slots، StrEnum للتحقق الرمزي والتبديل اللغوي، فصل القلق — BKT × FSRS × تحقق × ثقة × لغة في معادلة واحدة بلا LLM في المسار العددي. الاختبارات تثبت: نضج (MIN_OBS)، خانة حمراء، وزن رمزي، كلفة لغوية مشبعة، M×R ≠ M."
+      "gate": "python -m pytest tests/shared/test_vera_receipt.py tests/shared/test_vera_portable_trust.py tests/shared/test_cdkc_durable_knowledge.py tests/shared/test_cdkc_exportable_eval.py --noconftest -v",
+      "application_ar": "هياكل بيانات حتمية: dataclass frozen+slots، StrEnum للتحقق الرمزي والتبديل اللغوي، فصل القلق — BKT × FSRS × تحقق × ثقة × لغة في معادلة واحدة بلا LLM في المسار العددي. الاختبارات تثبت: نضج (MIN_OBS)، خانة حمراء، وزن رمزي، كلفة لغوية مشبعة، M×R ≠ M. | VEP: هياكل حتمية للبرهان — dataclass frozen+slots، StrEnum للمآل وصنف الفشل، تمثيل JSON كنسي (مفاتيح مرتبة بلا فراغات) كي تُبصَم البيانات نفسها على أي آلة."
     },
     {
       "standard": "the-algorithms-python",
       "paths": [
-        "shared/research/durable_knowledge.py"
+        "shared/research/durable_knowledge.py",
+        "shared/research/portable_trust.py"
       ],
-      "gate": "python -m pytest tests/shared/test_cdkc_durable_knowledge.py --noconftest -v",
-      "application_ar": "خوارزمية CDKC: ضرب لا جمع (أي عامل صفري يُصفر المعرفة)، إشباع لوغاريتمي لكلفة التبديل عند 0.40، عقوبة وهم λ=0.30 — كلها مع تبرير رياضي وحدود مجالات ورفع CdkcError بدل قيمة افتراضية مضللة (لا فشل صامت)."
+      "gate": "python -m pytest tests/shared/test_vera_receipt.py tests/shared/test_vera_portable_trust.py tests/shared/test_cdkc_durable_knowledge.py tests/shared/test_cdkc_exportable_eval.py --noconftest -v",
+      "application_ar": "خوارزمية CDKC: ضرب لا جمع (أي عامل صفري يُصفر المعرفة)، إشباع لوغاريتمي لكلفة التبديل عند 0.40، عقوبة وهم λ=0.30 — كلها مع تبرير رياضي وحدود مجالات ورفع CdkcError بدل قيمة افتراضية مضللة (لا فشل صامت). | VEP: خوارزميات بلا تبعيات — سلسلة هاش، شجرة ميركل وبرهان تضمين، التزامات مملّحة، فترات ويلسون ونيوكومب، ودالة توزيع طبيعي عبر math.erf بلا SciPy."
     },
     {
       "standard": "system-design-primer",
       "paths": [
         "docs/research/HARD_CURRENCY_NEW_KNOWLEDGE_CDKC.md",
         "docs/commercial/CDKC_EXPORTABLE_EVAL_OFFER.md",
-        "benchmarks/dz_bac_bench/v2/CDKC_BENCHMARK_SPEC.md"
+        "benchmarks/dz_bac_bench/v2/CDKC_BENCHMARK_SPEC.md",
+        "docs/research/HARD_CURRENCY_NEW_KNOWLEDGE_VERA.md",
+        "docs/commercial/VERA_EXPORT_OFFER.md"
       ],
-      "gate": "scripts/fitness/check_documentation_contract.py",
-      "application_ar": "صمّم سطح القياس قبل النظام: CDKC يعرّف معادلة حتمية + عقد تكرار (تثبيت أساس، ≥3 تشغيلات، حكم رمزي أولاً) + بطاقة معايرة (Brier/reliability/resolution) + شروط قتل K1-K5 — قابلية التكرار والدحض صُممت قبل أي تجربة. والروابط محلولة تحت بوابة عقد التوثيق."
+      "gate": "python -m pytest tests/shared/test_vera_receipt.py tests/shared/test_vera_portable_trust.py tests/shared/test_cdkc_durable_knowledge.py tests/shared/test_cdkc_exportable_eval.py --noconftest -v",
+      "application_ar": "صمّم سطح القياس قبل النظام: CDKC يعرّف معادلة حتمية + عقد تكرار (تثبيت أساس، ≥3 تشغيلات، حكم رمزي أولاً) + بطاقة معايرة (Brier/reliability/resolution) + شروط قتل K1-K5 — قابلية التكرار والدحض صُممت قبل أي تجربة. والروابط محلولة تحت بوابة عقد التوثيق. | VEP: سطح القياس صُمّم قبل التجربة — PTC وPRV وقاعدة قبول بعتبة معلنة θ، وشروط قتل K1–K5، وحدٌّ نصّي يفصل «المطابقة» عن «الصحّة»."
     },
     {
       "standard": "build-your-own-x",
       "paths": [
         "shared/research/exportable_eval.py",
-        "benchmarks/dz_bac_bench/v2/CDKC_BENCHMARK_SPEC.md"
+        "benchmarks/dz_bac_bench/v2/CDKC_BENCHMARK_SPEC.md",
+        "shared/research/verifiable_evidence.py",
+        "scripts/research/measure_vera_escape_width.py"
       ],
-      "gate": "python -m pytest tests/shared/test_cdkc_exportable_eval.py --noconftest -v",
-      "application_ar": "بناء معيار من الصفر: حزمة تقييم موثقة بمنشأ وبطاقة معايرة وبيان حدود وإجراء إعادة تشغيل — ليس بيانات خام بل منتج قابل للتدقيق يباع. مثال حي بثلاث مهام يثبت المفهوم."
+      "gate": "python -m pytest tests/shared/test_vera_receipt.py tests/shared/test_vera_portable_trust.py tests/shared/test_cdkc_durable_knowledge.py tests/shared/test_cdkc_exportable_eval.py --noconftest -v",
+      "application_ar": "بناء معيار من الصفر: حزمة تقييم موثقة بمنشأ وبطاقة معايرة وبيان حدود وإجراء إعادة تشغيل — ليس بيانات خام بل منتج قابل للتدقيق يباع. مثال حي بثلاث مهام يثبت المفهوم. | VEP: مصنوعٌ بُني من الصفر — إيصال تقييم قابل لإعادة التشغيل داخل بيئة المشتري، وسكربت قياس حتمي يكتب ملفّاً مؤرَّخاً بلا شبكة ولا عشوائية."
     },
     {
       "standard": "openhands-agent-canvas",
       "paths": [
         "docs/research/HARD_CURRENCY_NEW_KNOWLEDGE_CDKC.md",
-        "docs/changes/CURRENT_CODE_ACCEPTANCE_PACKET.json"
+        "docs/changes/CURRENT_CODE_ACCEPTANCE_PACKET.json",
+        "docs/research/HARD_CURRENCY_NEW_KNOWLEDGE_VERA.md"
       ],
-      "gate": ".github/scripts/validate_pr_description.py",
-      "application_ar": "الدليل قبل الدمج: هذه الحزمة نفسها هي التطبيق — وصف الدفعة يحمل الأوامر ومخرجاتها، وقسم HUMAN: بيد الإنسان، والعنوان عقد Conventional Commits. ولا ادعاء بلا وسم 🟢/🟡/🔴، ولا سعر بلا PRICING HYPOTHESIS، ولا حالة كتالوج متقدمة بلا دليل."
+      "gate": "python -m pytest tests/shared/test_vera_receipt.py tests/shared/test_vera_portable_trust.py tests/shared/test_cdkc_durable_knowledge.py tests/shared/test_cdkc_exportable_eval.py --noconftest -v",
+      "application_ar": "الدليل قبل الدمج: هذه الحزمة نفسها هي التطبيق — وصف الدفعة يحمل الأوامر ومخرجاتها، وقسم HUMAN: بيد الإنسان، والعنوان عقد Conventional Commits. ولا ادعاء بلا وسم 🟢/🟡/🔴، ولا سعر بلا PRICING HYPOTHESIS، ولا حالة كتالوج متقدمة بلا دليل. | VEP: برهانٌ على مسار وكيل — بصمة نصّ لا النصّ، تشغيلاتٌ متسقة البيئة والمحرّك، وبصمة مجموعة مستقلّة عن ترتيب التنفيذ المتوازي."
     },
     {
       "standard": "developer-roadmap",
       "paths": [
         "docs/commercial/CDKC_EXPORTABLE_EVAL_OFFER.md",
-        "docs/research/README_NEW_KNOWLEDGE.md"
+        "docs/research/README_NEW_KNOWLEDGE.md",
+        "docs/research/VERA_FX_REPATRIATION_PACKET.md"
       ],
-      "gate": "scripts/fitness/check_documentation_contract.py",
-      "application_ar": "خارطة طريق تجارية: معرفة جديدة → حزمة موثقة → 5 مقابلات اكتشاف → OFFER_READY → PILOT → PAID_PROOF → REPEATABLE → $/€. ثلاثة عروض من معادلة واحدة (خطوط 1 و2 و6) مع مزايا لا تُنسخ: تاريخ مقيس لتلميذ جزائري بعينه."
+      "gate": "python -m pytest tests/shared/test_vera_receipt.py tests/shared/test_vera_portable_trust.py tests/shared/test_cdkc_durable_knowledge.py tests/shared/test_cdkc_exportable_eval.py --noconftest -v",
+      "application_ar": "خارطة طريق تجارية: معرفة جديدة → حزمة موثقة → 5 مقابلات اكتشاف → OFFER_READY → PILOT → PAID_PROOF → REPEATABLE → $/€. ثلاثة عروض من معادلة واحدة (خطوط 1 و2 و6) مع مزايا لا تُنسخ: تاريخ مقيس لتلميذ جزائري بعينه. | VEP: خريطة بحثية تكمل CDKC — حزمة تحقّق تنظيمي لأجل ترحيل عائدات الخدمات، بشرط إغلاق مسمّى ومصادر أولية مُستخرجة."
     }
   ],
   "production": {
@@ -86,9 +97,16 @@
       "shared/research/exportable_eval.py: build_eval_bundle() + example_bundle() — يبني حزم تقييم موثقة",
       "docs/research/HARD_CURRENCY_NEW_KNOWLEDGE_CDKC.md: بحث مستقل يولد معرفة جديدة كلياً — قراءة بشرية",
       "docs/commercial/CDKC_EXPORTABLE_EVAL_OFFER.md: توسيع تجاري للخطوط 1 و2 و6 — PROPOSED",
-      "benchmarks/dz_bac_bench/v2/CDKC_BENCHMARK_SPEC.md: مواصفة معيار v2 — PROPOSED"
+      "benchmarks/dz_bac_bench/v2/CDKC_BENCHMARK_SPEC.md: مواصفة معيار v2 — PROPOSED",
+      "shared/research/verifiable_evidence.py: build_receipt() -> EvaluationReceipt + verify_receipt() — إيصال حتمي وتحقيق يسمّي الفحص الساقط",
+      "shared/research/portable_trust.py: compute_ptc() · compute_prv() · acceptance_decision() · repatriation_breach_risk() — مقاييس وقرار",
+      "shared/research/portable_trust.py: wilson_interval() · newcombe_difference() · contract_term_ceiling() — إحصاء بلا تبعيات، غير الناضج يُرجع None",
+      "scripts/research/measure_vera_escape_width.py: يكتب docs/research/VERA_MEASUREMENTS.json — قياس حتمي بلا شبكة",
+      "docs/research/HARD_CURRENCY_NEW_KNOWLEDGE_VERA.md: بحث مستقل — تحويل سلعة الثقة إلى سلعة فحص — قراءة بشرية",
+      "docs/commercial/VERA_EXPORT_OFFER.md: أثر على الخطوط 1 و5 و6 — PROPOSED، ولا خط ثامن",
+      "docs/research/VERA_FX_REPATRIATION_PACKET.md: حزمة تحقّق تنظيمي (D-282) — لا تعدّل عقيدة"
     ],
-    "failure_behavior_ar": "لا مسار تشغيلي إطلاقاً في هذه الدفعة: shared/research لا يستوردها أي كود حي بعد — أسوأ فشل هو معادلة خاطئة تُدحض في K1-K5 (دورة بحث ضائعة)، لا عطب إنتاج. والوثائق تعلن صراحة ما لا يجوز الاستشهاد بها عليه (لا طلب، لا جاهزية، لا إيراد). والتحقق الرمزي: TIMEOUT=0.0 — لا يُعامل كنجاح.",
+    "failure_behavior_ar": "لا مسار تشغيلي إطلاقاً في هذه الدفعة: shared/research لا يستوردها أي كود حي بعد — أسوأ فشل هو معادلة خاطئة تُدحض في K1-K5 (دورة بحث ضائعة)، لا عطب إنتاج. والوثائق تعلن صراحة ما لا يجوز الاستشهاد بها عليه (لا طلب، لا جاهزية، لا إيراد). والتحقق الرمزي: TIMEOUT=0.0 — لا يُعامل كنجاح. والقياسُ غير الناضج (n<30) يُرجع None لا صفراً، والبيئات المختلطة والمحرّكات المختلطة تُرفع VepError بدل إيصال مضلّل.",
     "observability_ar": "المراقبة نصية + اختبارات: 24 اختباراً أخضر (18 لـ CDKC + 6 للحزم)، وعقد التوثيق يفحص الروابط، ومسح العبارات الممنوعة يفحص حد المصداقية. المقاييس المستقبلية: cogniforge_cdkc_computations_total, cdkc_dangerous_total, cdkc_avg_clipped — تُضاف عند ربط المحرك بمسار حي.",
     "security_boundary_ar": "لا أسرار ولا PII ولا تبعيات جديدة: stdlib فقط، لا استيراد من app/ ولا microservices/ — قابلة للتوريّد والتدقيق. لا سطح هجوم جديد، لا مفاتيح، لا وصول شبكي. حزم التقييم تحترم حقوق المنشأ ولا تحتوي بيانات تلاميذ حقيقية.",
     "rollback_ar": "revert لالتزامات هذه الدفعة يعيد الحالة السابقة حرفياً؛ لا هجرة ولا عقد خارجي ولا حالة كتالوج متغيرة. shared/research معزولة — لا كود حي يعتمد عليها بعد.",
@@ -105,17 +123,18 @@
     "offer_ids": [
       "ai-red-teaming-multilingual",
       "niche-rlhf-data",
+      "formal-verification-ai",
       "eu-ai-act-compliance"
     ],
-    "customer_problem_ar": "ثلاث مشاكل مدفوعة من معادلة واحدة: (1) فرق أمن الذكاء الاصطناعي خارج الجزائر لا تكتشف مخاطر الحقن في العربية/الفرنسية — فجوة 80 نقطة [R1] 🟢 وندرة معيار عربي متعدد الفئات [R5] 🟢. (2) مختبرات النماذج تحتاج بيانات تقييم معايرة بثقة+إتقان+استرجاع+تحقق+لغة — لا أحد يبيعها. (3) شركات أوروبية تحتاج أدلة حوكمة قابلة للتدقيق — CDKC يقدم سجل أنظمة + تصنيف مخاطر (الخانة الحمراء) + حزمة أدلة + بيان حدود.",
-    "value_hypothesis_ar": "حزمة تقييم موثقة بمنشأ وبطاقة معايرة وبيان حدود وإجراء إعادة تشغيل — ليس بيانات خام بل منتج قابل للتدقيق. كل مهمة: نص أصلي + concept_id + ثقة قبل الإجابة + إتقان دائم + استرجاع + حكم رمزي + تبديل لغوي + CDKC. التميّز: لا معيار يجمع الخمسة — هذه هي المعرفة الجديدة كلياً. الحالة تبقى PROPOSED حتى 5 مقابلات اكتشاف منهجية.",
-    "foreign_currency_path_ar": "طريق K2/K3: تصريح المشروع المصدّر قبل أي عقد، والتحصيل عبر الكيان وحساب العملة الصعبة حصراً، وأجل الترحيل 306 أيام مع السؤال المفتوح (120 يوماً غير متحقق) مذكوراً بحدّه. ثلاث رزم: مسح (الثلث الأدنى 25k$-200k$)، تقييم شامل (الأوسط)، برنامج فصلي (الأعلى) — كلها PRICING HYPOTHESIS داخل نطاق D-273 §03 وحده. لا وعد بهامش ولا بإيراد حتى PAID_PROOF (عقد موقع أو دفعة مسواة).",
-    "foundation_exception_ar": "ليست استثناءً: محتوى دعم للخطوط 1 و2 و6 داخل السبعة المصرح بها (D-273)، لا خط ثامن، ولا تغيير كتالوج، ولا ادعاء حالة — إضافة لا استبدال. المعرفة الجديدة تخدم بناء تاريخ مقيس لتلميذ جزائري بعينه — وهو الشيء الوحيد الذي لا يشترى بالمال."
+    "customer_problem_ar": "ثلاث مشاكل مدفوعة من معادلة واحدة: (1) فرق أمن الذكاء الاصطناعي خارج الجزائر لا تكتشف مخاطر الحقن في العربية/الفرنسية — فجوة 80 نقطة [R1] 🟢 وندرة معيار عربي متعدد الفئات [R5] 🟢. (2) مختبرات النماذج تحتاج بيانات تقييم معايرة بثقة+إتقان+استرجاع+تحقق+لغة — لا أحد يبيعها. (3) شركات أوروبية تحتاج أدلة حوكمة قابلة للتدقيق — CDKC يقدم سجل أنظمة + تصنيف مخاطر (الخانة الحمراء) + حزمة أدلة + بيان حدود. ومشكلة رابعة: المشتري البعيد لا يستطيع التحقق من تقييم الوكيل بتكلفة معقولة، فتُسعَّر السلعة على توقّع الجودة لا عليها.",
+    "value_hypothesis_ar": "حزمة تقييم موثقة بمنشأ وبطاقة معايرة وبيان حدود وإجراء إعادة تشغيل — ليس بيانات خام بل منتج قابل للتدقيق. كل مهمة: نص أصلي + concept_id + ثقة قبل الإجابة + إتقان دائم + استرجاع + حكم رمزي + تبديل لغوي + CDKC. التميّز: لا معيار يجمع الخمسة — هذه هي المعرفة الجديدة كلياً. الحالة تبقى PROPOSED حتى 5 مقابلات اكتشاف منهجية. وفرضية VEP: إيصالٌ قابل لإعادة التشغيل عند المشتري يخفض كلفة تحقّقه (PTC) إلى ما دون عتبة θ، فيسقط شرط الحضور الشخصي.",
+    "foreign_currency_path_ar": "طريق K2/K3: تصريح المشروع المصدّر قبل أي عقد، والتحصيل عبر الكيان وحساب العملة الصعبة حصراً، وأجل الترحيل 306 أيام مع السؤال المفتوح (120 يوماً غير متحقق) مذكوراً بحدّه. ثلاث رزم: مسح (الثلث الأدنى 25k$-200k$)، تقييم شامل (الأوسط)، برنامج فصلي (الأعلى) — كلها PRICING HYPOTHESIS داخل نطاق D-273 §03 وحده. لا وعد بهامش ولا بإيراد حتى PAID_PROOF (عقد موقع أو دفعة مسواة). وتصميمُ العقد يقبض على المسار: سقفُ أجل تسديد ≤ 45 يوماً صامد تحت الرقمين التنظيميين (120 و306).",
+    "foundation_exception_ar": "ليست استثناءً: محتوى دعم للخطوط 1 و2 و6 داخل السبعة المصرح بها (D-273)، لا خط ثامن، ولا تغيير كتالوج، ولا ادعاء حالة — إضافة لا استبدال. المعرفة الجديدة تخدم بناء تاريخ مقيس لتلميذ جزائري بعينه — وهو الشيء الوحيد الذي لا يشترى بالمال. ولا استثناء: لا عقد قبل كيان مرخّص وتصريح مشروع مصدَّر (K2/K3)."
   },
   "deletions": {
     "count": 0,
     "paths": [],
-    "policy_ar": "صفر حذف: 7 ملفات جديدة + تحديث حزمة القبول. لا ملف محذوف ولا سطر محذوف من أي قانون أو دستور أو سجل. الإضافة فقط — على سابقة D-275 L9."
+    "policy_ar": "صفر حذف: 11 ملفاً جديداً + تحديث 3 ملفات قائمة بالزيادة فقط. لا ملف محذوف ولا سطر محذوف من أي قانون أو دستور أو سجل. الإضافة فقط — على سابقة D-275 L9."
   },
   "verification": {
     "result": "PASS",
@@ -126,7 +145,12 @@
       "grep -n 'نضمن|مضمون|سنحقق|سنجني|يضمن|guaranteed|صفر أخطاء|100%' docs/research/HARD_CURRENCY_NEW_KNOWLEDGE_CDKC.md docs/commercial/CDKC_EXPORTABLE_EVAL_OFFER.md  # بلا matches — حد المصداقية محترم",
       "grep -n '\\$' docs/research/HARD_CURRENCY_NEW_KNOWLEDGE_CDKC.md | grep -v 'PRICING HYPOTHESIS' | grep -v '25,000\\$' | grep -v '200,000\\$'  # بلا أسطر مال غير موسومة",
       "ls shared/research/durable_knowledge.py shared/research/exportable_eval.py  # موجودان — stdlib فقط",
-      "git diff --check  # لا أخطاء مسافات"
+      "git diff --check  # لا أخطاء مسافات",
+      "python -m pytest tests/shared/test_vera_receipt.py tests/shared/test_vera_portable_trust.py --noconftest -q  # PASS — 64 passed",
+      "python -m pytest tests/shared/test_cdkc_durable_knowledge.py tests/shared/test_cdkc_exportable_eval.py --noconftest -q  # PASS — 24 passed",
+      "python3 scripts/research/measure_vera_escape_width.py  # PASS — يكتب VERA_MEASUREMENTS.json حتمياً",
+      "python3 scripts/fitness/check_documentation_contract.py  # PASS — روابط محلولة",
+      "python3 scripts/fitness/check_agent_reliability_constitution.py  # PASS — لا خط ثامن، وحد المصداقية محترم"
     ],
     "measured_ar": "المقيس لا المستنتج: 24 اختباراً أخضر (18 CDKC + 6 حزم) + مثال حي يبني 3 مهام بفجوة خطرة واحدة + مسحا نص (ممنوعات/مال) نظيفان + صفر حذف. لا كتالوج متغير (7/7 PROPOSED)، ولا حالة بوابة متغيرة، ولا تبعيات جديدة."
   },
@@ -213,17 +237,20 @@
     "owner": "curriculum-governance"
   },
   "changed_paths": [
-    "docs/changes/CURRENT_CODE_ACCEPTANCE_PACKET.json",
-    "docs/changes/current_changed_paths.txt",
+    "shared/research/verifiable_evidence.py",
+    "shared/research/portable_trust.py",
     "shared/research/__init__.py",
-    "shared/research/durable_knowledge.py",
-    "shared/research/exportable_eval.py",
-    "docs/research/HARD_CURRENCY_NEW_KNOWLEDGE_CDKC.md",
+    "scripts/research/measure_vera_escape_width.py",
+    "tests/shared/test_vera_receipt.py",
+    "tests/shared/test_vera_portable_trust.py",
+    "docs/research/HARD_CURRENCY_NEW_KNOWLEDGE_VERA.md",
+    "docs/research/VERA_FX_REPATRIATION_PACKET.md",
+    "docs/research/VERA_MEASUREMENTS.json",
     "docs/research/README_NEW_KNOWLEDGE.md",
-    "docs/commercial/CDKC_EXPORTABLE_EVAL_OFFER.md",
-    "benchmarks/dz_bac_bench/v2/CDKC_BENCHMARK_SPEC.md",
-    "tests/shared/test_cdkc_durable_knowledge.py",
-    "tests/shared/test_cdkc_exportable_eval.py"
+    "docs/commercial/VERA_EXPORT_OFFER.md",
+    ".memory/vera_remote_acceptance_truth.md",
+    ".memory/fx_doctrine_truth.md",
+    "docs/changes/CURRENT_CODE_ACCEPTANCE_PACKET.json"
   ],
   "git_change_snapshot": {
     "base_ref": "origin/main",
