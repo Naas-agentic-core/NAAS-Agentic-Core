@@ -143,7 +143,7 @@ def build_eval_bundle(
         concept_cov[t.concept_id] = concept_cov.get(t.concept_id, 0) + 1
 
     # بطاقة معايرة — مبسطة للنسخة 1.0.0
-    calibration_card = {
+    calibration_card: dict[str, float | int | str] = {
         "version": CDKC_VERSION,
         "total": len(tasks),
         "calibrated": len(calibrated),
