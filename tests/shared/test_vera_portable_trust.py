@@ -112,11 +112,11 @@ def test_confidence_width_shrinks_as_the_sample_grows() -> None:
     """قانونٌ إحصائي لا رأي: إن لم يتحقق، فالمقياس نفسه فاسد."""
     widths = [
         newcombe_difference(
-                successes_a=base,
-                n_a=n,
-                successes_b=2 * base,
-                n_b=n,
-            ).width
+            successes_a=base,
+            n_a=n,
+            successes_b=2 * base,
+            n_b=n,
+        ).width
         for n, base in ((50, 5), (200, 20), (800, 80), (3200, 320))
     ]
     assert widths == sorted(widths, reverse=True)
@@ -320,9 +320,7 @@ def test_contract_term_ceiling_round_trips_to_the_target() -> None:
     sigma = 0.55
     ceiling = contract_term_ceiling(settle_sigma=sigma, deadline_days=120, target_breach=0.04)
     p90 = ceiling * math.exp(sigma * Z_90)
-    risk = repatriation_breach_risk(
-        settle_p50_days=ceiling, settle_p90_days=p90, deadline_days=120
-    )
+    risk = repatriation_breach_risk(settle_p50_days=ceiling, settle_p90_days=p90, deadline_days=120)
     assert risk.p_breach == pytest.approx(0.04, abs=1e-3)
     assert risk.verdict is BreachVerdict.TOLERABLE
 

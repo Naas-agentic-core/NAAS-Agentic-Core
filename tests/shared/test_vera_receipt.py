@@ -154,9 +154,7 @@ def test_failure_requires_a_class_and_success_forbids_it() -> None:
 
 
 def test_timeout_is_never_a_success() -> None:
-    timeout_run = make_run(
-        "t", outcome=RunOutcome.TIMEOUT, failure_class=FailureClass.STATE_DRIFT
-    )
+    timeout_run = make_run("t", outcome=RunOutcome.TIMEOUT, failure_class=FailureClass.STATE_DRIFT)
     assert timeout_run.is_failure
     assert not make_run("t").is_failure
 

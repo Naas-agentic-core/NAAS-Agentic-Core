@@ -33,7 +33,7 @@ from __future__ import annotations
 
 import json
 import math
-from datetime import datetime, timezone
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -78,9 +78,9 @@ def escape_width_table() -> list[dict[str, Any]]:
     for n in SAMPLE_SIZES:
         for p_base, p_injected in FAILURE_PAIRS:
             interval = newcombe_difference(
-                successes_a=int(round(p_base * n)),
+                successes_a=round(p_base * n),
                 n_a=n,
-                successes_b=int(round(p_injected * n)),
+                successes_b=round(p_injected * n),
                 n_b=n,
             )
             if interval is None:
@@ -116,9 +116,9 @@ def smallest_decisive_n(p_base: float, p_injected: float) -> int | None:
     """أصغر حجمِ عيّنةٍ يستبعد عنده الفاصلُ الصفر — أو `None` إن لم يحدث في المدى."""
     for n in (50, 100, 150, 200, 300, 400, 600, 800, 1200, 1600, 2400):
         interval = newcombe_difference(
-            successes_a=int(round(p_base * n)),
+            successes_a=round(p_base * n),
             n_a=n,
-            successes_b=int(round(p_injected * n)),
+            successes_b=round(p_injected * n),
             n_b=n,
         )
         if interval is not None and interval.low > 0.0:
@@ -166,7 +166,7 @@ def main() -> int:
             "(N=200) يستبعد الصفر من فاصل الفرق؟ (2) ما أجلُ السداد الذي يجوز منحُه "
             "قبل أن يخرق أجل الترحيل؟"
         ),
-        "generated_at_utc": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "generated_at_utc": datetime.now(datetime.UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "generator": "scripts/research/measure_vera_escape_width.py",
         "determinism": "حتمي: لا عشوائية ولا شبكة ولا ساعة في الحساب — الساعة في التقرير فقط.",
         "method": {

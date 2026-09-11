@@ -243,7 +243,7 @@
       "reported_as": "🟢⟨ح⟩ حتمي محسوب على مُقدِّر إحصائي — لا قياسُ عميل"
     }
   ],
-  "generated_at_utc": "2026-09-11T02:29:49Z",
+  "generated_at_utc": "2026-09-11T02:47:53Z",
   "generator": "scripts/research/measure_vera_escape_width.py",
   "h1_protocol_verdict": "يُقرأ من `smallest_decisive_n`: إن كان أصغرُ n حاسماً ≤ 200 فبروتوكول H1 المُعلن كافٍ للأثر المفترض، وإن كان > 200 فالبروتوكول ناقصُ القدرة ويجب رفعُ N قبل التنفيذ كي لا يُنتج «لا نعرف» ويُقرأ دحضاً للفرضية.",
   "method": {

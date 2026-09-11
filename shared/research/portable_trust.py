@@ -299,8 +299,7 @@ def acceptance_decision(
     if gross_low_usd <= 0:
         return (
             AcceptDecision.DECLINE,
-            "القيمة المحافظة ≤ صفر: الحدّ الأدنى للفاصل لا يبرّر الشراء، وأيّ بيعٍ هنا "
-            "بيعٌ على الرجاء.",
+            "القيمة المحافظة ≤ صفر: الحدّ الأدنى للفاصل لا يبرّر الشراء، وأيّ بيعٍ هنا بيعٌ على الرجاء.",
         )
     threshold = theta * gross_low_usd
     if c_check_usd <= threshold:
@@ -441,9 +440,7 @@ def contract_term_ceiling(
     return deadline_days * math.exp(-z_target * settle_sigma)
 
 
-def presence_substitution_index(
-    closed_without_visit: int, closed_total: int
-) -> float | None:
+def presence_substitution_index(closed_without_visit: int, closed_total: int) -> float | None:
     """مؤشّر إحلال الحضور (PSI): كم صفقةً أُغلقت بلا زيارة أو لقاء شخصي؟
 
     0 ⇒ الحضور شرطٌ لكل صفقة (حالةُ التعهيد الخارجي كما تصفها الأدبيات).

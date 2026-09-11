@@ -50,22 +50,22 @@ from enum import StrEnum
 from typing import Final
 
 __all__ = [
-    "VEP_VERSION",
-    "MIN_RUNS_FOR_RECEIPT",
     "GENESIS_CHAIN",
-    "VepError",
+    "MIN_RUNS_FOR_RECEIPT",
+    "VEP_VERSION",
+    "Commitment",
+    "EvaluationReceipt",
     "FailureClass",
+    "MerkleStep",
+    "ReceiptVerification",
     "RunOutcome",
     "RunRecord",
-    "Commitment",
-    "MerkleStep",
-    "EvaluationReceipt",
-    "ReceiptVerification",
+    "VepError",
     "build_chain",
     "build_receipt",
     "canonical_json",
-    "commit_value",
     "commit_failure_classes",
+    "commit_value",
     "deterministic_probe_stream",
     "digest_payload",
     "env_fingerprint",
@@ -449,9 +449,7 @@ def build_receipt(
         raise VepError("الإيصال بلا تاريخ إنشاء: برهانٌ بلا زمنٍ لا يُؤرَّخ به ادّعاء.")
     fingerprints = {run.env_fingerprint for run in runs}
     if fingerprints != {env_fingerprint}:
-        raise VepError(
-            "بيئاتٌ مختلطة في إيصالٍ واحد: المقارنة بين بيئتين ليست قياساً واحداً."
-        )
+        raise VepError("بيئاتٌ مختلطة في إيصالٍ واحد: المقارنة بين بيئتين ليست قياساً واحداً.")
     harnesses = {run.harness for run in runs}
     if harnesses != {harness}:
         raise VepError("محرّكاتٌ مختلطة في إيصالٍ واحد: الإيصال يُعلن محرّكاً واحداً.")
@@ -462,9 +460,12 @@ def build_receipt(
     for run in runs:
         counts[str(run.outcome)] = counts.get(str(run.outcome), 0) + 1
     ordered_counts = tuple(sorted(counts.items()))
-    identifier = receipt_id or digest_payload(
-        {"env": env_fingerprint, "harness": harness, "replay": replay_digest(digests)}
-    )[:32]
+    identifier = (
+        receipt_id
+        or digest_payload(
+            {"env": env_fingerprint, "harness": harness, "replay": replay_digest(digests)}
+        )[:32]
+    )
 
     return EvaluationReceipt(
         vep_version=VEP_VERSION,
@@ -577,7 +578,7 @@ def public_summary(receipt: EvaluationReceipt) -> dict[str, object]:
         "env_fingerprint": receipt.env_fingerprint,
         "harness": receipt.harness,
         "merkle_root": receipt.merkle_root,
-        "outcome_counts": {name: count for name, count in receipt.outcome_counts},
+        "outcome_counts": dict(receipt.outcome_counts),
         "receipt_digest": receipt.receipt_digest(),
         "replay_digest": receipt.replay_digest,
         "run_count": receipt.run_count,
