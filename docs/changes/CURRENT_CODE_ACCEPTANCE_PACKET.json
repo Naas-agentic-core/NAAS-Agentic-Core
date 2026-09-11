@@ -262,6 +262,7 @@
       ".memory/vera_remote_acceptance_truth.md",
       "docs/changes/current_changed_paths.txt",
       "docs/commercial/VERA_EXPORT_OFFER.md",
+      "docs/governance/MAGIC_STRINGS.json",
       "docs/research/HARD_CURRENCY_NEW_KNOWLEDGE_VERA.md",
       "docs/research/README_NEW_KNOWLEDGE.md",
       "docs/research/VERA_FX_REPATRIATION_PACKET.md",
@@ -273,7 +274,7 @@
       "tests/shared/test_vera_portable_trust.py",
       "tests/shared/test_vera_receipt.py"
     ],
-    "content_sha256_excluding_packet": "4387f1bd4e8bdd8345981afae09c82a07208f34061974f7fcf42246e353423a6",
+    "content_sha256_excluding_packet": "841c17f705b7ab3df2ba14abf13cfd46542c89cd1107f4d96d59174a5135ae5e",
     "refreshed_on": "2026-08-21",
     "refresh_command": "python3 scripts/research/refresh_acceptance_diff_snapshot.py"
   }
