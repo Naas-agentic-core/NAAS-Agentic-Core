@@ -231,6 +231,7 @@
       "benchmarks/dz_bac_bench/v2/CDKC_BENCHMARK_SPEC.md",
       "docs/changes/current_changed_paths.txt",
       "docs/commercial/CDKC_EXPORTABLE_EVAL_OFFER.md",
+      "docs/governance/MAGIC_STRINGS.json",
       "docs/research/HARD_CURRENCY_NEW_KNOWLEDGE_CDKC.md",
       "docs/research/README_NEW_KNOWLEDGE.md",
       "shared/research/__init__.py",
@@ -239,7 +240,7 @@
       "tests/shared/test_cdkc_durable_knowledge.py",
       "tests/shared/test_cdkc_exportable_eval.py"
     ],
-    "content_sha256_excluding_packet": "5f0710b28a6c89efb70d964c78dc07f4ab3f5d10831c56a077341dd525154ae2",
+    "content_sha256_excluding_packet": "e73feeee8ad07a939bd4c4276d725df1d297b2230a91d5a21e63f7da9bde5205",
     "refreshed_on": "2026-08-21",
     "refresh_command": "python3 scripts/research/refresh_acceptance_diff_snapshot.py"
   }
