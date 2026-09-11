@@ -270,7 +270,7 @@
       "tests/shared/test_vera_portable_trust.py",
       "tests/shared/test_vera_receipt.py"
     ],
-    "content_sha256_excluding_packet": "15b76dca0fefe752e5bb1f7590a8c361ec8fb647b187d8d3fbe3e29e6f666b72",
+    "content_sha256_excluding_packet": "4387f1bd4e8bdd8345981afae09c82a07208f34061974f7fcf42246e353423a6",
     "refreshed_on": "2026-08-21",
     "refresh_command": "python3 scripts/research/refresh_acceptance_diff_snapshot.py"
   }
