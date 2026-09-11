@@ -239,7 +239,7 @@
       "tests/shared/test_cdkc_durable_knowledge.py",
       "tests/shared/test_cdkc_exportable_eval.py"
     ],
-    "content_sha256_excluding_packet": "d187a867cbc11eba466c9902bb4fca6df9dee128a73611120589d2f00198428c",
+    "content_sha256_excluding_packet": "dab6e95629610e29df8a1d3cc1d0b18ca1330297c35c39b54e804e1c6bbc98ad",
     "refreshed_on": "2026-08-21",
     "refresh_command": "python3 scripts/research/refresh_acceptance_diff_snapshot.py"
   }
