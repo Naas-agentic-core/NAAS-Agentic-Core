@@ -22,8 +22,6 @@
 from __future__ import annotations
 
 from .durable_knowledge import (
-    CDKC_VERSION,
-    MIN_OBS_CDKC,
     CdkcError,
     CdkcInput,
     CdkcResult,
@@ -40,9 +38,6 @@ from .exportable_eval import (
     build_eval_bundle,
 )
 from .portable_trust import (
-    DEFAULT_ACCEPT_THETA,
-    DEFAULT_REPATRIATION_DEADLINE_DAYS,
-    MIN_N_FOR_ESTIMATE,
     AcceptDecision,
     BreachVerdict,
     EscapeDelta,
@@ -60,9 +55,6 @@ from .portable_trust import (
     wilson_interval,
 )
 from .verifiable_evidence import (
-    GENESIS_CHAIN,
-    MIN_RUNS_FOR_RECEIPT,
-    VEP_VERSION,
     Commitment,
     EvaluationReceipt,
     FailureClass,
@@ -91,18 +83,8 @@ from .verifiable_evidence import (
 
 __all__ = [
     # CDKC — المعرفة الدائمة القابلة للتصدير
-    "CDKC_VERSION",
-    "DEFAULT_ACCEPT_THETA",
-    "DEFAULT_REPATRIATION_DEADLINE_DAYS",
-    "GENESIS_CHAIN",
     # VEP — البرهان القابل للحمل: الاقتصاد والقرار
-    "MIN_N_FOR_ESTIMATE",
-    "MIN_OBS_CDKC",
-    "MIN_RUNS_FOR_RECEIPT",
     # VEP — البرهان القابل للحمل: الإيصال
-    "VEP_VERSION",
-    "WILSON_Z_95",
-    "WILSON_Z_95",
     "AcceptDecision",
     "BreachVerdict",
     "CdkcError",

@@ -31,10 +31,11 @@
         "shared/research/verifiable_evidence.py",
         "shared/research/portable_trust.py",
         "tests/shared/test_vera_receipt.py",
-        "tests/shared/test_vera_portable_trust.py"
+        "tests/shared/test_vera_portable_trust.py",
+        "docs/governance/MAGIC_STRINGS.json"
       ],
       "gate": "python -m pytest tests/shared/test_vera_receipt.py tests/shared/test_vera_portable_trust.py tests/shared/test_cdkc_durable_knowledge.py tests/shared/test_cdkc_exportable_eval.py --noconftest -v",
-      "application_ar": "هياكل بيانات حتمية: dataclass frozen+slots، StrEnum للتحقق الرمزي والتبديل اللغوي، فصل القلق — BKT × FSRS × تحقق × ثقة × لغة في معادلة واحدة بلا LLM في المسار العددي. الاختبارات تثبت: نضج (MIN_OBS)، خانة حمراء، وزن رمزي، كلفة لغوية مشبعة، M×R ≠ M. | VEP: هياكل حتمية للبرهان — dataclass frozen+slots، StrEnum للمآل وصنف الفشل، تمثيل JSON كنسي (مفاتيح مرتبة بلا فراغات) كي تُبصَم البيانات نفسها على أي آلة."
+      "application_ar": "هياكل بيانات حتمية: dataclass frozen+slots، StrEnum للتحقق الرمزي والتبديل اللغوي، فصل القلق — BKT × FSRS × تحقق × ثقة × لغة في معادلة واحدة بلا LLM في المسار العددي. الاختبارات تثبت: نضج (MIN_OBS)، خانة حمراء، وزن رمزي، كلفة لغوية مشبعة، M×R ≠ M. | VEP: هياكل حتمية للبرهان — dataclass frozen+slots، StrEnum للمآل وصنف الفشل، تمثيل JSON كنسي (مفاتيح مرتبة بلا فراغات) كي تُبصَم البيانات نفسها على أي آلة. | VEP: انضباطُ الأسماء قبل البوّابة — أُزيلت ثوابت SCREAMING_SNAKE من `shared/research/__init__.py` كي لا تتكرّر الحرفية في ملفّين (D-270 L5)، فانخفض الدَّين المُجمَّد 176 → 174 بدل أن يرتفع."
     },
     {
       "standard": "the-algorithms-python",
@@ -150,7 +151,8 @@
       "python -m pytest tests/shared/test_cdkc_durable_knowledge.py tests/shared/test_cdkc_exportable_eval.py --noconftest -q  # PASS — 24 passed",
       "python3 scripts/research/measure_vera_escape_width.py  # PASS — يكتب VERA_MEASUREMENTS.json حتمياً",
       "python3 scripts/fitness/check_documentation_contract.py  # PASS — روابط محلولة",
-      "python3 scripts/fitness/check_agent_reliability_constitution.py  # PASS — لا خط ثامن، وحد المصداقية محترم"
+      "python3 scripts/fitness/check_agent_reliability_constitution.py  # PASS — لا خط ثامن، وحد المصداقية محترم",
+      "python3 scripts/fitness/check_no_magic_strings.py  # PASS — صفر حرفية مكرّرة جديدة، والدين يتقلّص 176→174"
     ],
     "measured_ar": "المقيس لا المستنتج: 24 اختباراً أخضر (18 CDKC + 6 حزم) + مثال حي يبني 3 مهام بفجوة خطرة واحدة + مسحا نص (ممنوعات/مال) نظيفان + صفر حذف. لا كتالوج متغير (7/7 PROPOSED)، ولا حالة بوابة متغيرة، ولا تبعيات جديدة."
   },
@@ -250,7 +252,8 @@
     "docs/commercial/VERA_EXPORT_OFFER.md",
     ".memory/vera_remote_acceptance_truth.md",
     ".memory/fx_doctrine_truth.md",
-    "docs/changes/CURRENT_CODE_ACCEPTANCE_PACKET.json"
+    "docs/changes/CURRENT_CODE_ACCEPTANCE_PACKET.json",
+    "docs/governance/MAGIC_STRINGS.json"
   ],
   "git_change_snapshot": {
     "base_ref": "origin/main",
