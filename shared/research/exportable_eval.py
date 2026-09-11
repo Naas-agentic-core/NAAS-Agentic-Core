@@ -16,7 +16,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from enum import StrEnum
 from typing import Final
@@ -24,8 +24,8 @@ from typing import Final
 from .durable_knowledge import CDKC_VERSION, CdkcInput, CdkcResult, LanguageSwitchCost, compute_cdkc
 
 __all__ = [
-    "EvalTaskKind",
     "EvalTask",
+    "EvalTaskKind",
     "ExportableEvalBundle",
     "build_eval_bundle",
 ]
@@ -192,9 +192,9 @@ def example_bundle() -> ExportableEvalBundle:
 
     يبني 3 مهام تثبت أن CDKC يعمل ويكشف الوهم والتبديل اللغوي.
     """
-    from datetime import datetime, timezone
+    from datetime import datetime
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
 
     tasks: list[EvalTask] = []
 
